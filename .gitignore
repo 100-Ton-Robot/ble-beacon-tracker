@@ -1,0 +1,19 @@
+# Build output (regenerate with C:\fw\build-scanner.ps1)
+scanner_fw/build/
+scanner_fw/build.log
+__pycache__/
+*.pyc
+
+# ESPHome local build state and real secrets (secrets.example.yaml is tracked)
+.esphome/
+secrets.yaml
+
+# Signing keys never go in the repo (MCUboot key lives in C:\fw\keys)
+*.pem
+
+# KiCad per-user state and experiment renders
+*.kicad_prl
+experiments/*/out/
+
+# Personal working notes (Claude Code loads CLAUDE.local.md automatically)
+*.local.md

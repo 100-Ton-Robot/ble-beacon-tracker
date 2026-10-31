@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the scanner firmware, gateway or deck scripts doesn't work
+labels: [bug]
+body:
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part?
+      options:
+        - Scanner firmware (scanner_fw)
+        - Gateway (ESPHome)
+        - Shield deck / templates
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Scanner firmware version (from `status`), ESPHome version, or the commit you built from.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Scanner console `status` output, gateway logs, or script output. Remove any MQTT passwords or keys first.
+      render: text

@@ -1,0 +1,5 @@
+* text=auto
+*.pdf binary
+*.zip binary
+*.png binary
+*.kicad_pcb text eol=lf

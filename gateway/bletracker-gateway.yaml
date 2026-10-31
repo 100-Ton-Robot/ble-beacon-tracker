@@ -1,0 +1,120 @@
+# BLE tracker mast gateway: ESP32-S3 + W5500 Ethernet, 3 sector scanners on UART -> MQTT.
+# Each scanner's frames (scanner_fw/README.md) become one JSON message per second on
+# bletracker/<mast>/<sector>. See README.md in this folder.
+
+substitutions:
+  name: bletracker-gateway
+  mast: mast
+  # Pins: Waveshare ESP32-S3-ETH pinout (docs.waveshare.com/ESP32-S3-ETH). W5500 is on
+  # GPIO 9-14. Not usable for the scanners: GPIO 4-7 (TF card), 0/3/45/46 (strapping),
+  # 19/20 (USB), 33-37 (octal PSRAM on the S3R8), 43/44 (UART0 header pins, kept free).
+  # Scanner UARTs use the left header next to VBUS (pin 40) and GND (pins 33/38).
+  eth_clk: GPIO13
+  eth_mosi: GPIO11
+  eth_miso: GPIO12
+  eth_cs: GPIO14
+  eth_int: GPIO10
+  eth_rst: GPIO9
+  s0_rx: GPIO21  # header pin 35 <- sector 0 XIAO D6 (TX)
+  s0_tx: GPIO17  # header pin 34 -> sector 0 XIAO D7 (RX), unused for now
+  s1_rx: GPIO16  # header pin 32
+  s1_tx: GPIO18  # header pin 31
+  s2_rx: GPIO2   # header pin 26
+  s2_tx: GPIO1   # header pin 25
+
+esphome:
+  name: ${name}
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+# All 3 hardware UARTs go to the scanners, so logs use the S3's native USB
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+ethernet:
+  type: W5500
+  clk_pin: ${eth_clk}
+  mosi_pin: ${eth_mosi}
+  miso_pin: ${eth_miso}
+  cs_pin: ${eth_cs}
+  interrupt_pin: ${eth_int}
+  reset_pin: ${eth_rst}
+
+mqtt:
+  broker: !secret mqtt_broker
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  # Only the gateway's own health sensors are discovered; no per-device entities
+  discovery: true
+
+ota:
+  - platform: esphome
+    # Encrypted OTA (32-byte base64 key); cheaper on flash and RAM than a password
+    encryption:
+      key: !secret ota_key
+
+uart:
+  - id: uart_s0
+    rx_pin: ${s0_rx}
+    tx_pin: ${s0_tx}
+    baud_rate: 115200
+    rx_buffer_size: 2048
+  - id: uart_s1
+    rx_pin: ${s1_rx}
+    tx_pin: ${s1_tx}
+    baud_rate: 115200
+    rx_buffer_size: 2048
+  - id: uart_s2
+    rx_pin: ${s2_rx}
+    tx_pin: ${s2_tx}
+    baud_rate: 115200
+    rx_buffer_size: 2048
+
+sector_scanner:
+  - uart_id: uart_s0
+    sector: 0
+    topic: bletracker/${mast}/0
+    devices:
+      name: Sector 0 devices
+      filters:
+        - throttle: 10s
+    lost_frames:
+      name: Sector 0 lost frames
+      filters:
+        - throttle: 60s
+    bad_frames:
+      name: Sector 0 bad frames
+  - uart_id: uart_s1
+    sector: 1
+    topic: bletracker/${mast}/1
+    devices:
+      name: Sector 1 devices
+      filters:
+        - throttle: 10s
+    lost_frames:
+      name: Sector 1 lost frames
+      filters:
+        - throttle: 60s
+    bad_frames:
+      name: Sector 1 bad frames
+  - uart_id: uart_s2
+    sector: 2
+    topic: bletracker/${mast}/2
+    devices:
+      name: Sector 2 devices
+      filters:
+        - throttle: 10s
+    lost_frames:
+      name: Sector 2 lost frames
+      filters:
+        - throttle: 60s
+    bad_frames:
+      name: Sector 2 bad frames
