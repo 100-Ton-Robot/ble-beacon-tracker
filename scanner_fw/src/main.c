@@ -27,6 +27,7 @@
  *   list on|csv|off        per-device table each second (csv = gateway line format)
  *   minrssi <dBm>          hide devices whose median is below this in the list
  *   stream [dump]          gateway frame stats; dump = hex of the next frame
+ *   chan [auto|37|38|39|rot [s]]  primary channels scanned (bench test, not saved)
  */
 
 #include <stdlib.h>
@@ -50,6 +51,7 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/shell/shell.h>
 #include <app_version.h>
+#include <bluetooth/hci_vs_sdc.h>
 
 /*
  * The board devicetree models the RF switch as two fixed regulators, both
@@ -376,6 +378,31 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	}
 }
 
+/*
+ * Primary channel bench test (chan command). The SoftDevice applies a scan
+ * channel map only when scanning starts, so each change is stop + map + start;
+ * chan_gap_us is how long the last one took. Changes happen in the main
+ * thread at the 1 s boundary, after that second's report.
+ */
+enum chan_mode { CHAN_AUTO, CHAN_FIXED, CHAN_ROTATE };
+
+static enum chan_mode chan_mode;
+static uint8_t chan_fixed = 39;
+static uint8_t chan_dwell = 1;
+static uint8_t chan_now; /* 37-39, 0 = all three (controller rotates) */
+static uint32_t chan_secs;
+static uint32_t chan_gap_us;
+
+static int chan_map_set(uint8_t ch)
+{
+	/* Bits 0-36 must stay set; bits 37-39 (byte 4 bits 5-7) pick the channels */
+	sdc_hci_cmd_vs_scan_channel_map_set_t p = {
+		.channel_map = { 0xff, 0xff, 0xff, 0xff, ch ? 0x1f | BIT(ch - 32) : 0xff },
+	};
+
+	return hci_vs_sdc_scan_channel_map_set(&p);
+}
+
 static int scan_start(void)
 {
 	/* Interval == window: radio listens all the time. No duplicate filter. */
@@ -385,7 +412,11 @@ static int scan_start(void)
 		.interval = 0x0030, /* 30 ms */
 		.window = 0x0030,
 	};
+	int err = chan_map_set(chan_now);
 
+	if (err) {
+		printk("scan channel map %u failed (%d)\n", chan_now, err);
+	}
 	return bt_le_scan_start(&param, scan_cb);
 }
 
@@ -925,6 +956,44 @@ static void housekeeping(int64_t now)
 	}
 }
 
+/* At the 1 s boundary: pick the channel for the coming second */
+static void chan_tick(void)
+{
+	uint8_t want;
+	uint32_t t0;
+	int err;
+
+	switch (chan_mode) {
+	case CHAN_FIXED:
+		want = chan_fixed;
+		break;
+	case CHAN_ROTATE:
+		want = 37 + (chan_secs / chan_dwell) % 3;
+		break;
+	default:
+		want = 0;
+		break;
+	}
+	chan_secs++;
+	if (want == chan_now) {
+		return;
+	}
+	chan_now = want;
+	if (!scanning) {
+		return; /* scan_start applies it */
+	}
+	t0 = k_cycle_get_32();
+	err = bt_le_scan_stop();
+	if (err == 0) {
+		err = scan_start();
+	}
+	chan_gap_us = k_cyc_to_us_floor32(k_cycle_get_32() - t0);
+	if (err) {
+		scanning = false;
+		printk("channel switch failed (%d), listening off\n", err);
+	}
+}
+
 static void report_second(void)
 {
 	uint32_t drops = (uint32_t)atomic_set(&dropped, 0);
@@ -945,10 +1014,20 @@ static void report_second(void)
 	} else if (list_mode != LIST_OFF) {
 		list_print();
 	} else if (!print_raw) {
-		printk("[1s] ant=%s adverts=%u devices=%u dropped=%u%s%s\n", ant, sec_total,
-		       n_devs, drops, scanning ? "" : " (listening off)",
+		char ch[24];
+		int len = chan_now ? snprintk(ch, sizeof(ch), "%u", chan_now)
+				   : snprintk(ch, sizeof(ch), "all");
+
+		/* The switch made at the start of this second, if any */
+		if (chan_gap_us) {
+			snprintk(ch + len, sizeof(ch) - len, " switch=%uus", chan_gap_us);
+		}
+		printk("[1s] ant=%s ch=%s adverts=%u devices=%u dropped=%u%s%s\n", ant, ch,
+		       sec_total, n_devs, drops, scanning ? "" : " (listening off)",
 		       flash_mode ? " (flash mode)" : "");
 	}
+	chan_gap_us = 0;
+	chan_tick();
 
 	n_devs = 0;
 	devs_full = 0;
@@ -1064,6 +1143,47 @@ static int cmd_scan(const struct shell *sh, size_t argc, char **argv)
 		}
 	}
 	shell_print(sh, "listening %s", scanning ? "on" : "off");
+	return 0;
+}
+
+/* Takes effect at the next 1 s boundary (main thread) */
+static int cmd_chan(const struct shell *sh, size_t argc, char **argv)
+{
+	const char *usage = "chan [auto|37|38|39|rot [1-31]]";
+
+	if (argc > 1) {
+		long v = strtol(argv[1], NULL, 10);
+
+		if (strcmp(argv[1], "auto") == 0 && argc == 2) {
+			chan_mode = CHAN_AUTO;
+		} else if (v >= 37 && v <= 39 && argc == 2) {
+			chan_fixed = (uint8_t)v;
+			chan_mode = CHAN_FIXED;
+		} else if (strcmp(argv[1], "rot") == 0) {
+			long s = argc > 2 ? strtol(argv[2], NULL, 10) : 1;
+
+			if (s < 1 || s > 31) {
+				shell_error(sh, "usage: %s", usage);
+				return -EINVAL;
+			}
+			chan_dwell = (uint8_t)s;
+			chan_mode = CHAN_ROTATE;
+		} else {
+			shell_error(sh, "usage: %s", usage);
+			return -EINVAL;
+		}
+	}
+	switch (chan_mode) {
+	case CHAN_FIXED:
+		shell_print(sh, "channel %u only", chan_fixed);
+		break;
+	case CHAN_ROTATE:
+		shell_print(sh, "channels 37-39, %u s each", chan_dwell);
+		break;
+	default:
+		shell_print(sh, "channels auto (controller rotates 37-39)");
+		break;
+	}
 	return 0;
 }
 
@@ -1184,6 +1304,8 @@ SHELL_CMD_ARG_REGISTER(status, NULL, "Version, settings, flash mode, image state
 SHELL_CMD_ARG_REGISTER(sector, NULL, "Show or set the sector ID: sector [0-254]", cmd_sector,
 		       1, 1);
 SHELL_CMD_ARG_REGISTER(scan, NULL, "Show or start/stop listening: scan [on|off]", cmd_scan, 1, 1);
+SHELL_CMD_ARG_REGISTER(chan, NULL, "Primary channels scanned: chan [auto|37|38|39|rot [1-31]]",
+		       cmd_chan, 1, 2);
 SHELL_CMD_ARG_REGISTER(flash, NULL, "BLE update mode: flash [on|off]", cmd_flash, 1, 1);
 SHELL_CMD_ARG_REGISTER(reboot, NULL, "Restart", cmd_reboot, 1, 0);
 SHELL_CMD_ARG_REGISTER(inject, NULL, "Feed hex bytes to the D7 command decoder: inject <hex>",

@@ -173,8 +173,9 @@ default; .NET `SerialPort` needs `DtrEnable = true`), or nothing comes out. Clos
 also reads it.
 
 What you see and type:
-- Every second: `[1s] ant=int adverts=37 devices=12 dropped=0` = adverts and distinct
-  addresses heard in that second.
+- Every second: `[1s] ant=int ch=all adverts=37 devices=12 dropped=0` = adverts and distinct
+  addresses heard in that second. `ch` is the primary channel scanned (`all` = the controller
+  rotates 37-39); `switch=850us` follows it in a second that started with a channel change.
 - `print on`: one line per advert, e.g. `C1:7D:2B:AC:03:BC (random) rssi=-48 type=0`.
   `type` is the advert type: 0 connectable, 1 directed, 2 scannable, 3 non-connectable
   (most beacons), 4 scan response, 5 extended. `print off` to stop; it scrolls fast.
@@ -200,6 +201,11 @@ What you see and type:
   set. Every boot starts listening.
 - `flash on|off`: enter or leave flash mode (see above).
 - `reboot`: restart.
+- `chan auto|37|38|39|rot [s]`: primary channels scanned (bench test for frame v3, not saved,
+  every boot is `auto`). `37`-`39` = that channel only; `rot 1` = 37, 38, 39 in turn, changing at
+  the 1 s boundary. The controller only takes a new channel map when scanning starts, so each
+  change stops and restarts the scan (`switch=` shows how long). `tools/chan_test.py` compares
+  the modes.
 - `inject <hex>`: feed bytes to the D7 command decoder as if the gateway sent them. Get the hex
   from `python tools/decode_frames.py --cmd "flash on" --id <chip ID>` (no `--id` = all scanners).
 - `help`: lists all commands, including Zephyr's built-ins (`kernel uptime`, `device list`).
