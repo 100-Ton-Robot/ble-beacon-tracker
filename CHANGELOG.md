@@ -60,9 +60,8 @@ rejected.
 
 ### 0.2.2 (2026-10-30)
 
-- Image: `scanner_fw/release/scanner_fw-0.2.2-dfu.zip`.
-- Known issue: the image in this zip is signed with MCUboot version `0.2.1+0`, not `0.2.2`, so
-  `status` and the update app show 0.2.1 after installing it.
+- No image in `scanner_fw/release/`: the zip was removed because its image was signed as
+  `0.2.1+0`, not `0.2.2`.
 
 ### 0.2.1 (2026-10-30)
 
