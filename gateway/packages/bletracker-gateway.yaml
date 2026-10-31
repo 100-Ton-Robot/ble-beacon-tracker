@@ -1,15 +1,13 @@
-# BLE tracker mast gateway: ESP32-S3 + W5500 Ethernet, 3 sector scanners on UART -> MQTT.
-# Needs scanner firmware 0.3.0 or later (frame and command v2, scanner_fw/README.md).
-# Each scanner's frames become one JSON message per second on bletracker/<mast>/<sector>.
-# Home Assistant gets the gateway's own entities over the ESPHome API; MQTT carries only
-# the beacon data and the commands. See README.md in this folder.
+# BLE tracker mast gateway, shared by every mast: ESP32-S3 + W5500 Ethernet, 3 sector
+# scanners on UART -> MQTT. Needs scanner firmware 0.3.0 or later (frame and command v2,
+# ../../scanner_fw/README.md). Each scanner's frames become one JSON message per second on
+# bletracker/<mast>/<sector>. Home Assistant gets the gateway's own entities over the
+# ESPHome API; MQTT carries only the beacon data and the commands.
 #
-# One file per mast: copy this file, set `mast` (and the secrets) for each gateway.
+# Not a device config on its own: each mast has a small file (see ../example-mast.yaml)
+# that sets mast, name, friendly_name and api_key, then includes this with `packages:`.
 
 substitutions:
-  mast: mast1  # short, lowercase, no spaces: used in the MQTT topics and the device name
-  name: bletracker-${mast}
-  friendly_name: BLE Tracker ${mast}
   # Pins: Waveshare ESP32-S3-ETH pinout (docs.waveshare.com/ESP32-S3-ETH). W5500 is on
   # GPIO 9-14. Not usable for the scanners: GPIO 4-7 (TF card), 0/3/45/46 (strapping),
   # 19/20 (USB), 33-37 (octal PSRAM on the S3R8), 43/44 (UART0 header pins, kept free).
@@ -55,13 +53,13 @@ ethernet:
 # Health sensors, chip IDs and buttons reach Home Assistant here
 api:
   encryption:
-    key: !secret api_key
+    key: ${api_key}
 
 # Encrypted OTA with the same key; cheaper on flash and RAM than a password
 ota:
   - platform: esphome
     encryption:
-      key: !secret api_key
+      key: ${api_key}
 
 # Beacon data and commands only: no MQTT devices or entities in Home Assistant
 mqtt:

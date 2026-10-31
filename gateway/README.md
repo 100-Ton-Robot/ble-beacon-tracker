@@ -9,27 +9,48 @@ Home Assistant sees only the gateway's own entities, over the ESPHome API: healt
 the chip ID on each sector and a few buttons. There are no Home Assistant entities per beacon,
 and MQTT carries only the beacon data and the commands (MQTT discovery is off).
 
-- `bletracker-gateway.yaml`: the device config for the Waveshare ESP32-S3-ETH (pins from its
-  [pinout](https://docs.waveshare.com/ESP32-S3-ETH), all in `substitutions`). One file per
-  mast: set `mast` to a short, lowercase ID (it goes into the topics and the device name).
+- `example-mast.yaml`: the per-mast device config. Copy it once per gateway (e.g.
+  `bletracker-garage.yaml`) and set the mast ID, name and API key secret; it stays on DHCP
+  unless you uncomment its static IP block.
+- `packages/bletracker-gateway.yaml`: everything shared by every mast, for the Waveshare
+  ESP32-S3-ETH (pins from its [pinout](https://docs.waveshare.com/ESP32-S3-ETH), all in
+  `substitutions`). The mast files pull it in with `packages:`; it is not a device config on
+  its own.
 - `components/sector_scanner/`: external component, one entry per scanner UART.
 - `secrets.example.yaml`: copy to `secrets.yaml` (or use the ESPHome dashboard's secrets).
 
+Each mast needs its own `mast` ID: it goes into the MQTT topics (`bletracker/<mast>/...`) and
+the device name (`bletracker-<mast>`), so two gateways never share topics or a Home Assistant
+device.
+
+```yaml
+# bletracker-garage.yaml
+substitutions:
+  mast: garage
+  name: bletracker-${mast}
+  friendly_name: BLE Tracker Garage
+  api_key: !secret api_key_garage
+
+packages:
+  gateway: !include packages/bletracker-gateway.yaml
+```
+
 ## Build and flash
 
-In the Home Assistant ESPHome add-on: copy `components/` into the add-on's `config/esphome/`
-folder next to the YAML, then Install. First flash over the S3's USB-C; later ones over
-Ethernet (OTA). Then add the device in Home Assistant's ESPHome integration (API key from
-your secrets).
+In the Home Assistant ESPHome add-on: copy `components/`, `packages/` and your mast file(s)
+into the add-on's `config/esphome/` folder, then Install the mast. First flash over the S3's
+USB-C; later ones over Ethernet (OTA). Then add the device in Home Assistant's ESPHome
+integration (API key from your secrets).
 
 From a PC, ESPHome must build in a path without spaces (like the scanner firmware), so copy
 this folder somewhere like `C:\fw\gw-build` first:
 
 ```bash
-esphome run bletracker-gateway.yaml
+esphome run example-mast.yaml
 ```
 
-Compiled clean with ESPHome 2026.9.0 on 2026-10-31 (frame/command v2; not yet run on a board).
+`example-mast.yaml` compiled clean with ESPHome 2026.9.0 on 2026-10-31, and the same gateway
+code runs on a board (ESPHome 2026.10.1, flashed 2026-10-31; scanner frames not yet seen).
 
 ## Wiring
 

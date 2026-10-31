@@ -1,0 +1,23 @@
+# Example mast: copy this file once per gateway (e.g. bletracker-garage.yaml), set the mast
+# ID and the secrets, and keep packages/ and components/ next to it. Everything else is in
+# packages/bletracker-gateway.yaml.
+
+substitutions:
+  # Short, lowercase, no spaces: goes into the MQTT topics (bletracker/<mast>/<sector>) and
+  # the device name, so every mast needs its own.
+  mast: example
+  name: bletracker-${mast}
+  friendly_name: BLE Tracker Example
+  # API encryption key (also the OTA key). Give each mast its own secret, e.g. api_key_garage.
+  api_key: !secret api_key
+
+packages:
+  gateway: !include packages/bletracker-gateway.yaml
+
+# Optional: a fixed IP instead of DHCP (also lets OTA find the gateway without mDNS).
+# ethernet:
+#   use_address: 192.0.2.20
+#   manual_ip:
+#     static_ip: 192.0.2.20
+#     gateway: 192.0.2.1
+#     subnet: 255.255.255.0
