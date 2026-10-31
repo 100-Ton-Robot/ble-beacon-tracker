@@ -1,29 +1,33 @@
 # BLE tracker mast gateway: ESP32-S3 + W5500 Ethernet, 3 sector scanners on UART -> MQTT.
-# Each scanner's frames (scanner_fw/README.md) become one JSON message per second on
-# bletracker/<mast>/<sector>. See README.md in this folder.
+# Needs scanner firmware 0.3.0 or later (frame and command v2, scanner_fw/README.md).
+# Each scanner's frames become one JSON message per second on bletracker/<mast>/<sector>.
+# Home Assistant gets the gateway's own entities over the ESPHome API; MQTT carries only
+# the beacon data and the commands. See README.md in this folder.
+#
+# One file per mast: copy this file, set `mast` (and the secrets) for each gateway.
 
 substitutions:
-  name: bletracker-gateway
-  mast: mast
+  mast: mast1  # short, lowercase, no spaces: used in the MQTT topics and the device name
+  name: bletracker-${mast}
+  friendly_name: BLE Tracker ${mast}
   # Pins: Waveshare ESP32-S3-ETH pinout (docs.waveshare.com/ESP32-S3-ETH). W5500 is on
   # GPIO 9-14. Not usable for the scanners: GPIO 4-7 (TF card), 0/3/45/46 (strapping),
   # 19/20 (USB), 33-37 (octal PSRAM on the S3R8), 43/44 (UART0 header pins, kept free).
-  # Scanner UARTs use the left header next to VBUS (pin 40) and GND (pins 33/38).
+  # All scanner wiring is on header pins 31-40: RX 31-34, TX 35, GND 38, VBUS 40.
   eth_clk: GPIO13
   eth_mosi: GPIO11
   eth_miso: GPIO12
   eth_cs: GPIO14
   eth_int: GPIO10
   eth_rst: GPIO9
-  s0_rx: GPIO21  # header pin 35 <- sector 0 XIAO D6 (TX)
-  s0_tx: GPIO17  # header pin 34 -> sector 0 XIAO D7 (RX), unused for now
-  s1_rx: GPIO16  # header pin 32
-  s1_tx: GPIO18  # header pin 31
-  s2_rx: GPIO2   # header pin 26
-  s2_tx: GPIO1   # header pin 25
+  s0_rx: GPIO17   # header pin 34 <- sector 0 XIAO D6 (TX)
+  s1_rx: GPIO16   # header pin 32 <- sector 1 XIAO D6
+  s2_rx: GPIO18   # header pin 31 <- sector 2 XIAO D6
+  cmd_tx: GPIO21  # header pin 35 -> bus TX row -> every XIAO's D7 (RX)
 
 esphome:
   name: ${name}
+  friendly_name: ${friendly_name}
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -48,40 +52,56 @@ ethernet:
   interrupt_pin: ${eth_int}
   reset_pin: ${eth_rst}
 
+# Health sensors, chip IDs and buttons reach Home Assistant here
+api:
+  encryption:
+    key: !secret api_key
+
+# Encrypted OTA with the same key; cheaper on flash and RAM than a password
+ota:
+  - platform: esphome
+    encryption:
+      key: !secret api_key
+
+# Beacon data and commands only: no MQTT devices or entities in Home Assistant
 mqtt:
   broker: !secret mqtt_broker
   username: !secret mqtt_username
   password: !secret mqtt_password
-  # Only the gateway's own health sensors are discovered; no per-device entities
-  discovery: true
+  discovery: false
 
-ota:
-  - platform: esphome
-    # Encrypted OTA (32-byte base64 key); cheaper on flash and RAM than a password
-    encryption:
-      key: !secret ota_key
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: "IP Address"
+    mac_address:
+      name: "MAC Address"
 
+# Sector 0's UART also carries the one command TX that every scanner hears; sectors 1
+# and 2 are RX-only. Commands are addressed by chip ID, so only the target acts.
 uart:
   - id: uart_s0
     rx_pin: ${s0_rx}
-    tx_pin: ${s0_tx}
+    tx_pin: ${cmd_tx}
     baud_rate: 115200
     rx_buffer_size: 2048
   - id: uart_s1
     rx_pin: ${s1_rx}
-    tx_pin: ${s1_tx}
     baud_rate: 115200
     rx_buffer_size: 2048
   - id: uart_s2
     rx_pin: ${s2_rx}
-    tx_pin: ${s2_tx}
     baud_rate: 115200
     rx_buffer_size: 2048
 
 sector_scanner:
-  - uart_id: uart_s0
+  - id: scanner_s0
+    uart_id: uart_s0
+    command_uart_id: uart_s0
     sector: 0
     topic: bletracker/${mast}/0
+    command_topic: bletracker/${mast}/0/cmd
+    broadcast_command_topic: bletracker/${mast}/all/cmd
     devices:
       name: Sector 0 devices
       filters:
@@ -92,9 +112,14 @@ sector_scanner:
         - throttle: 60s
     bad_frames:
       name: Sector 0 bad frames
-  - uart_id: uart_s1
+    chip:
+      name: Sector 0 chip
+  - id: scanner_s1
+    uart_id: uart_s1
+    command_uart_id: uart_s0
     sector: 1
     topic: bletracker/${mast}/1
+    command_topic: bletracker/${mast}/1/cmd
     devices:
       name: Sector 1 devices
       filters:
@@ -105,9 +130,14 @@ sector_scanner:
         - throttle: 60s
     bad_frames:
       name: Sector 1 bad frames
-  - uart_id: uart_s2
+    chip:
+      name: Sector 1 chip
+  - id: scanner_s2
+    uart_id: uart_s2
+    command_uart_id: uart_s0
     sector: 2
     topic: bletracker/${mast}/2
+    command_topic: bletracker/${mast}/2/cmd
     devices:
       name: Sector 2 devices
       filters:
@@ -118,3 +148,38 @@ sector_scanner:
         - throttle: 60s
     bad_frames:
       name: Sector 2 bad frames
+    chip:
+      name: Sector 2 chip
+
+# Addressed to the chip last seen on that sector's UART
+button:
+  - platform: template
+    name: Sector 0 flash mode
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s0).send_command(sector_scanner::CMD_FLASH, 1);
+  - platform: template
+    name: Sector 0 reboot scanner
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s0).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
+  - platform: template
+    name: Sector 1 flash mode
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s1).send_command(sector_scanner::CMD_FLASH, 1);
+  - platform: template
+    name: Sector 1 reboot scanner
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s1).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
+  - platform: template
+    name: Sector 2 flash mode
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s2).send_command(sector_scanner::CMD_FLASH, 1);
+  - platform: template
+    name: Sector 2 reboot scanner
+    entity_category: config
+    on_press:
+      - lambda: id(scanner_s2).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
