@@ -27,7 +27,7 @@ cmd /c mklink /J C:\fw\scanner_fw "<path to your clone>\scanner_fw"
 ```
 
 (create `C:\fw` first). Keep build folders short too: Windows' 260-character path limit breaks
-the build in deep folders. Built clean on 2026-10-29 with NCS v3.4.0: 103 KB flash, 26 KB RAM.
+the build in deep folders. Built clean on 2026-10-29 with NCS v3.4.1: 103 KB flash, 26 KB RAM.
 
 The commands below use `C:\ncs\v3.4.1` for the SDK and `C:\fw\scanner_fw` for the app. Change
 them to your own SDK version and paths.
