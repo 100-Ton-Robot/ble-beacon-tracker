@@ -1,8 +1,8 @@
 # Changelog
 
 Scanner firmware versions come from `scanner_fw/VERSION`; the gateway and the shield deck have no
-version numbers yet. Dates are when the change was made or the image was built. Versions before
-0.3.0 predate this repo, so only what the docs and code still say about them is listed here.
+version numbers yet. All versions below were made between 2026-10-29 and 2026-10-31; dates are
+when the image was built, where known.
 
 ## Unreleased
 
@@ -48,7 +48,7 @@ rejected.
 - The gateway assigns the sector (command 4); scanners need no manual sector setup.
 - Image: `scanner_fw/release/scanner_fw-0.3.0-dfu.zip`.
 
-### 0.2.4 (date not recorded)
+### 0.2.4
 
 - Flash mode opens only on a serial command (gateway `flash on` or the USB console). A normal
   boot no longer opens it. A test image after an update still opens it for 2 minutes.
@@ -56,11 +56,11 @@ rejected.
 
 ### 0.2.3 (2026-10-30)
 
-- Image: `scanner_fw/release/scanner_fw-0.2.3-dfu.zip`. Changes not recorded.
+- Image: `scanner_fw/release/scanner_fw-0.2.3-dfu.zip`.
 
 ### 0.2.2 (2026-10-30)
 
-- Image: `scanner_fw/release/scanner_fw-0.2.2-dfu.zip`. Changes not recorded.
+- Image: `scanner_fw/release/scanner_fw-0.2.2-dfu.zip`.
 - Known issue: the image in this zip is signed with MCUboot version `0.2.1+0`, not `0.2.2`, so
   `status` and the update app show 0.2.1 after installing it.
 
@@ -68,7 +68,7 @@ rejected.
 
 - Used to check MCUboot test boot, revert and confirm on hardware, updating from 0.2.0.
 
-### 0.2.0 (date not recorded)
+### 0.2.0
 
 - Frame header flags bits 2-5: listening off, flash mode, update client connected, test image
   (not yet confirmed). A v0.1 reader ignores them.
