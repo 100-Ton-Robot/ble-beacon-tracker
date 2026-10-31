@@ -150,7 +150,10 @@ openocd -s C:\ncs\v3.4.1\zephyr\boards\seeed\xiao_nrf54l15\support -f openocd.cf
 ```
 
 Use the toolchain's Python for imgtool, and give the `--version` from `VERSION` (0.3.0 here).
-`--slot-size` and the `0xC2000` load address must match the board's devicetree partitions. On reset,
+These values match the board's devicetree partitions (checked in `build/scanner_fw/zephyr/zephyr.dts`, NCS v3.4.1):
+MCUboot at `0x0` (`0xf800`), slot 0 at `0x10000` and slot 1 at `0xC2000` (`0xb2000` each), storage at
+`0x174000` (`0x9000`). `0x5004b500` is the RRAM controller's CONFIG register: `0x1` enables writes
+without the write buffer, as in `support/scanner-load.tcl`. On reset,
 MCUboot logs `Swap type: test` and boots the new image. Then either:
 - `reboot` within 60 s: `Swap type: revert`, the old image comes back;
 - wait 60 s: `image confirmed`, and it stays after a reboot.
