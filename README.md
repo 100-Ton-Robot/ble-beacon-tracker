@@ -16,7 +16,8 @@ Passive RSSI only: it works with any beacon, with no pairing and no Channel Soun
 | [`shield_deck/`](shield_deck/README.md) | Copper shield deck PCB (Gerbers for PCBWay) and printable 1:1 drilling templates, generated from Python scripts. |
 | [`experiments/`](experiments/kicad_deck/README.md) | Side experiments (the deck redone in KiCad). |
 
-Prebuilt scanner update images are in `scanner_fw/release/`. They only install on scanners whose
+Changes are listed in [`CHANGELOG.md`](CHANGELOG.md). Prebuilt scanner update images are in
+`scanner_fw/release/`. They only install on scanners whose
 MCUboot was built with the same signing key, so build your own from source with your own key
 (see `scanner_fw/README.md`).
 
