@@ -10,7 +10,7 @@ python build.py
 ```
 
 Needs KiCad 10 (`winget install KiCad.KiCad`, which installs per-user to `%LOCALAPPDATA%\Programs\KiCad\10.0`).
-KiCad was uninstalled after the test (2026-10-30); `out/` holds the results from that run. Findings are also in the plan doc's Research notes tab ("PCB tools").
+The results below are from a run on 2026-10-30. `out/` is not committed (it's in `.gitignore`); run `build.py` to regenerate it.
 Steps:
 1. `make_deck_kicad.py` writes `shield_deck.kicad_pcb` + `.kicad_pro` as plain text (KiCad isn't needed for this step).
 2. `kicad-cli pcb drc --refill-zones --save-board` fills the GND pour and checks DRC (`out/drc.rpt`).

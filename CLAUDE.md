@@ -8,7 +8,8 @@ in Home Assistant. See `README.md` and each folder's README.
   Sysbuild breaks on paths with spaces: build through a space-free path. The board's stock OpenOCD
   load loses the image tail; `CMakeLists.txt` swaps in `support/scanner-load.tcl`. The signing key
   stays outside the repo (`*.pem` is ignored).
-- `gateway/`: ESPHome YAML + external component `components/sector_scanner/`. Frame and command
+- `gateway/`: ESPHome package `packages/bletracker-gateway.yaml`, per-mast `example-mast.yaml`
+  and external component `components/sector_scanner/`. Frame and command
   formats are defined in `scanner_fw/README.md`; keep both sides in step.
 - `shield_deck/`: regenerate Gerbers and templates from `make_shield_deck.py` and
   `make_templates.py` (needs `reportlab`) rather than hand-editing outputs.

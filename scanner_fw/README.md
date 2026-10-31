@@ -13,7 +13,8 @@ over BLE, so it can be updated with the box sealed. The sector ID and antenna ch
 1. Install VS Code and the **nRF Connect for VS Code** extension pack.
 2. In the extension, install a toolchain and an SDK (latest v3.x). The board target
    `xiao_nrf54l15/nrf54l15/cpuapp` must be in the board list; if it isn't, the SDK is too old.
-3. "Open an existing application" -> `C:\fw\scanner_fw` (the junction below).
+3. "Open an existing application" -> the `scanner_fw` folder, through a path without spaces
+   (e.g. `C:\fw\scanner_fw`, see below).
 
 ## Path without spaces
 
@@ -27,6 +28,9 @@ cmd /c mklink /J C:\fw\scanner_fw "<path to your clone>\scanner_fw"
 
 (create `C:\fw` first). Keep build folders short too: Windows' 260-character path limit breaks
 the build in deep folders. Built clean on 2026-10-29 with NCS v3.4.0: 103 KB flash, 26 KB RAM.
+
+The commands below use `C:\ncs\v3.4.1` for the SDK and `C:\fw\scanner_fw` for the app. Change
+them to your own SDK version and paths.
 
 ## Build and flash
 
@@ -44,8 +48,8 @@ west flash
 Flashing goes through the board's onboard SAMD11 (CMSIS-DAP) with **OpenOCD**, the board's
 default runner. The SDK toolchain doesn't include OpenOCD. Stock OpenOCD works (Seeed's wiki
 uses it): the board's `support/openocd.cfg` writes RRAM directly, so no special nRF54L driver
-is needed, and Arduino's fork mentioned in the Zephyr docs has no downloadable releases. From an
-**admin** PowerShell (Chocolatey is already installed on this PC):
+is needed, and Arduino's fork mentioned in the Zephyr docs has no downloadable releases. On
+Windows, from an **admin** PowerShell with [Chocolatey](https://chocolatey.org/) installed:
 
 ```bash
 choco install openocd
@@ -67,13 +71,15 @@ Open the board's USB serial port at 115200 baud (the extension's serial terminal
 
 `sysbuild.conf` puts MCUboot in front of the app. It uses swap-using-move with revert: a new
 image first runs as a test and is rolled back unless it confirms itself. MCUboot only boots
-images signed with the Ed25519 key in `C:\fw\keys\bletracker-mcuboot-ed25519.pem`.
+images signed with the Ed25519 key named by `SB_CONFIG_BOOT_SIGNATURE_KEY_FILE` in
+`sysbuild.conf` (`C:/fw/keys/bletracker-mcuboot-ed25519.pem`; change it if your key is
+elsewhere).
 
 The key is deliberately outside the repo. **Back it up** (password manager or a USB stick). If it
 is lost, sealed scanners can no longer be updated over BLE; the box has to be opened and each
 one reflashed by USB with a new key.
 
-To make the key on a new PC:
+To make a new key:
 
 ```bash
 python C:\ncs\v3.4.1\bootloader\mcuboot\scripts\imgtool.py keygen -k C:\fw\keys\bletracker-mcuboot-ed25519.pem -t ed25519
@@ -102,8 +108,9 @@ show which image is running.
 
 ## Updating over BLE (box sealed)
 
-1. **Turn on flash mode.** Only a serial command opens it: the gateway's `flash on` on D7, or
-   `flash on` on the USB console. A normal boot does not (since v0.2.4), so a power cycle won't
+1. **Turn on flash mode.** Only a serial command opens it: `flash on` from the gateway on D7
+   (the "Sector <n> flash mode" button in Home Assistant, or MQTT, see `../gateway/README.md`),
+   or `flash on` on the USB console. A normal boot does not (since v0.2.4), so a power cycle won't
    help if the gateway can't send the command. The scanner then advertises as
    `bletracker-s<sector>`.
    - Scanning carries on throughout.
@@ -115,8 +122,8 @@ show which image is running.
    - Phone: **nRF Connect Device Manager** (Nordic, iOS/Android). Pick `bletracker-s<n>`, then
      Image -> Firmware Upgrade -> `dfu_application.zip`, mode "Test Only" (the scanner's own
      60 s check then decides; "Test and Confirm" would let the app confirm it instead).
-   - PC with Bluetooth LE: `pip install smpmgr` (venv `C:\fw\smp-venv`), then the command below.
-     The bench PC's adapter can't do it: bleak reports no BLE central role.
+   - PC with Bluetooth LE: `pip install smpmgr` (a venv is fine), then the command below.
+     Not every adapter works: if bleak reports no BLE central role, use the phone app.
 
      ```bash
      smpmgr --ble bletracker-s0 upgrade build/scanner_fw/zephyr/zephyr.signed.bin
@@ -135,14 +142,15 @@ but all they can install is your own signed firmware.
 This puts an image in the second slot exactly as a BLE upload would, marked for a test boot:
 
 ```bash
-python C:\ncs\v3.4.1\bootloader\mcuboot\scripts\imgtool.py sign --version 0.2.1+0 --slot-size 0xb2000 --header-size 0x800 --align 16 --rom-fixed 0x10000 -k C:/fw/keys/bletracker-mcuboot-ed25519.pem --sha 512 --pad C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.bin slot1-test.bin
+python C:\ncs\v3.4.1\bootloader\mcuboot\scripts\imgtool.py sign --version 0.3.0+0 --slot-size 0xb2000 --header-size 0x800 --align 16 --rom-fixed 0x10000 -k C:/fw/keys/bletracker-mcuboot-ed25519.pem --sha 512 --pad C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.bin slot1-test.bin
 ```
 
 ```bash
 openocd -s C:\ncs\v3.4.1\zephyr\boards\seeed\xiao_nrf54l15\support -f openocd.cfg -c init -c "reset halt" -c "mww 0x5004b500 0x1" -c "load_image slot1-test.bin 0xC2000 bin" -c "mww 0x5004b500 0x0" -c reset -c shutdown
 ```
 
-Use the toolchain's Python for imgtool, and give the `--version` from `VERSION`. On reset,
+Use the toolchain's Python for imgtool, and give the `--version` from `VERSION` (0.3.0 here).
+`--slot-size` and the `0xC2000` load address must match the board's devicetree partitions. On reset,
 MCUboot logs `Swap type: test` and boots the new image. Then either:
 - `reboot` within 60 s: `Swap type: revert`, the old image comes back;
 - wait 60 s: `image confirmed`, and it stays after a reboot.
@@ -260,8 +268,8 @@ for `inject`. With `--port COM5` (adapter TX wired to D7) it sends them.
 1. **Boot:** banner, `rf switch: on, antenna int` (onboard until the pigtails go in), `scanning: ...`; the LED toggles each second.
    One `[1s] ... adverts=N dropped=0` line a second.
 2. **Scan:** `print on` shows a line per advert (address, RSSI, PDU type); `print off` to stop.
-3. **Antenna switch:** use a beacon with a fixed address (one of the spare nRF52840 boards
-   running a beacon sample works) 2-3 m away. `filter AA:BB:CC:DD:EE:FF`, then alternate
+3. **Antenna switch:** use a beacon with a fixed address (any nRF52 board running a
+   beacon sample works) 2-3 m away. `filter AA:BB:CC:DD:EE:FF`, then alternate
    `ant int` / `ant ext` every ~10 s:
    - nothing on the IPEX connector: `ext` should be clearly weaker (10 dB or more) than `int`;
    - antenna on the pigtail: `ext` should match or beat `int`.

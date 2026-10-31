@@ -12,9 +12,9 @@ Passive RSSI only: it works with any beacon, with no pairing and no Channel Soun
 | Folder | What it is |
 | --- | --- |
 | [`scanner_fw/`](scanner_fw/README.md) | Scanner firmware: nRF Connect SDK / Zephyr behind MCUboot, with signed BLE updates. Build, flash, console commands, frame format. |
-| [`gateway/`](gateway/README.md) | ESPHome config and the `sector_scanner` external component: binary UART frames in, JSON over MQTT out. |
+| [`gateway/`](gateway/README.md) | ESPHome package, per-mast example config and the `sector_scanner` external component: binary UART frames in, JSON over MQTT out; sets each scanner's sector and passes commands to it. |
 | [`shield_deck/`](shield_deck/README.md) | Copper shield deck PCB (Gerbers for PCBWay) and printable 1:1 drilling templates, generated from Python scripts. |
-| `experiments/` | Side experiments (the deck redone in KiCad). |
+| [`experiments/`](experiments/kicad_deck/README.md) | Side experiments (the deck redone in KiCad). |
 
 Prebuilt scanner update images are in `scanner_fw/release/`. They only install on scanners whose
 MCUboot was built with the same signing key, so build your own from source with your own key
@@ -22,8 +22,11 @@ MCUboot was built with the same signing key, so build your own from source with 
 
 ## Status
 
-Work in progress. The scanner firmware runs on hardware; the gateway compiles but hasn't run on a
-board yet; the Home Assistant tracker isn't written yet.
+Work in progress:
+- Scanner firmware 0.3.0 runs on hardware.
+- The gateway (frame and command v2, needs scanner firmware 0.3.0 or later) runs on a board,
+  but hasn't received scanner frames on real wiring yet.
+- The Home Assistant tracker isn't written yet.
 
 ## Bugs and contributions
 

@@ -1,4 +1,4 @@
-# Build output (regenerate with C:\fw\build-scanner.ps1)
+# Build output (regenerate with west build, see scanner_fw/README.md)
 scanner_fw/build/
 scanner_fw/build.log
 __pycache__/
@@ -8,7 +8,7 @@ __pycache__/
 .esphome/
 secrets.yaml
 
-# Signing keys never go in the repo (MCUboot key lives in C:\fw\keys)
+# Signing keys never go in the repo (MCUboot key path is set in scanner_fw/sysbuild.conf)
 *.pem
 
 # KiCad per-user state and experiment renders
