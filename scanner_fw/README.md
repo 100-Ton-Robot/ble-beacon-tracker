@@ -172,6 +172,12 @@ Only one program can hold the port. A script opening it must turn DTR on (pyseri
 default; .NET `SerialPort` needs `DtrEnable = true`), or nothing comes out. Close the terminal before flashing from a script that
 also reads it.
 
+**Keep boards off USB hubs for radio tests.** A XIAO plugged straight into a USB hub lost
+everything weaker than about -70 dBm (2026-10-31: 5 addresses and 16 adverts/s in the hub,
+22 and 39/s on a cable, same board, same channel): the hub's noise raises the receiver's floor.
+Put each board on a cable at least 30 cm from hubs, the PC and other boards. With several boards
+attached, `openocd ... -c "adapter serial <probe serial>"` picks which one to flash.
+
 What you see and type:
 - Every second: `[1s] ant=int ch=all adverts=37 devices=12 dropped=0` = adverts and distinct
   addresses heard in that second. `ch` is the primary channel scanned (`all` = the controller
