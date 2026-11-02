@@ -16,3 +16,9 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(scanner_fw)
 
 target_sources(app PRIVATE src/main.c)
+
+# Gateway stream schema (protocol 3): nanopb C from proto/bletracker.proto, sizes from
+# proto/bletracker.options. The gateway and tools/ generate their own code from it.
+list(APPEND CMAKE_MODULE_PATH ${ZEPHYR_BASE}/modules/nanopb)
+include(nanopb)
+zephyr_nanopb_sources(app proto/bletracker.proto)

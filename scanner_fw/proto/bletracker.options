@@ -1,0 +1,10 @@
+# nanopb sizes for the scanner build (the gateway keeps its own options file)
+bletracker.Bucket.chip_id     max_size:8 fixed_length:true
+# Records are encoded one at a time (main.c), so the scanner never holds the list
+bletracker.Bucket.records     type:FT_IGNORE
+bletracker.Rssi.addr          max_size:6 fixed_length:true
+bletracker.Payload.addr       max_size:6 fixed_length:true
+bletracker.Payload.data       max_size:31
+bletracker.Status.version     max_size:24
+bletracker.Event.text         max_size:40
+bletracker.Command.target     max_size:8

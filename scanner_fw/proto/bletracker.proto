@@ -1,0 +1,197 @@
+// Scanner <-> gateway stream (protocol 3). Rules and framing: ../PROTOCOL.md.
+//
+// Compatibility rules (keep them, or old readers break):
+//   - never reuse or renumber a field; retire it with `reserved`
+//   - never change a field's type or meaning; add a new field instead
+//   - every field is optional: readers cope with any field missing
+//   - new record kinds are new members of Record.kind; old readers skip them
+//   - units are in the field name
+syntax = "proto3";
+
+package bletracker;
+
+// Scanner -> gateway, one per tick (200 ms by default) on D6.
+message Bucket {
+  bytes chip_id = 1;             // 8 bytes, FICR device ID as hwinfo returns it
+  uint32 sector = 2;             // the scanner's saved sector claim, 0-254; 255 = not set
+  uint32 seq = 3;                // tick number since boot (+1 per tick, a gap = lost bucket)
+  uint32 t_ms = 4;               // scanner uptime at the start of the tick, ms (wraps)
+  uint32 tick_ms = 5;            // tick length, ms
+  uint32 chan = 6;               // primary channel scanned, 37-39; 0 = all three
+  uint32 load = 7;               // throttle level, see LoadLevel
+  repeated Record records = 15;  // any mix, any order
+}
+
+message Record {
+  oneof kind {
+    Status status = 1;
+    Rssi rssi = 2;
+    Payload advert = 3;
+    Payload scan_rsp = 4;
+    Event event = 5;
+    Counters counters = 6;
+  }
+}
+
+// RSSI of one address over the RSSI interval that ends with this tick
+// (Intervals.rssi ticks). Mean = rssi_sum_dbm / count. Scan responses are not counted.
+message Rssi {
+  bytes addr = 1;                // 6 bytes, most significant first, as printed
+  bool random = 2;               // random (not public) address
+  uint32 adv_type = 3;           // last advert PDU type, see AdvType
+  sint32 rssi_sum_dbm = 4;
+  uint32 count = 5;
+  sint32 rssi_max_dbm = 6;
+  optional sint32 tx_1m_dbm = 7; // advertised power at 1 m (iBeacon, Eddystone UID/URL)
+}
+
+// Raw advert or scan response bytes (AD structures as received, legacy PDUs: <= 31 bytes).
+// Sent when they change (at most once per payload interval: the last bytes heard in it)
+// and every refresh interval while the address is still heard.
+message Payload {
+  bytes addr = 1;
+  bool random = 2;
+  uint32 adv_type = 3;
+  sint32 rssi_dbm = 4;           // of the last advert that carried these bytes
+  bytes data = 5;
+  bool refresh = 6;              // same bytes as last sent
+  uint32 age_ticks = 7;          // ticks since these bytes were heard (> 0 if held back)
+}
+
+// First tick of each status interval (1 s by default).
+message Status {
+  string version = 1;            // firmware version
+  bool ext_antenna = 2;
+  bool listening = 3;
+  bool active_scan = 4;
+  bool payloads = 5;             // payload records on
+  bool flash_mode = 6;
+  bool client = 7;               // update client connected
+  bool test_image = 8;           // running image not confirmed yet
+  uint32 adverts = 9;            // adverts heard in the last second
+  uint32 dropped = 10;           // adverts lost before processing, last second
+  uint32 devices = 11;           // addresses heard in the last second
+  uint32 load_reasons = 12;      // bitmask of LoadReason
+  uint32 line_peak_pct = 13;     // largest bucket since the last status, % of the budget
+  uint32 budget_pct = 14;        // budget, % of the line's time per tick
+  Intervals intervals = 15;
+  uint32 baud = 16;
+}
+
+// Service intervals in ticks. In a Command, a field left at 0 is unchanged.
+message Intervals {
+  uint32 rssi = 1;               // mast-wide: only accepted in a command to all scanners
+  uint32 payload = 2;
+  uint32 refresh = 3;
+  uint32 status = 4;
+  uint32 counters = 5;
+}
+
+message Event {
+  Category category = 1;
+  Severity severity = 2;
+  Code code = 3;
+  uint32 cmd_seq = 4;            // CMD_OK / CMD_REJECTED: the command's seq
+  sint32 value = 5;              // meaning depends on code (PROTOCOL.md)
+  sint32 value2 = 6;
+  string text = 7;               // short, human readable
+
+  enum Category {
+    GENERAL = 0;
+    SECURITY = 1;
+    LOAD = 2;
+    COMMAND = 3;
+  }
+  enum Severity {
+    INFO = 0;
+    WARN = 1;
+    ERROR = 2;
+  }
+  enum Code {
+    UNKNOWN = 0;
+    BOOT = 1;                    // value = reset cause bits (hwinfo), value2 = boot count
+    VERSION_CHANGED = 2;         // text = "old -> new"
+    TEST_IMAGE = 3;              // running an unconfirmed image
+    IMAGE_CONFIRMED = 4;
+    FLASH_MODE_ON = 5;           // value = Source, value2 = open count
+    FLASH_MODE_OFF = 6;          // value = 0 command, 1 timeout
+    CLIENT_CONNECTED = 7;
+    CLIENT_DISCONNECTED = 8;     // value = HCI reason
+    SETTING_CHANGED = 9;         // value = Setting, value2 = new value, text = source
+    CMD_OK = 10;                 // value = Command action field number
+    CMD_REJECTED = 11;           // value = action field number, text = why
+    BAD_COMMANDS = 12;           // value = bad command frames in the last 10 s
+    LOAD_LEVEL = 13;             // value = new LoadLevel, value2 = LoadReason bits
+    SECTOR_NOT_SET = 14;
+    EVENTS_LOST = 15;            // value = events dropped (queue full)
+  }
+  enum Source {
+    CONSOLE = 0;
+    GATEWAY = 1;
+    TEST_WINDOW = 2;
+  }
+  enum Setting {
+    NONE = 0;
+    SECTOR = 1;
+    ANTENNA = 2;
+  }
+}
+
+// Every counters interval (10 s by default). Totals since boot unless noted.
+message Counters {
+  uint32 uptime_s = 1;
+  uint32 buckets_sent = 2;
+  uint32 buckets_skipped = 3;    // previous bucket still going out
+  uint32 cmds_ok = 4;
+  uint32 cmds_bad = 5;
+  uint32 cmds_other = 6;         // valid, for another scanner
+  uint32 rx_errors = 7;          // UART errors on D7
+  uint32 payloads_sent = 8;
+  uint32 payloads_held = 9;      // payload records held back by the budget
+  uint32 rssi_trimmed = 10;      // RSSI records left out by the budget
+  uint32 seen_evicted = 11;      // addresses dropped from the payload table
+  uint32 events_lost = 12;
+  uint32 boots = 13;             // saved in flash
+  uint32 flash_opens = 14;       // saved in flash
+}
+
+enum AdvType {
+  ADV_IND = 0;
+  ADV_DIRECT_IND = 1;
+  ADV_SCAN_IND = 2;
+  ADV_NONCONN_IND = 3;
+  SCAN_RSP = 4;
+}
+
+enum LoadLevel {
+  NORMAL = 0;
+  REFRESH_SLOWED = 1;            // payload refreshes at 3x their interval
+  REFRESH_OFF = 2;               // changed payloads only
+  PAYLOADS_OFF = 3;              // RSSI, status and events only
+  RSSI_TRIMMED = 4;              // RSSI records left out (weakest first)
+}
+
+enum LoadReason {
+  LOAD_NONE = 0;
+  LOAD_LINE = 1;                 // records due didn't fit the budget
+  LOAD_QUEUE = 2;                // adverts dropped before processing
+  LOAD_TABLE = 4;                // per-tick device table full
+  LOAD_SEEN = 8;                 // payload table evicting addresses
+}
+
+// Gateway -> scanner on D7 (shared by all scanners).
+message Command {
+  bytes target = 1;              // chip ID; empty or all zeros = every scanner
+  uint32 seq = 2;                // echoed in the CMD_OK / CMD_REJECTED event
+  oneof action {
+    bool listen = 3;
+    bool flash = 4;              // true = open flash mode for 10 min (each open extends)
+    bool ext_antenna = 5;        // saved
+    uint32 sector = 6;           // 0-254, saved; single scanner only
+    uint32 reboot = 7;           // must be 0xA5
+    bool payloads = 8;           // payload records on/off (off after boot)
+    bool active_scan = 9;        // off after boot
+    Intervals intervals = 10;    // not saved
+    uint32 budget_pct = 11;      // 10-90, not saved
+  }
+}

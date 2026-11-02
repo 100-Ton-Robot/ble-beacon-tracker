@@ -1,34 +1,44 @@
-"""Decode the scanner's gateway frames (format in src/main.c and the README).
+"""Decode the scanner's bucket stream (protocol 3: ../PROTOCOL.md, ../proto/bletracker.proto).
+
+Needs `pip install protobuf pyserial`. bletracker_pb2.py next to this script is generated:
+    protoc -I../proto --python_out=. ../proto/bletracker.proto
+(the NCS toolchain has protoc in opt/nanopb/generator-bin).
 
 Reads either the header UART itself through a 3.3 V USB-serial adapter on D6:
     python decode_frames.py --port COM5
 or the hex printed by the console's `stream dump` command, pasted or saved:
     python decode_frames.py --hex dump.txt      (or --hex - for stdin)
+--json prints one JSON object per bucket instead of the summary lines.
 
-The gateway (ESPHome component) does the same steps: split on 0x00, COBS-decode,
-check the CRC, then read the header and 11-byte records.
+The gateway does the same steps: split on 0x00, COBS-decode, check the CRC-16 (last two
+bytes, LE), then parse the rest as a protobuf Bucket.
 
-It also builds gateway -> scanner commands (D7). D7 is shared by all scanners, so
-a command goes to one chip ID (--id, as shown in frames and `status`) or, without
---id, to all of them (not allowed for sector). Without --port it prints the hex for
-the console's `inject` command; with --port it sends them on the adapter's TX:
+It also builds gateway -> scanner commands (D7). D7 is shared by all scanners, so a command
+goes to one chip ID (--id, as shown in buckets and `status`) or, without --id, to all of them
+(not allowed for sector). Without --port it prints the hex for the console's `inject`
+command; with --port it sends them on the adapter's TX:
     python decode_frames.py --cmd "flash on" --id 1a2b3c4d5e6f7081
     python decode_frames.py --cmd "sector 2" --id 1a2b3c4d5e6f7081 --port COM5
-Commands: listen on|off, flash on|off, ant int|ext, sector <0-254>, reboot
-
-Frame v1 (firmware before 0.3.0, no chip ID) is still decoded.
+Commands: listen on|off, flash on|off, ant int|ext, sector <0-254>, reboot,
+          payloads on|off, active on|off, budget <10-90>,
+          intervals [rssi=N] [payload=N] [refresh=N] [status=N] [counters=N]   (ticks)
+--seq sets the command's seq (echoed in the scanner's CMD_OK / CMD_REJECTED event).
 """
 
 import argparse
+import json
+import os
 import re
 import struct
 import sys
 
-HDR = struct.Struct("<BBBBHBB")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bletracker_pb2 as pb  # noqa: E402
+from google.protobuf.json_format import MessageToDict  # noqa: E402
+
 CHIP_ID_LEN = 8
-HDR_LEN = {1: HDR.size, 2: HDR.size + CHIP_ID_LEN}
-REC_LEN = 11
 ADV_TYPES = ["ind", "direct", "scan", "nonconn", "scanrsp", "ext", "6", "7"]
+SEVERITY = {0: "INFO", 1: "WARN", 2: "ERROR"}
 
 
 def crc16_ccitt_false(data: bytes) -> int:
@@ -74,79 +84,101 @@ def cobs_encode(data: bytes) -> bytes:
     return bytes(out)
 
 
-CMDS = {"listen": (1, {"off": 0, "on": 1}), "flash": (2, {"off": 0, "on": 1}),
-        "ant": (3, {"int": 0, "ext": 1}), "sector": (4, None), "reboot": (5, None)}
-
-
-def build_cmd(text: str, chip_id: bytes = bytes(CHIP_ID_LEN)) -> bytes:
-    """'flash on' -> COBS-encoded command frame with its 0x00 delimiter.
-    chip_id all zeros = every scanner."""
-    if len(chip_id) != CHIP_ID_LEN:
-        raise ValueError(f"chip ID must be {CHIP_ID_LEN} bytes")
-    words = text.split()
-    if not words or words[0] not in CMDS:
-        raise ValueError(f"unknown command {text!r}")
-    cmd, args = CMDS[words[0]]
-    if words[0] == "reboot":
-        arg = 0xA5
-    elif words[0] == "sector":
-        arg = int(words[1])
-        if not 0 <= arg <= 254:
-            raise ValueError("sector must be 0-254")
-        if not any(chip_id):
-            raise ValueError("sector needs --id (every scanner would take it)")
-    else:
-        arg = args[words[1]]
-    raw = bytes([2]) + chip_id + bytes([cmd, arg])
-    raw += struct.pack("<H", crc16_ccitt_false(raw))
+def frame(payload: bytes) -> bytes:
+    """Protobuf bytes -> COBS frame with CRC and the 0x00 delimiter."""
+    raw = payload + struct.pack("<H", crc16_ccitt_false(payload))
     return cobs_encode(raw) + b"\x00"
 
 
-def decode_frame(enc: bytes) -> dict:
+def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
+    """'flash on' -> framed Command. chip_id empty or all zeros = every scanner."""
+    if chip_id and len(chip_id) != CHIP_ID_LEN:
+        raise ValueError(f"chip ID must be {CHIP_ID_LEN} bytes")
+    words = text.split()
+    if not words:
+        raise ValueError("empty command")
+    on_off = {"on": True, "off": False}
+    c = pb.Command(target=chip_id, seq=seq)
+    name, args = words[0], words[1:]
+    if name in ("listen", "flash", "payloads", "active"):
+        setattr(c, {"active": "active_scan"}.get(name, name), on_off[args[0]])
+    elif name == "ant":
+        c.ext_antenna = {"int": False, "ext": True}[args[0]]
+    elif name == "sector":
+        c.sector = int(args[0])
+        if not 0 <= c.sector <= 254:
+            raise ValueError("sector must be 0-254")
+        if not any(chip_id):
+            raise ValueError("sector needs --id (every scanner would take it)")
+    elif name == "reboot":
+        c.reboot = 0xA5
+    elif name == "budget":
+        c.budget_pct = int(args[0])
+    elif name == "intervals":
+        c.intervals.SetInParent()
+        for a in args:
+            key, val = a.split("=")
+            setattr(c.intervals, key, int(val))
+    else:
+        raise ValueError(f"unknown command {text!r}")
+    return frame(c.SerializeToString())
+
+
+def decode_frame(enc: bytes) -> pb.Bucket:
     raw = cobs_decode(enc)
-    if len(raw) < HDR.size + 2:
+    if len(raw) < 3:
         raise ValueError(f"short frame ({len(raw)} bytes)")
     body, crc = raw[:-2], struct.unpack("<H", raw[-2:])[0]
     if crc16_ccitt_false(body) != crc:
         raise ValueError("CRC mismatch")
-    ver, sector, seq, flags, adverts, n_devs, dropped = HDR.unpack_from(body)
-    if ver not in HDR_LEN:
-        raise ValueError(f"unknown version {ver}")
-    hdr_len = HDR_LEN[ver]
-    if len(body) != hdr_len + n_devs * REC_LEN:
-        raise ValueError(f"length {len(body)} does not match {n_devs} devices")
-    chip_id = body[HDR.size:hdr_len].hex() if ver >= 2 else None
-    devs = []
-    for k in range(n_devs):
-        r = body[hdr_len + k * REC_LEN:hdr_len + (k + 1) * REC_LEN]
-        rflags = r[6]
-        devs.append({
-            "addr": ":".join(f"{b:02X}" for b in r[:6]),
-            "random": bool(rflags & 1),
-            "adv": ADV_TYPES[(rflags >> 1) & 7],
-            "med": struct.unpack("b", r[7:8])[0],
-            "max": struct.unpack("b", r[8:9])[0],
-            "count": r[9],
-            "tx_1m": struct.unpack("b", r[10:11])[0] if rflags & 0x10 else None,
-        })
-    return {"ver": ver, "chip_id": chip_id, "sector": sector, "seq": seq, "ext": bool(flags & 1), "full": bool(flags & 2),
-            "listening": not flags & 4, "flash": bool(flags & 8), "client": bool(flags & 16),
-            "test_image": bool(flags & 32),
-            "adverts": adverts, "dropped": dropped, "devs": devs}
+    b = pb.Bucket()
+    b.ParseFromString(body)
+    return b
 
 
-def show(f: dict) -> None:
-    state = [name for name, on in (("LISTENING OFF", not f["listening"]), ("FLASH MODE", f["flash"]),
-                                   ("CLIENT", f["client"]), ("TEST IMAGE", f["test_image"]),
-                                   ("TABLE FULL", f["full"])) if on]
-    chip = f" chip {f['chip_id']}" if f["chip_id"] else ""
-    print(f"sector {f['sector']}{chip} seq {f['seq']} ant={'ext' if f['ext'] else 'int'} "
-          f"adverts={f['adverts']} devices={len(f['devs'])} dropped={f['dropped']}"
-          f"{''.join(' ' + s for s in state)}")
-    for d in f["devs"]:
-        tx = "" if d["tx_1m"] is None else d["tx_1m"]
-        print(f"  {d['addr']} {'random' if d['random'] else 'public':6} {d['med']:4} {d['max']:4} "
-              f"{d['count']:3} {tx!s:>5} {d['adv']}")
+def addr(a: bytes) -> str:
+    return ":".join(f"{x:02X}" for x in a)
+
+
+def show(b: pb.Bucket) -> None:
+    sector = "unset" if b.sector == 255 else b.sector
+    kinds = {}
+    for r in b.records:
+        k = r.WhichOneof("kind")
+        kinds[k] = kinds.get(k, 0) + 1
+    summary = " ".join(f"{k}={n}" for k, n in kinds.items())
+    print(f"chip {b.chip_id.hex()} sector {sector} seq {b.seq} t={b.t_ms} ms "
+          f"ch={b.chan or 'all'} load={b.load} {summary}")
+    for r in b.records:
+        k = r.WhichOneof("kind")
+        if k == "rssi":
+            x = r.rssi
+            mean = x.rssi_sum_dbm / x.count if x.count else 0
+            tx = x.tx_1m_dbm if x.HasField("tx_1m_dbm") else ""
+            print(f"  rssi    {addr(x.addr)} {'random' if x.random else 'public':6} "
+                  f"mean {mean:6.1f} max {x.rssi_max_dbm:4} n {x.count:2} "
+                  f"{ADV_TYPES[x.adv_type & 7]:7} {tx}")
+        elif k in ("advert", "scan_rsp"):
+            x = getattr(r, k)
+            print(f"  {k:8} {addr(x.addr)} rssi {x.rssi_dbm:4} age {x.age_ticks} "
+                  f"{'refresh ' if x.refresh else ''}{x.data.hex()}")
+        elif k == "event":
+            e = r.event
+            cat = pb.Event.Category.Name(e.category)
+            print(f"  event   [{cat} {SEVERITY.get(e.severity, e.severity)}] "
+                  f"{pb.Event.Code.Name(e.code)}: {e.text}")
+        elif k == "status":
+            s = r.status
+            print(f"  status  {s.version} ant={'ext' if s.ext_antenna else 'int'} "
+                  f"listening={s.listening} active={s.active_scan} payloads={s.payloads} "
+                  f"flash={s.flash_mode} test_image={s.test_image} adverts={s.adverts} "
+                  f"devices={s.devices} dropped={s.dropped} budget={s.budget_pct}% "
+                  f"peak={s.line_peak_pct}% reasons={s.load_reasons} baud={s.baud} "
+                  f"intervals=({MessageToDict(s.intervals)})")
+        elif k == "counters":
+            print(f"  counters {MessageToDict(r.counters)}")
+        else:
+            print(f"  unknown record {r}")
 
 
 def frames_in(stream):
@@ -167,18 +199,20 @@ def main() -> None:
     src = ap.add_mutually_exclusive_group()
     src.add_argument("--port", help="serial port wired to D6 (TX) and D7 (RX), 115200 8N1")
     src.add_argument("--hex", help="file with `stream dump` output, or - for stdin")
+    ap.add_argument("--json", action="store_true", help="one JSON object per bucket")
     ap.add_argument("--cmd", help='command to send, e.g. "flash on"; prints inject hex without --port')
     ap.add_argument("--id", help="chip ID (16 hex digits) the command is for; omit for all scanners")
+    ap.add_argument("--seq", type=int, default=1, help="command seq (default 1)")
     args = ap.parse_args()
 
     if args.cmd:
-        frame = build_cmd(args.cmd, bytes.fromhex(args.id) if args.id else bytes(CHIP_ID_LEN))
+        frm = build_cmd(args.cmd, bytes.fromhex(args.id) if args.id else b"", args.seq)
         if not args.port:
-            print(f"inject {frame.hex()}")
+            print(f"inject {frm.hex()}")
             return
         import serial  # pip install pyserial
-        serial.Serial(args.port, 115200, timeout=1).write(frame)
-        print(f"sent {args.cmd!r}: {frame.hex(' ')}")
+        serial.Serial(args.port, 115200, timeout=1).write(frm)
+        print(f"sent {args.cmd!r}: {frm.hex(' ')}")
         return
     if not args.port and not args.hex:
         ap.error("one of --port, --hex or --cmd is required")
@@ -191,6 +225,8 @@ def main() -> None:
             lines = dump.splitlines()[1:]
             hex_lines = []
             for line in lines:
+                if not line.strip():
+                    continue  # \r\r\n from some terminals
                 if not re.fullmatch(r"\s*([0-9a-f]{2}\s*)+", line):
                     break
                 hex_lines.append(line)
@@ -202,9 +238,14 @@ def main() -> None:
 
     for enc in frames_in(stream):
         try:
-            show(decode_frame(enc))
-        except ValueError as e:
+            b = decode_frame(enc)
+        except Exception as e:  # noqa: BLE001 - a bad frame must not stop the reader
             print(f"dropped frame: {e}")
+            continue
+        if args.json:
+            print(json.dumps(MessageToDict(b, preserving_proto_field_name=True)))
+        else:
+            show(b)
 
 
 if __name__ == "__main__":

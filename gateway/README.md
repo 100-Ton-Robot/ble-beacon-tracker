@@ -1,5 +1,9 @@
 # Mast gateway (ESPHome, ESP32-S3 + Ethernet)
 
+> **Out of step (2026-11-02):** scanner firmware 0.4.0 speaks protocol 3 (protobuf buckets
+> every 200 ms, [`../scanner_fw/PROTOCOL.md`](../scanner_fw/PROTOCOL.md)). This component still
+> reads the v2 frames described below and needs updating before it can talk to 0.4.0 scanners.
+
 Reads the three sector scanners' binary frames and publishes each second's device table to
 MQTT, one JSON message per sector. It also sets each scanner's sector and passes commands to
 the scanners. Frame and command formats (v2) are in `../scanner_fw/README.md`; the gateway

@@ -1,35 +1,45 @@
 /*
  * Sector scanner:
  *   1. boots, prints a banner, blinks the LED once a second
- *   2. passive scan at 100% duty, duplicates kept, adverts to the USB console
+ *   2. passive scan at 100% duty, duplicates kept (active scanning on command)
  *   3. RF switch control so onboard vs external antenna can be compared
- *   4. 1 s aggregation per address: median/max RSSI, count, advertised 1 m power
- *   5. binary frame of that table each second on the header UART (D6 TX, D7 RX)
- *      to the gateway; format below and in the README. Each scanner's D6 has its
- *      own gateway RX pin (that pin is the sector); D7 is shared by all three
- *   6. commands from the gateway on D7 (listen, flash mode, antenna, sector, reboot),
- *      addressed by chip ID since every scanner hears them
+ *   4. 1 s aggregation per address for the console: median/max RSSI, count, 1 m power
+ *   5. bucket stream to the gateway (D6 TX, D7 RX): one protobuf Bucket per 200 ms tick,
+ *      typed records (RSSI, advert and scan response bytes, status, events, counters),
+ *      each service on its own interval, a byte budget per tick and a throttle that
+ *      sheds payloads before RSSI. Schema: proto/bletracker.proto, rules: PROTOCOL.md.
+ *      Each scanner's D6 has its own gateway RX pin; D7 is shared by all three
+ *   6. commands from the gateway on D7 (protobuf Command), addressed by chip ID since
+ *      every scanner hears them, acknowledged with an event
  *   7. flash mode: connectable BLE with MCUmgr SMP so MCUboot images can be
  *      uploaded with the box sealed; only on a serial command (and for 2 min
  *      after an update, while the new image is on trial)
- *   8. sector ID and antenna kept in flash
+ *   8. sector claim and antenna kept in flash; the sector is set at assembly (console
+ *      or an explicit command) and the gateway checks it against the RX pin
+ *   9. security events (flash mode, updates, resets, settings, bad commands) with
+ *      boot and flash-mode counts kept in flash
  *
  * Shell commands:
- *   status                 version, chip ID, sector, antenna, listening, flash mode, image
+ *   status                 version, chip ID, sector, antenna, listening, flash mode, stream
  *   ant [int|ext]          show or switch antenna (saved in flash)
- *   sector [0-254]         show or set the sector ID (saved in flash)
+ *   sector [0-254|unset]   show or set the sector claim (saved in flash)
  *   scan [on|off]          show or start/stop listening (always on after boot)
+ *   active [on|off]        show or switch active scanning (passive after boot)
+ *   data [on|off]          show or switch payload records (off after boot)
+ *   budget [10-90]         show or set the stream budget, % of the line per tick
  *   flash [on|off]         show or enter/leave flash mode (on = 10 min)
  *   reboot                 restart
  *   inject <hex>           feed bytes to the D7 command decoder (bench test)
+ *   cmdlog                 last rejected D7 command frames
  *   filter <addr>|off      only track one address, print a 1 s summary for it
- *   print on|off           raw line per advert (off by default: floods)
- *   list on|csv|off        per-device table each second (csv = gateway line format)
+ *   print on|off           raw line per advert with its bytes (off by default: floods)
+ *   list on|csv|off        per-device table each second
  *   minrssi <dBm>          hide devices whose median is below this in the list
- *   stream [dump]          gateway frame stats; dump = hex of the next frame
+ *   stream [dump]          bucket stats; dump = hex of the next bucket frame
  *   chan [auto|37|38|39|rot [s]]  primary channels scanned (bench test, not saved)
  */
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,6 +62,9 @@
 #include <zephyr/shell/shell.h>
 #include <app_version.h>
 #include <bluetooth/hci_vs_sdc.h>
+#include <pb_encode.h>
+#include <pb_decode.h>
+#include <proto/bletracker.pb.h>
 
 /*
  * The board devicetree models the RF switch as two fixed regulators, both
@@ -68,15 +81,20 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios
 
 /* Advertised power at 1 m not present in the advert */
 #define TX_UNKNOWN INT8_MAX
+/* Legacy advert or scan response payload (extended adverts aren't scanned) */
+#define AD_MAX 31
+#define SECTOR_UNSET 255
 
 struct adv_evt {
 	bt_addr_le_t addr;
 	int8_t rssi;
 	uint8_t type;
 	int8_t tx_1m;
+	uint8_t len;
+	uint8_t data[AD_MAX];
 };
 
-/* One second of adverts from one address, main thread only */
+/* One second of adverts from one address for the console, main thread only */
 #define MAX_DEVS 64
 #define MAX_SAMPLES 32
 
@@ -96,64 +114,128 @@ static uint32_t devs_full;
 static uint8_t order[MAX_DEVS]; /* devs[] indices, strongest median first */
 
 /*
- * Gateway frame, one per second on uart21 (D6 TX, D7 RX), 115200 8N1.
- * Little-endian, COBS-encoded, each frame followed by a 0x00 delimiter.
- *   header (16): ver, sector, seq, flags, adverts (u16), n_devs, dropped,
- *                chip_id[8] (FICR device ID as hwinfo returns it, printed in that order)
- *                flags: bit0 external antenna, bit1 table was full,
- *                       bit2 listening stopped, bit3 flash mode,
- *                       bit4 update client connected, bit5 image not confirmed
- *   record (11): addr[6] (most significant first, as printed), flags,
- *                rssi_med, rssi_max, count, tx_1m
- *                flags: bit0 random address, bits1-3 adv type, bit4 tx_1m valid
- *   crc (2):     CRC-16/CCITT-FALSE (poly 0x1021, init 0xffff) of header + records
- * Counts saturate at their field size. Every device heard is sent (minrssi only
- * affects the console list), strongest median first. Frames keep coming with
- * listening stopped (no devices), so the gateway always sees the state.
+ * Bucket stream on uart21 (D6 TX, D7 RX), 115200 8N1. Each tick (TICK_MS) one frame:
+ * protobuf Bucket (header fields, then Record submessages encoded one at a time), then
+ * CRC-16/CCITT-FALSE (poly 0x1021, init 0xffff, LE) of the protobuf bytes, COBS-encoded,
+ * followed by a 0x00 delimiter. Records per tick, in this order:
+ *   events     all queued, never held back
+ *   status     every intervals.status ticks
+ *   counters   every intervals.counters ticks
+ *   rssi       every intervals.rssi ticks, per address heard in that interval, strongest
+ *              mean first; the budget can trim the weakest (load level 4)
+ *   payloads   every intervals.payload ticks while payload records are on: changed
+ *              advert/scan response bytes first, then refreshes, until the budget is used;
+ *              the rest wait (load levels 1-3 slow, then stop them)
+ * The budget is budget_pct of the bytes the line carries in one tick; events and status
+ * may go over it.
  */
-#define FRAME_VER 2
-#define FRAME_HDR_LEN 16
-#define FRAME_REC_LEN 11
-#define FRAME_RAW_MAX (FRAME_HDR_LEN + MAX_DEVS * FRAME_REC_LEN + 2)
+#define TICK_MS 200
+#define TICKS_PER_S (1000 / TICK_MS)
+#define FRAME_RAW_MAX 4096
 /* COBS adds one byte per 254, plus the delimiter */
 #define FRAME_TX_MAX (FRAME_RAW_MAX + FRAME_RAW_MAX / 254 + 2)
+#define BUCKET_RECORDS_TAG 15	/* Bucket.records (FT_IGNORE in the options: encoded here) */
+#define BUDGET_PCT_DEFAULT 70
 
 static const struct device *const gw_uart = DEVICE_DT_GET(DT_NODELABEL(uart21));
 static uint8_t frame_raw[FRAME_RAW_MAX];
 static uint8_t frame_tx[FRAME_TX_MAX];
 static volatile size_t frame_tx_len;
 static volatile size_t frame_tx_pos;
-static uint8_t frame_seq;
-static uint32_t frames_sent;
-static uint32_t frames_skipped; /* previous frame still going out */
+static uint32_t tick_seq;
+static uint32_t buckets_sent;
+static uint32_t buckets_skipped; /* previous bucket still going out */
+static uint32_t uart_baud = 115200;
+static uint8_t budget_pct = BUDGET_PCT_DEFAULT;
 static bool frame_dump;
 
-/*
- * Gateway command, on uart21 RX (D7), same framing (COBS + 0x00, CRC-16). One gateway
- * TX drives all three scanners' D7, so each command names its target:
- *   ver (2), target[8], cmd, arg, crc (2, LE, of everything before it)
- *   target: a chip ID from a frame header, or all zeros for every scanner
- *           (not allowed for sector)
- *   cmd 1 listen   arg 0 stop, 1 start
- *   cmd 2 flash    arg 0 leave, 1 enter (10 min, extended by each enter)
- *   cmd 3 antenna  arg 0 onboard, 1 external (saved in flash)
- *   cmd 4 sector   arg 0-254 (saved in flash)
- *   cmd 5 reboot   arg 0xa5
- * There is no reply; the result shows in the next frame's header.
- */
-#define CMD_VER 2
-#define CHIP_ID_LEN 8
-#define CMD_RAW_LEN (1 + CHIP_ID_LEN + 4)
-#define CMD_ENC_MAX 16
-#define CMD_REBOOT_MAGIC 0xa5
-
-enum gw_cmd {
-	CMD_LISTEN = 1,
-	CMD_FLASH = 2,
-	CMD_ANT = 3,
-	CMD_SECTOR = 4,
-	CMD_REBOOT = 5,
+static bletracker_Intervals intervals = {
+	.rssi = 1, .payload = 1, .refresh = 50, .status = TICKS_PER_S, .counters = 50,
 };
+
+/* RSSI of each address over the current RSSI interval, main thread only */
+#define MAX_TICK_DEVS 96
+
+struct tick_dev {
+	bt_addr_le_t addr;
+	uint8_t adv_type;
+	int8_t tx_1m;
+	int8_t rssi_max;
+	uint16_t count;
+	int32_t sum;
+};
+
+static struct tick_dev tdevs[MAX_TICK_DEVS];
+static uint8_t n_tdevs;
+static bool tdevs_full;
+static uint8_t torder[MAX_TICK_DEVS];
+
+/*
+ * Payloads per address across ticks, main thread only: [0] advert, [1] scan response.
+ * A payload is due when heard since it was last sent and either its bytes changed
+ * (or were never sent) or the refresh interval has passed; not once it's AD_STALE_MS
+ * old. Changed ones first, then the ones sent longest ago.
+ */
+#define MAX_SEEN 128
+#define AD_STALE_MS 5000
+
+struct seen_part {
+	int64_t heard_at;	/* 0 = never */
+	int64_t sent_at;	/* 0 = never */
+	uint32_t hash;
+	uint32_t sent_hash;
+	int8_t rssi;
+	uint8_t type;
+	uint8_t len;
+	uint8_t data[AD_MAX];
+};
+
+struct seen_dev {
+	bt_addr_le_t addr;
+	int64_t heard_at;
+	struct seen_part p[2];
+};
+
+static struct seen_dev seen[MAX_SEEN];
+static uint8_t n_seen;
+static bool payloads_on;
+static bool scan_active;
+
+/* Throttle: level and the reasons seen since the last status record */
+#define CALM_TICKS 50		/* ticks under half the budget before going down a level */
+
+static uint8_t load_level;
+static uint32_t load_reasons;
+static uint32_t calm_ticks;
+static uint32_t line_peak_pct;
+static uint32_t payloads_sent;
+static uint32_t payloads_held;
+static uint32_t rssi_trimmed;
+static uint32_t seen_evicted;
+
+/*
+ * Events: queued from any thread, sent first in the next bucket. Each is also printed
+ * on the console, security ones tagged SECURITY.
+ */
+#define EVENT_Q_LEN 16
+static char __aligned(4) event_q_buf[EVENT_Q_LEN * sizeof(bletracker_Event)];
+static struct k_msgq event_q;
+static atomic_t events_lost;
+static atomic_t events_lost_reported;
+
+/* Saved in flash: boot and flash-mode counts, last version booted */
+static uint32_t boot_count;
+static uint32_t flash_opens;
+static char last_version[24];
+
+/*
+ * Gateway command, on uart21 RX (D7), same framing as buckets (COBS + 0x00, CRC-16 LE
+ * after the protobuf bytes). A protobuf Command: target chip ID (empty or zeros = every
+ * scanner), seq, one action. Each is answered with a CMD_OK or CMD_REJECTED event.
+ */
+#define CMD_ENC_MAX 72
+#define CMD_RAW_MAX 64
+#define CMD_REBOOT_MAGIC 0xa5
 
 struct cmd_msg {
 	uint8_t len;
@@ -179,19 +261,21 @@ enum cmd_bad_reason {
 	BAD_LONG,	/* no 0x00 within CMD_ENC_MAX bytes */
 	BAD_QUEUE,	/* queue full */
 	BAD_FRAME,	/* COBS or length wrong */
-	BAD_VER,
 	BAD_CRC,
-	BAD_ARG,	/* unknown command or argument, or sector sent to all */
+	BAD_DECODE,	/* not a valid Command */
+	BAD_ARG,	/* no action, unknown action or argument out of range */
 };
 static const char *const cmd_bad_names[] = {
-	"too long", "queue full", "bad COBS/length", "wrong version", "bad CRC", "bad cmd/arg",
+	"too long", "queue full", "bad COBS/length", "bad CRC", "bad protobuf", "bad action/arg",
 };
+
+#define CMD_BAD_SHOW 16
 
 struct cmd_bad {
 	int64_t t;
 	uint8_t reason;
 	uint8_t len;
-	uint8_t b[CMD_ENC_MAX];
+	uint8_t b[CMD_BAD_SHOW];
 };
 
 #define CMD_BAD_LOG 8
@@ -205,7 +289,7 @@ static void cmd_bad_note(enum cmd_bad_reason reason, const uint8_t *b, uint8_t l
 
 	e->t = k_uptime_get();
 	e->reason = reason;
-	e->len = MIN(len, CMD_ENC_MAX);
+	e->len = MIN(len, CMD_BAD_SHOW);
 	memcpy(e->b, b, e->len);
 	irq_unlock(key);
 	atomic_inc(&cmds_bad);
@@ -229,7 +313,7 @@ static bool flash_mode;
 static int64_t flash_until;
 static struct bt_conn *smp_conn;
 static struct k_work adv_work;
-static char flash_name[16];
+static char flash_name[20];
 static bool flash_adv_ok;  /* flash mode advertising has started at least once */
 static bool img_confirmed;
 
@@ -239,7 +323,7 @@ static const struct bt_data flash_ad[] = {
 };
 
 /*
- * Scan callback runs in the BT RX thread: queue and get out, print from main.
+ * Scan callback runs in the BT RX thread: queue and get out, handle in main.
  * Not K_MSGQ_DEFINE: its __noinit buffer gets a section name built from the
  * file path, which breaks the assembler when the path contains spaces.
  */
@@ -256,24 +340,73 @@ static bool scanning;
 static bool print_raw;
 static enum list_mode list_mode;
 static int8_t list_min_rssi = -127;
-static uint8_t sector_id;
-static uint8_t chip_id[CHIP_ID_LEN];
-static char chip_id_str[2 * CHIP_ID_LEN + 1];
+static uint8_t sector_id = SECTOR_UNSET;
+static uint8_t chip_id[8];
+static char chip_id_str[17];
 static bool filter_on;
 static bt_addr_t filter_addr;
 
-/* Per-second counters, main thread only */
+/* Per-second counters, main thread only; last_* = the last whole second */
 static uint32_t sec_total;
 static uint32_t sec_n;
 static int32_t sec_sum;
 static int8_t sec_min;
 static int8_t sec_max;
+static uint32_t last_adverts;
+static uint32_t last_dropped;
+static uint32_t last_devices;
 
-/* Settings: "scanner/sector" and "scanner/ant", one byte each */
+static const char *const sev_names[] = { "INFO", "WARN", "ERROR" };
+
+static void event_post(bletracker_Event_Category cat, bletracker_Event_Severity sev,
+		       bletracker_Event_Code code, int32_t value, int32_t value2, uint32_t cmd_seq,
+		       const char *fmt, ...)
+{
+	bletracker_Event ev = bletracker_Event_init_zero;
+	va_list ap;
+
+	ev.category = cat;
+	ev.severity = sev;
+	ev.code = code;
+	ev.value = value;
+	ev.value2 = value2;
+	ev.cmd_seq = cmd_seq;
+	va_start(ap, fmt);
+	vsnprintk(ev.text, sizeof(ev.text), fmt, ap);
+	va_end(ap);
+
+	printk("[%s%s] %s\n", cat == bletracker_Event_Category_SECURITY ? "SECURITY " : "",
+	       sev_names[MIN(sev, 2)], ev.text);
+	if (k_msgq_put(&event_q, &ev, K_NO_WAIT) != 0) {
+		atomic_inc(&events_lost);
+	}
+}
+
+#define SECURITY_EVENT(sev, code, v, v2, ...) \
+	event_post(bletracker_Event_Category_SECURITY, bletracker_Event_Severity_##sev, \
+		   bletracker_Event_Code_##code, v, v2, 0, __VA_ARGS__)
+
+/* Settings under "scanner/": sector, ant (1 byte), boots, fopens (u32), ver (string) */
 static int settings_set_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	uint8_t v;
 
+	if (strcmp(key, "boots") == 0 || strcmp(key, "fopens") == 0) {
+		uint32_t n;
+
+		if (len != sizeof(n) || read_cb(cb_arg, &n, sizeof(n)) != sizeof(n)) {
+			return -EINVAL;
+		}
+		*(key[0] == 'b' ? &boot_count : &flash_opens) = n;
+		return 0;
+	}
+	if (strcmp(key, "ver") == 0) {
+		if (len >= sizeof(last_version) || read_cb(cb_arg, last_version, len) != len) {
+			return -EINVAL;
+		}
+		last_version[len] = '\0';
+		return 0;
+	}
 	if (len != 1 || read_cb(cb_arg, &v, 1) != 1) {
 		return -EINVAL;
 	}
@@ -301,12 +434,18 @@ static void antenna_select(bool external)
 	ant_external = external;
 }
 
-static void antenna_set(bool external)
+static void antenna_set(bool external, bletracker_Event_Source src)
 {
 	uint8_t v = external;
+	bool changed = external != ant_external;
 
 	antenna_select(external);
 	settings_save_one("scanner/ant", &v, 1);
+	if (changed) {
+		SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_ANTENNA, v,
+			       "antenna %s (%s)", v ? "ext" : "int",
+			       src == bletracker_Event_Source_GATEWAY ? "gateway" : "console");
+	}
 }
 
 static int antenna_init(void)
@@ -328,15 +467,25 @@ static int antenna_init(void)
 
 static int flash_adv_start(void);
 
-static int sector_set(uint8_t id)
+static int sector_set(uint8_t id, bletracker_Event_Source src)
 {
+	uint8_t old = sector_id;
+	int err;
+
 	sector_id = id;
 	/* Re-advertise so the flash-mode name follows the new sector */
 	if (flash_mode && smp_conn == NULL) {
 		bt_le_adv_stop();
 		flash_adv_start();
 	}
-	return settings_save_one("scanner/sector", &id, 1);
+	err = settings_save_one("scanner/sector", &id, 1);
+	if (id != old) {
+		SECURITY_EVENT(WARN, SETTING_CHANGED, bletracker_Event_Setting_SECTOR, id,
+			       "sector %u -> %u (%s)%s", old, id,
+			       src == bletracker_Event_Source_GATEWAY ? "gateway" : "console",
+			       err ? " NOT SAVED" : "");
+	}
+	return err;
 }
 
 /* Pick the 1 m power out of iBeacon or Eddystone UID/URL adverts */
@@ -372,6 +521,8 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 		return;
 	}
 	bt_addr_le_copy(&evt.addr, addr);
+	evt.len = MIN(ad->len, AD_MAX);
+	memcpy(evt.data, ad->data, evt.len);
 	bt_data_parse(ad, ad_tx_cb, &evt.tx_1m);
 	if (k_msgq_put(&adv_q, &evt, K_NO_WAIT) != 0) {
 		atomic_inc(&dropped);
@@ -407,7 +558,7 @@ static int scan_start(void)
 {
 	/* Interval == window: radio listens all the time. No duplicate filter. */
 	struct bt_le_scan_param param = {
-		.type = BT_LE_SCAN_TYPE_PASSIVE,
+		.type = scan_active ? BT_LE_SCAN_TYPE_ACTIVE : BT_LE_SCAN_TYPE_PASSIVE,
 		.options = BT_LE_SCAN_OPT_NONE,
 		.interval = 0x0030, /* 30 ms */
 		.window = 0x0030,
@@ -434,6 +585,29 @@ static int listen_set(bool on)
 	return err;
 }
 
+/* Active scanning sends a scan request to each scannable advertiser and hears its reply */
+static int active_set(bool on)
+{
+	int err;
+
+	if (on == scan_active) {
+		return 0;
+	}
+	scan_active = on;
+	if (!scanning) {
+		return 0; /* scan_start applies it */
+	}
+	err = bt_le_scan_stop();
+	if (err == 0) {
+		err = scan_start();
+	}
+	if (err) {
+		scanning = false;
+		printk("scan restart failed (%d), listening off\n", err);
+	}
+	return err;
+}
+
 static int flash_adv_start(void)
 {
 	const struct bt_le_adv_param *param =
@@ -442,7 +616,11 @@ static int flash_adv_start(void)
 	struct bt_data sd[1];
 	int err;
 
-	snprintk(flash_name, sizeof(flash_name), "bletracker-s%u", sector_id);
+	if (sector_id == SECTOR_UNSET) {
+		snprintk(flash_name, sizeof(flash_name), "bletracker-s?");
+	} else {
+		snprintk(flash_name, sizeof(flash_name), "bletracker-s%u", sector_id);
+	}
 	sd[0] = (struct bt_data)BT_DATA(BT_DATA_NAME_COMPLETE, flash_name, strlen(flash_name));
 	err = bt_le_adv_start(param, flash_ad, ARRAY_SIZE(flash_ad), sd, ARRAY_SIZE(sd));
 	if (err == -EALREADY) {
@@ -456,11 +634,18 @@ static int flash_adv_start(void)
 	return err;
 }
 
-static int flash_mode_set(bool on, uint32_t secs)
+static const char *const source_names[] = { "console", "gateway", "test image window" };
+
+/* timeout: closed because flash_until passed (not by a command) */
+static int flash_mode_set(bool on, uint32_t secs, bletracker_Event_Source src, bool timeout)
 {
 	int err = 0;
 
 	if (!on) {
+		if (flash_mode) {
+			SECURITY_EVENT(INFO, FLASH_MODE_OFF, timeout, 0, "flash mode off (%s)",
+				       timeout ? "timeout" : source_names[src]);
+		}
 		flash_mode = false;
 		bt_le_adv_stop();
 		if (smp_conn != NULL) {
@@ -477,7 +662,12 @@ static int flash_mode_set(bool on, uint32_t secs)
 		}
 		if (err) {
 			flash_mode = false;
+			return err;
 		}
+		flash_opens++;
+		settings_save_one("scanner/fopens", &flash_opens, sizeof(flash_opens));
+		SECURITY_EVENT(WARN, FLASH_MODE_ON, src, flash_opens,
+			       "flash mode on for %u s (%s)", secs, source_names[src]);
 	}
 	return err;
 }
@@ -501,19 +691,21 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 	bt_addr_le_to_str(bt_conn_get_dst(conn), addr_str, sizeof(addr_str));
-	printk("flash mode: %s connected\n", addr_str);
 	smp_conn = bt_conn_ref(conn);
 	if (!flash_mode) {
 		bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		return;
 	}
+	SECURITY_EVENT(WARN, CLIENT_CONNECTED, 0, 0, "update client %s", addr_str);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
-	printk("flash mode: client disconnected (0x%02x)\n", reason);
 	if (smp_conn == conn) {
 		bt_conn_unref(smp_conn);
 		smp_conn = NULL;
+		SECURITY_EVENT(INFO, CLIENT_DISCONNECTED, reason, 0,
+			       "update client left (0x%02x)", reason);
 	}
 }
 
@@ -563,6 +755,91 @@ static void agg_add(const struct adv_evt *evt)
 	if (evt->tx_1m != TX_UNKNOWN) {
 		d->tx_1m = evt->tx_1m;
 	}
+}
+
+static void tick_add(const struct adv_evt *evt)
+{
+	struct tick_dev *d = NULL;
+
+	for (uint8_t i = 0; i < n_tdevs; i++) {
+		if (bt_addr_le_eq(&tdevs[i].addr, &evt->addr)) {
+			d = &tdevs[i];
+			break;
+		}
+	}
+	if (d == NULL) {
+		if (n_tdevs == MAX_TICK_DEVS) {
+			tdevs_full = true;
+			return;
+		}
+		d = &tdevs[n_tdevs++];
+		bt_addr_le_copy(&d->addr, &evt->addr);
+		d->count = 0;
+		d->sum = 0;
+		d->rssi_max = evt->rssi;
+		d->tx_1m = TX_UNKNOWN;
+	}
+	d->count++;
+	d->sum += evt->rssi;
+	d->adv_type = evt->type;
+	if (evt->rssi > d->rssi_max) {
+		d->rssi_max = evt->rssi;
+	}
+	if (evt->tx_1m != TX_UNKNOWN) {
+		d->tx_1m = evt->tx_1m;
+	}
+}
+
+/* Keep this advert's bytes as the address's latest advert or scan response */
+static void seen_add(const struct adv_evt *evt, int64_t now)
+{
+	struct seen_dev *s = NULL;
+	struct seen_part *p;
+
+	for (uint8_t i = 0; i < n_seen; i++) {
+		if (bt_addr_le_eq(&seen[i].addr, &evt->addr)) {
+			s = &seen[i];
+			break;
+		}
+	}
+	if (s == NULL) {
+		if (n_seen < MAX_SEEN) {
+			s = &seen[n_seen++];
+		} else {
+			/* Full: reuse the address heard longest ago */
+			s = &seen[0];
+			for (uint8_t i = 1; i < n_seen; i++) {
+				if (seen[i].heard_at < s->heard_at) {
+					s = &seen[i];
+				}
+			}
+			seen_evicted++;
+			load_reasons |= bletracker_LoadReason_LOAD_SEEN;
+		}
+		memset(s, 0, sizeof(*s));
+		bt_addr_le_copy(&s->addr, &evt->addr);
+	}
+
+	s->heard_at = now;
+	p = &s->p[evt->type == BT_GAP_ADV_TYPE_SCAN_RSP ? 1 : 0];
+	p->heard_at = now;
+	p->hash = crc32_ieee_update(crc32_ieee(&evt->type, 1), evt->data, evt->len);
+	p->rssi = evt->rssi;
+	p->type = evt->type;
+	p->len = evt->len;
+	memcpy(p->data, evt->data, evt->len);
+}
+
+/* 0 = not due, 2 = changed (or never sent), 1 = refresh; refresh_ms 0 = no refreshes */
+static int seen_due(const struct seen_part *p, int64_t now, int64_t refresh_ms)
+{
+	if (p->heard_at == 0 || p->heard_at <= p->sent_at || now - p->heard_at >= AD_STALE_MS) {
+		return 0;
+	}
+	if (p->sent_at == 0 || p->hash != p->sent_hash) {
+		return 2;
+	}
+	return (refresh_ms && now - p->sent_at >= refresh_ms) ? 1 : 0;
 }
 
 static int8_t median(const int8_t *samples, uint16_t n)
@@ -658,10 +935,14 @@ static void gw_uart_isr(const struct device *dev, void *user_data)
 
 static int gw_uart_init(void)
 {
+	struct uart_config cfg;
 	int err;
 
 	if (!device_is_ready(gw_uart)) {
 		return -ENODEV;
+	}
+	if (uart_config_get(gw_uart, &cfg) == 0) {
+		uart_baud = cfg.baudrate;
 	}
 	err = uart_irq_callback_user_data_set(gw_uart, gw_uart_isr, NULL);
 	if (err == 0) {
@@ -722,39 +1003,62 @@ static int cobs_decode(const uint8_t *in, size_t len, uint8_t *out, size_t out_m
 	return o;
 }
 
-static const char *cmd_apply(uint8_t cmd, uint8_t arg)
+/* NULL = rejected (argument out of range); else what was done, for the ack */
+static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 {
-	switch (cmd) {
-	case CMD_LISTEN:
-		if (arg > 1) {
+	const bletracker_Event_Source gw = bletracker_Event_Source_GATEWAY;
+
+	switch (c->which_action) {
+	case bletracker_Command_listen_tag:
+		return listen_set(c->action.listen) ? "listen FAILED" :
+		       (c->action.listen ? "listen on" : "listen off");
+	case bletracker_Command_flash_tag:
+		return flash_mode_set(c->action.flash, FLASH_MODE_S, gw, false) ? "flash FAILED" :
+		       (c->action.flash ? "flash on" : "flash off");
+	case bletracker_Command_ext_antenna_tag:
+		antenna_set(c->action.ext_antenna, gw);
+		return c->action.ext_antenna ? "ant ext" : "ant int";
+	case bletracker_Command_sector_tag:
+		/* Every scanner would take the same sector */
+		if (to_all || c->action.sector > 254) {
 			return NULL;
 		}
-		return listen_set(arg) ? "listen FAILED" : (arg ? "listen on" : "listen off");
-	case CMD_FLASH:
-		if (arg > 1) {
-			return NULL;
-		}
-		return flash_mode_set(arg, FLASH_MODE_S) ? "flash FAILED" :
-		       (arg ? "flash on" : "flash off");
-	case CMD_ANT:
-		if (arg > 1) {
-			return NULL;
-		}
-		antenna_set(arg);
-		return arg ? "ant ext" : "ant int";
-	case CMD_SECTOR:
-		if (arg == 0xff) {
-			return NULL;
-		}
-		return sector_set(arg) ? "sector NOT SAVED" : "sector set";
-	case CMD_REBOOT:
-		if (arg != CMD_REBOOT_MAGIC) {
+		return sector_set(c->action.sector, gw) ? "sector NOT SAVED" : "sector set";
+	case bletracker_Command_reboot_tag:
+		if (c->action.reboot != CMD_REBOOT_MAGIC) {
 			return NULL;
 		}
 		printk("gateway command: reboot\n");
 		k_sleep(K_MSEC(50));
 		sys_reboot(SYS_REBOOT_COLD);
 		return NULL;
+	case bletracker_Command_payloads_tag:
+		payloads_on = c->action.payloads;
+		return payloads_on ? "payloads on" : "payloads off";
+	case bletracker_Command_active_scan_tag:
+		return active_set(c->action.active_scan) ? "active FAILED" :
+		       (c->action.active_scan ? "active on" : "active off");
+	case bletracker_Command_intervals_tag: {
+		const bletracker_Intervals *iv = &c->action.intervals;
+
+		/* RSSI timing is mast-wide: sectors are compared over the same window */
+		if ((iv->rssi && !to_all) || iv->rssi > 50 || iv->payload > 50 ||
+		    iv->refresh > 3000 || iv->status > 50 || iv->counters > 3000) {
+			return NULL;
+		}
+		intervals.rssi = iv->rssi ? iv->rssi : intervals.rssi;
+		intervals.payload = iv->payload ? iv->payload : intervals.payload;
+		intervals.refresh = iv->refresh ? iv->refresh : intervals.refresh;
+		intervals.status = iv->status ? iv->status : intervals.status;
+		intervals.counters = iv->counters ? iv->counters : intervals.counters;
+		return "intervals set";
+	}
+	case bletracker_Command_budget_pct_tag:
+		if (c->action.budget_pct < 10 || c->action.budget_pct > 90) {
+			return NULL;
+		}
+		budget_pct = c->action.budget_pct;
+		return "budget set";
 	default:
 		return NULL;
 	}
@@ -763,95 +1067,346 @@ static const char *cmd_apply(uint8_t cmd, uint8_t arg)
 /* Decode, check and run queued gateway commands (system workqueue) */
 static void cmd_work_handler(struct k_work *work)
 {
+	static const uint8_t all[sizeof(chip_id)];
 	struct cmd_msg m;
 
 	ARG_UNUSED(work);
 
 	while (k_msgq_get(&cmd_q, &m, K_NO_WAIT) == 0) {
-		uint8_t raw[CMD_ENC_MAX];
+		bletracker_Command c = bletracker_Command_init_zero;
+		uint8_t raw[CMD_RAW_MAX];
 		int len = cobs_decode(m.enc, m.len, raw, sizeof(raw));
-		static const uint8_t all[CHIP_ID_LEN];
-		const uint8_t *target = &raw[1];
-		uint8_t cmd = raw[1 + CHIP_ID_LEN];
-		uint8_t arg = raw[2 + CHIP_ID_LEN];
+		pb_istream_t is;
 		bool to_all;
 		const char *result;
 
-		if (len != CMD_RAW_LEN) {
+		if (len < 3) {
 			cmd_bad_note(BAD_FRAME, m.enc, m.len);
 			continue;
 		}
-		if (raw[0] != CMD_VER) {
-			cmd_bad_note(BAD_VER, m.enc, m.len);
-			continue;
-		}
-		if (crc16_itu_t(0xffff, raw, CMD_RAW_LEN - 2) !=
-		    sys_get_le16(&raw[CMD_RAW_LEN - 2])) {
+		if (crc16_itu_t(0xffff, raw, len - 2) != sys_get_le16(&raw[len - 2])) {
 			cmd_bad_note(BAD_CRC, m.enc, m.len);
 			continue;
 		}
-		to_all = memcmp(target, all, CHIP_ID_LEN) == 0;
-		if (!to_all && memcmp(target, chip_id, CHIP_ID_LEN) != 0) {
+		is = pb_istream_from_buffer(raw, len - 2);
+		if (!pb_decode(&is, bletracker_Command_fields, &c) ||
+		    (c.target.size != 0 && c.target.size != sizeof(chip_id))) {
+			cmd_bad_note(BAD_DECODE, m.enc, m.len);
+			continue;
+		}
+		to_all = c.target.size == 0 || memcmp(c.target.bytes, all, sizeof(chip_id)) == 0;
+		if (!to_all && memcmp(c.target.bytes, chip_id, sizeof(chip_id)) != 0) {
 			atomic_inc(&cmds_other);
 			continue;
 		}
-		/* Every scanner would take the same sector */
-		result = (to_all && cmd == CMD_SECTOR) ? NULL : cmd_apply(cmd, arg);
+		result = cmd_apply(&c, to_all);
 		if (result == NULL) {
 			cmd_bad_note(BAD_ARG, m.enc, m.len);
-			printk("gateway command %u arg %u%s rejected\n", cmd, arg,
-			       to_all ? " (to all)" : "");
+			event_post(bletracker_Event_Category_COMMAND, bletracker_Event_Severity_WARN,
+				   bletracker_Event_Code_CMD_REJECTED, c.which_action, 0, c.seq,
+				   "command %u (action %u)%s rejected", c.seq, c.which_action,
+				   to_all ? " to all" : "");
 			continue;
 		}
 		atomic_inc(&cmds_ok);
-		printk("gateway command: %s (%u)%s\n", result, arg, to_all ? " (to all)" : "");
+		event_post(bletracker_Event_Category_COMMAND, bletracker_Event_Severity_INFO,
+			   bletracker_Event_Code_CMD_OK, c.which_action, 0, c.seq,
+			   "command %u: %s%s", c.seq, result, to_all ? " (to all)" : "");
 	}
 }
 
-static void frame_send(uint32_t drops)
+/* Append one Record as Bucket.records; false if it would pass `limit` bytes */
+static bool record_put(pb_ostream_t *s, const bletracker_Record *rec, size_t limit)
 {
-	uint8_t *p = frame_raw;
+	size_t size;
+	size_t need;
+
+	if (!pb_get_encoded_size(&size, bletracker_Record_fields, rec)) {
+		return false;
+	}
+	need = 1 + (size < 128 ? 1 : 2) + size;
+	if (s->bytes_written + need > limit) {
+		return false;
+	}
+	return pb_encode_tag(s, PB_WT_STRING, BUCKET_RECORDS_TAG) &&
+	       pb_encode_submessage(s, bletracker_Record_fields, rec);
+}
+
+static void addr_put(uint8_t out[6], const bt_addr_le_t *addr)
+{
+	for (int b = 0; b < 6; b++) {
+		out[b] = addr->a.val[5 - b];
+	}
+}
+
+static void level_set(uint8_t level)
+{
+	static const char *const names[] = {
+		"normal", "payload refresh slowed", "payload refresh off", "payloads off",
+		"RSSI trimmed",
+	};
+
+	if (level == load_level) {
+		return;
+	}
+	load_level = level;
+	event_post(bletracker_Event_Category_LOAD,
+		   level == 0 ? bletracker_Event_Severity_INFO :
+		   level < bletracker_LoadLevel_RSSI_TRIMMED ? bletracker_Event_Severity_WARN :
+		   bletracker_Event_Severity_ERROR,
+		   bletracker_Event_Code_LOAD_LEVEL, level, load_reasons, 0, "load level %u: %s",
+		   level, names[level]);
+}
+
+static void status_fill(bletracker_Status *st)
+{
+	strncpy(st->version, APP_VERSION_STRING, sizeof(st->version) - 1);
+	st->ext_antenna = ant_external;
+	st->listening = scanning;
+	st->active_scan = scan_active;
+	st->payloads = payloads_on;
+	st->flash_mode = flash_mode;
+	st->client = smp_conn != NULL;
+	st->test_image = !img_confirmed;
+	st->adverts = last_adverts;
+	st->dropped = last_dropped;
+	st->devices = last_devices;
+	st->load_reasons = load_reasons;
+	st->line_peak_pct = line_peak_pct;
+	st->budget_pct = budget_pct;
+	st->has_intervals = true;
+	st->intervals = intervals;
+	st->baud = uart_baud;
+}
+
+static void counters_fill(bletracker_Counters *c)
+{
+	c->uptime_s = k_uptime_get() / 1000;
+	c->buckets_sent = buckets_sent;
+	c->buckets_skipped = buckets_skipped;
+	c->cmds_ok = atomic_get(&cmds_ok);
+	c->cmds_bad = atomic_get(&cmds_bad);
+	c->cmds_other = atomic_get(&cmds_other);
+	c->rx_errors = atomic_get(&cmd_rx_errors);
+	c->payloads_sent = payloads_sent;
+	c->payloads_held = payloads_held;
+	c->rssi_trimmed = rssi_trimmed;
+	c->seen_evicted = seen_evicted;
+	c->events_lost = atomic_get(&events_lost);
+	c->boots = boot_count;
+	c->flash_opens = flash_opens;
+}
+
+/* RSSI records strongest mean first; true if any were left out */
+static bool rssi_put(pb_ostream_t *s, bletracker_Record *rec, size_t budget)
+{
+	bool trimmed = false;
+
+	for (uint8_t i = 0; i < n_tdevs; i++) {
+		uint8_t j = i;
+
+		/* mean_i > mean_j  <=>  sum_i * n_j > sum_j * n_i (counts are positive) */
+		while (j > 0 && (int64_t)tdevs[i].sum * tdevs[torder[j - 1]].count >
+				(int64_t)tdevs[torder[j - 1]].sum * tdevs[i].count) {
+			torder[j] = torder[j - 1];
+			j--;
+		}
+		torder[j] = i;
+	}
+
+	for (uint8_t k = 0; k < n_tdevs; k++) {
+		const struct tick_dev *d = &tdevs[torder[k]];
+		bletracker_Rssi *r = &rec->kind.rssi;
+
+		*rec = (bletracker_Record)bletracker_Record_init_zero;
+		rec->which_kind = bletracker_Record_rssi_tag;
+		addr_put(r->addr, &d->addr);
+		r->random = d->addr.type & 1;
+		r->adv_type = d->adv_type;
+		r->rssi_sum_dbm = d->sum;
+		r->count = d->count;
+		r->rssi_max_dbm = d->rssi_max;
+		r->has_tx_1m_dbm = d->tx_1m != TX_UNKNOWN;
+		r->tx_1m_dbm = r->has_tx_1m_dbm ? d->tx_1m : 0;
+		if (!record_put(s, rec, budget)) {
+			rssi_trimmed += n_tdevs - k;
+			trimmed = true;
+			break;
+		}
+	}
+	n_tdevs = 0;
+	tdevs_full = false;
+	return trimmed;
+}
+
+/* Due payloads, changed first, until the budget is used; true if any were held back */
+static bool payloads_put(pb_ostream_t *s, bletracker_Record *rec, size_t budget, int64_t now)
+{
+	int64_t refresh_ms = load_level >= bletracker_LoadLevel_REFRESH_OFF ? 0 :
+			     (int64_t)intervals.refresh * TICK_MS *
+			     (load_level == bletracker_LoadLevel_REFRESH_SLOWED ? 3 : 1);
+
+	for (;;) {
+		struct seen_dev *best_s = NULL;
+		struct seen_part *best = NULL;
+		int best_due = 0;
+		bletracker_Payload *p;
+
+		for (uint8_t i = 0; i < n_seen; i++) {
+			for (int k = 0; k < 2; k++) {
+				struct seen_part *c = &seen[i].p[k];
+				int due = seen_due(c, now, refresh_ms);
+
+				if (due > best_due ||
+				    (due && due == best_due && c->sent_at < best->sent_at)) {
+					best_s = &seen[i];
+					best = c;
+					best_due = due;
+				}
+			}
+		}
+		if (best == NULL) {
+			return false;
+		}
+
+		*rec = (bletracker_Record)bletracker_Record_init_zero;
+		if (best->type == BT_GAP_ADV_TYPE_SCAN_RSP) {
+			rec->which_kind = bletracker_Record_scan_rsp_tag;
+			p = &rec->kind.scan_rsp;
+		} else {
+			rec->which_kind = bletracker_Record_advert_tag;
+			p = &rec->kind.advert;
+		}
+		addr_put(p->addr, &best_s->addr);
+		p->random = best_s->addr.type & 1;
+		p->adv_type = best->type;
+		p->rssi_dbm = best->rssi;
+		p->data.size = best->len;
+		memcpy(p->data.bytes, best->data, best->len);
+		p->refresh = best_due == 1;
+		p->age_ticks = (now - best->heard_at) / TICK_MS;
+		if (!record_put(s, rec, budget)) {
+			for (uint8_t i = 0; i < n_seen; i++) {
+				payloads_held += (seen_due(&seen[i].p[0], now, refresh_ms) != 0) +
+						 (seen_due(&seen[i].p[1], now, refresh_ms) != 0);
+			}
+			return true;
+		}
+		best->sent_at = now;
+		best->sent_hash = best->hash;
+		payloads_sent++;
+	}
+}
+
+/* Build and send this tick's bucket; the throttle follows how full it was */
+static void tick_send(int64_t now, int64_t t_start)
+{
+	static bletracker_Record rec;
+	bletracker_Bucket hdr = bletracker_Bucket_init_zero;
+	bletracker_Event ev;
+	uint32_t seq = tick_seq++;
+	size_t budget = (size_t)uart_baud / 10 * TICK_MS / 1000 * budget_pct / 100;
 	size_t raw_len;
 	size_t tx_len;
+	pb_ostream_t s;
+	bool rssi_due = (seq + 1) % intervals.rssi == 0;
+	bool trimmed = false;
+	bool held = false;
+	uint32_t lost;
+	uint32_t pct;
 
 	if (!device_is_ready(gw_uart)) {
 		return;
 	}
 	if (frame_tx_pos < frame_tx_len) {
-		frames_skipped++;
-		frame_seq++; /* the gateway sees the gap */
+		/* The gateway sees the gap; this tick's RSSI is lost with it */
+		buckets_skipped++;
+		load_reasons |= bletracker_LoadReason_LOAD_LINE;
+		if (rssi_due) {
+			n_tdevs = 0;
+		}
 		return;
 	}
 
-	*p++ = FRAME_VER;
-	*p++ = sector_id;
-	*p++ = frame_seq++;
-	*p++ = (ant_external ? BIT(0) : 0) | (devs_full ? BIT(1) : 0) |
-	       (scanning ? 0 : BIT(2)) | (flash_mode ? BIT(3) : 0) |
-	       (smp_conn != NULL ? BIT(4) : 0) | (img_confirmed ? 0 : BIT(5));
-	sys_put_le16(MIN(sec_total, UINT16_MAX), p);
-	p += 2;
-	*p++ = n_devs;
-	*p++ = MIN(drops, UINT8_MAX);
-	memcpy(p, chip_id, CHIP_ID_LEN);
-	p += CHIP_ID_LEN;
+	s = pb_ostream_from_buffer(frame_raw, sizeof(frame_raw) - 2);
+	memcpy(hdr.chip_id, chip_id, sizeof(chip_id));
+	hdr.sector = sector_id;
+	hdr.seq = seq;
+	hdr.t_ms = (uint32_t)t_start;
+	hdr.tick_ms = TICK_MS;
+	hdr.chan = chan_now;
+	hdr.load = load_level;
+	pb_encode(&s, bletracker_Bucket_fields, &hdr);
 
-	for (uint8_t k = 0; k < n_devs; k++) {
-		const struct dev_agg *d = &devs[order[k]];
-		bool tx_valid = d->tx_1m != TX_UNKNOWN;
-
-		for (int b = 5; b >= 0; b--) {
-			*p++ = d->addr.a.val[b];
+	lost = atomic_get(&events_lost);
+	if (lost != (uint32_t)atomic_get(&events_lost_reported)) {
+		atomic_set(&events_lost_reported, lost);
+		event_post(bletracker_Event_Category_GENERAL, bletracker_Event_Severity_WARN,
+			   bletracker_Event_Code_EVENTS_LOST, lost, 0, 0, "%u events lost", lost);
+	}
+	while (k_msgq_get(&event_q, &ev, K_NO_WAIT) == 0) {
+		rec = (bletracker_Record)bletracker_Record_init_zero;
+		rec.which_kind = bletracker_Record_event_tag;
+		rec.kind.event = ev;
+		if (!record_put(&s, &rec, s.max_size)) {
+			atomic_inc(&events_lost);
+			break;
 		}
-		*p++ = (d->addr.type & 1) | ((d->adv_type & 0x7) << 1) | (tx_valid ? BIT(4) : 0);
-		*p++ = (uint8_t)d->rssi_med;
-		*p++ = (uint8_t)d->rssi_max;
-		*p++ = MIN(d->count, UINT8_MAX);
-		*p++ = tx_valid ? (uint8_t)d->tx_1m : 0;
 	}
 
-	raw_len = p - frame_raw;
-	sys_put_le16(crc16_itu_t(0xffff, frame_raw, raw_len), p);
+	if (seq % intervals.status == 0) {
+		rec = (bletracker_Record)bletracker_Record_init_zero;
+		rec.which_kind = bletracker_Record_status_tag;
+		status_fill(&rec.kind.status);
+		if (record_put(&s, &rec, s.max_size)) {
+			load_reasons = 0;
+			line_peak_pct = 0;
+		}
+	}
+	if (seq % intervals.counters == 0) {
+		rec = (bletracker_Record)bletracker_Record_init_zero;
+		rec.which_kind = bletracker_Record_counters_tag;
+		counters_fill(&rec.kind.counters);
+		record_put(&s, &rec, s.max_size);
+	}
+
+	if (rssi_due) {
+		if (tdevs_full) {
+			load_reasons |= bletracker_LoadReason_LOAD_TABLE;
+		}
+		trimmed = rssi_put(&s, &rec, MAX(budget, s.bytes_written));
+	}
+	if (payloads_on && load_level < bletracker_LoadLevel_PAYLOADS_OFF &&
+	    (seq + 1) % intervals.payload == 0) {
+		held = payloads_put(&s, &rec, budget, now);
+	}
+
+	pct = s.bytes_written * 100 / budget;
+	line_peak_pct = MAX(line_peak_pct, pct);
+	if (trimmed || held) {
+		load_reasons |= bletracker_LoadReason_LOAD_LINE;
+	}
+
+	/* Throttle: straight to 4 on a trim, up one step when payloads are held back,
+	 * down one step after CALM_TICKS quiet ticks (level 4: without a trim)
+	 */
+	if (trimmed) {
+		calm_ticks = 0;
+		level_set(bletracker_LoadLevel_RSSI_TRIMMED);
+	} else if (held) {
+		calm_ticks = 0;
+		level_set(MIN(load_level + 1, bletracker_LoadLevel_PAYLOADS_OFF));
+	} else if (load_level == bletracker_LoadLevel_RSSI_TRIMMED || pct < 50) {
+		if (load_level > 0 && ++calm_ticks >= CALM_TICKS) {
+			calm_ticks = 0;
+			level_set(load_level - 1);
+		}
+	} else {
+		calm_ticks = 0;
+	}
+
+	raw_len = s.bytes_written;
+	sys_put_le16(crc16_itu_t(0xffff, frame_raw, raw_len), &frame_raw[raw_len]);
 	raw_len += 2;
 
 	tx_len = cobs_encode(frame_raw, raw_len, frame_tx);
@@ -868,7 +1423,7 @@ static void frame_send(uint32_t drops)
 
 	frame_tx_pos = 0;
 	frame_tx_len = tx_len;
-	frames_sent++;
+	buckets_sent++;
 	uart_irq_tx_enable(gw_uart);
 }
 
@@ -919,14 +1474,26 @@ static void list_print(void)
 static void handle_adv(const struct adv_evt *evt)
 {
 	sec_total++;
-	agg_add(evt);
+	if (payloads_on) {
+		seen_add(evt, k_uptime_get());
+	}
 
 	if (print_raw) {
 		char addr_str[BT_ADDR_LE_STR_LEN];
+		char hex[2 * AD_MAX + 1];
 
 		bt_addr_le_to_str(&evt->addr, addr_str, sizeof(addr_str));
-		printk("%s rssi=%d type=%u\n", addr_str, evt->rssi, evt->type);
+		bin2hex(evt->data, evt->len, hex, sizeof(hex));
+		printk("%s rssi=%d type=%u ad=%s\n", addr_str, evt->rssi, evt->type,
+		       evt->len ? hex : "-");
 	}
+
+	/* Scan responses only feed payloads, so RSSI means the same in both scan modes */
+	if (evt->type == BT_GAP_ADV_TYPE_SCAN_RSP) {
+		return;
+	}
+	agg_add(evt);
+	tick_add(evt);
 
 	if (filter_on) {
 		if (sec_n == 0 || evt->rssi < sec_min) {
@@ -940,19 +1507,38 @@ static void handle_adv(const struct adv_evt *evt)
 	}
 }
 
-/* Once a second: flash mode timeout, and confirming a test image */
+/* Once a second: flash mode timeout, confirming a test image, periodic warnings */
 static void housekeeping(int64_t now)
 {
+	static uint32_t secs;
+	static uint32_t bad_seen;
+
 	if (flash_mode && smp_conn == NULL && now >= flash_until) {
-		flash_mode_set(false, 0);
-		printk("flash mode: off (timeout)\n");
+		flash_mode_set(false, 0, bletracker_Event_Source_GATEWAY, true);
 	}
 
 	if (!img_confirmed && now >= CONFIRM_AFTER_MS && scanning && flash_adv_ok) {
 		if (boot_write_img_confirmed() == 0) {
 			img_confirmed = true;
-			printk("image confirmed\n");
+			SECURITY_EVENT(INFO, IMAGE_CONFIRMED, 0, 0, "image %s confirmed",
+				       APP_VERSION_STRING);
 		}
+	}
+
+	secs++;
+	if (secs % 10 == 0) {
+		uint32_t bad = atomic_get(&cmds_bad);
+
+		if (bad - bad_seen >= 3) {
+			SECURITY_EVENT(WARN, BAD_COMMANDS, bad - bad_seen, 0,
+				       "%u bad command frames on D7 in 10 s", bad - bad_seen);
+		}
+		bad_seen = bad;
+	}
+	if (sector_id == SECTOR_UNSET && secs % 60 == 1) {
+		event_post(bletracker_Event_Category_GENERAL, bletracker_Event_Severity_WARN,
+			   bletracker_Event_Code_SECTOR_NOT_SET, 0, 0, 0,
+			   "sector not set (console: sector <n>)");
 	}
 }
 
@@ -1000,7 +1586,16 @@ static void report_second(void)
 	const char *ant = ant_external ? "ext" : "int";
 
 	agg_finish();
-	frame_send(drops);
+	last_adverts = sec_total;
+	last_dropped = drops;
+	last_devices = n_devs;
+	if (drops) {
+		load_reasons |= bletracker_LoadReason_LOAD_QUEUE;
+		/* Payload handling costs main-thread time: shed it */
+		if (payloads_on && load_level < bletracker_LoadLevel_PAYLOADS_OFF) {
+			level_set(load_level + 1);
+		}
+	}
 
 	if (filter_on) {
 		if (sec_n > 0) {
@@ -1022,8 +1617,8 @@ static void report_second(void)
 		if (chan_gap_us) {
 			snprintk(ch + len, sizeof(ch) - len, " switch=%uus", chan_gap_us);
 		}
-		printk("[1s] ant=%s ch=%s adverts=%u devices=%u dropped=%u%s%s\n", ant, ch,
-		       sec_total, n_devs, drops, scanning ? "" : " (listening off)",
+		printk("[1s] ant=%s ch=%s adverts=%u devices=%u dropped=%u load=%u%s%s\n", ant, ch,
+		       sec_total, n_devs, drops, load_level, scanning ? "" : " (listening off)",
 		       flash_mode ? " (flash mode)" : "");
 	}
 	chan_gap_us = 0;
@@ -1036,13 +1631,49 @@ static void report_second(void)
 	sec_sum = 0;
 }
 
+/* Boot count, reset cause, version change and test image, as security events */
+static void boot_events(void)
+{
+	uint32_t cause = 0;
+
+	boot_count++;
+	settings_save_one("scanner/boots", &boot_count, sizeof(boot_count));
+	if (hwinfo_get_reset_cause(&cause) == 0) {
+		hwinfo_clear_reset_cause();
+	}
+	/* Anything but power-on, a software reset or the debugger is worth a look */
+	if (cause & ~(RESET_POR | RESET_SOFTWARE | RESET_DEBUG)) {
+		SECURITY_EVENT(WARN, BOOT, cause, boot_count, "boot %u, reset cause 0x%x",
+			       boot_count, cause);
+	} else {
+		SECURITY_EVENT(INFO, BOOT, cause, boot_count, "boot %u, reset cause 0x%x",
+			       boot_count, cause);
+	}
+
+	if (strcmp(last_version, APP_VERSION_STRING) != 0) {
+		SECURITY_EVENT(WARN, VERSION_CHANGED, 0, 0, "version %s -> %s",
+			       last_version[0] ? last_version : "?", APP_VERSION_STRING);
+		settings_save_one("scanner/ver", APP_VERSION_STRING, strlen(APP_VERSION_STRING));
+	}
+	if (!img_confirmed) {
+		SECURITY_EVENT(WARN, TEST_IMAGE, 0, 0, "test image %s (confirms after 60 s)",
+			       APP_VERSION_STRING);
+	}
+}
+
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 {
 	shell_print(sh, "version %s, image %s", APP_VERSION_STRING,
 		    img_confirmed ? "confirmed" : "TEST (not confirmed yet)");
-	shell_print(sh, "chip ID %s", chip_id_str);
-	shell_print(sh, "sector %u, antenna %s, listening %s", sector_id,
-		    ant_external ? "ext" : "int", scanning ? "on" : "off");
+	shell_print(sh, "chip ID %s, boot %u, flash mode opened %u times", chip_id_str,
+		    boot_count, flash_opens);
+	if (sector_id == SECTOR_UNSET) {
+		shell_print(sh, "sector NOT SET, antenna %s", ant_external ? "ext" : "int");
+	} else {
+		shell_print(sh, "sector %u, antenna %s", sector_id, ant_external ? "ext" : "int");
+	}
+	shell_print(sh, "listening %s (%s), payloads %s", scanning ? "on" : "off",
+		    scan_active ? "active" : "passive", payloads_on ? "on" : "off");
 	if (flash_mode) {
 		shell_print(sh, "flash mode on as %s, %s, %lld s left", flash_name,
 			    smp_conn ? "client connected" : "advertising",
@@ -1050,6 +1681,14 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 	} else {
 		shell_print(sh, "flash mode off");
 	}
+	shell_print(sh, "stream: %u ms ticks, %u baud, budget %u%%, load level %u", TICK_MS,
+		    uart_baud, budget_pct, load_level);
+	shell_print(sh, "intervals (ticks): rssi %u, payload %u, refresh %u, status %u, "
+		    "counters %u", intervals.rssi, intervals.payload, intervals.refresh,
+		    intervals.status, intervals.counters);
+	shell_print(sh, "payloads sent %u, held %u; rssi trimmed %u; addresses kept %u, "
+		    "evicted %u; events lost %u", payloads_sent, payloads_held, rssi_trimmed,
+		    n_seen, seen_evicted, (unsigned)atomic_get(&events_lost));
 	shell_print(sh, "gateway commands: %u ok, %u bad (cmdlog shows them), %u for others",
 		    (unsigned)atomic_get(&cmds_ok), (unsigned)atomic_get(&cmds_bad),
 		    (unsigned)atomic_get(&cmds_other));
@@ -1067,10 +1706,10 @@ static int cmd_cmdlog(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 	shell_print(sh, "last %u of %u bad frames (bytes before the 0x00, first %u kept):", n,
-		    cmd_bad_next, CMD_ENC_MAX);
+		    cmd_bad_next, CMD_BAD_SHOW);
 	for (unsigned int i = cmd_bad_next - n; i < cmd_bad_next; i++) {
 		struct cmd_bad e;
-		char hex[2 * CMD_ENC_MAX + 1];
+		char hex[2 * CMD_BAD_SHOW + 1];
 		unsigned int key = irq_lock();
 
 		e = cmd_bad_log[i % CMD_BAD_LOG];
@@ -1098,9 +1737,9 @@ static int cmd_ant(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
 		if (strcmp(argv[1], "ext") == 0) {
-			antenna_set(true);
+			antenna_set(true, bletracker_Event_Source_CONSOLE);
 		} else if (strcmp(argv[1], "int") == 0) {
-			antenna_set(false);
+			antenna_set(false, bletracker_Event_Source_CONSOLE);
 		} else {
 			shell_error(sh, "usage: ant [int|ext]");
 			return -EINVAL;
@@ -1113,19 +1752,23 @@ static int cmd_ant(const struct shell *sh, size_t argc, char **argv)
 static int cmd_sector(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		char *end;
-		long v = strtol(argv[1], &end, 10);
+		char *end = "";
+		long v = strcmp(argv[1], "unset") == 0 ? SECTOR_UNSET : strtol(argv[1], &end, 10);
 
-		if (*end != '\0' || v < 0 || v > 254) {
-			shell_error(sh, "usage: sector [0-254]");
+		if (*end != '\0' || v < 0 || v > SECTOR_UNSET) {
+			shell_error(sh, "usage: sector [0-254|unset]");
 			return -EINVAL;
 		}
-		if (sector_set((uint8_t)v) != 0) {
+		if (sector_set((uint8_t)v, bletracker_Event_Source_CONSOLE) != 0) {
 			shell_error(sh, "sector %ld NOT saved", v);
 			return -EIO;
 		}
 	}
-	shell_print(sh, "sector %u", sector_id);
+	if (sector_id == SECTOR_UNSET) {
+		shell_print(sh, "sector not set");
+	} else {
+		shell_print(sh, "sector %u", sector_id);
+	}
 	return 0;
 }
 
@@ -1143,6 +1786,53 @@ static int cmd_scan(const struct shell *sh, size_t argc, char **argv)
 		}
 	}
 	shell_print(sh, "listening %s", scanning ? "on" : "off");
+	return 0;
+}
+
+static int cmd_active(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc > 1) {
+		int on = on_off_arg(sh, argv[1], "active [on|off]");
+
+		if (on < 0) {
+			return on;
+		}
+		if (active_set(on) != 0) {
+			shell_error(sh, "scan restart failed");
+			return -EIO;
+		}
+	}
+	shell_print(sh, "scanning %s", scan_active ? "active" : "passive");
+	return 0;
+}
+
+static int cmd_data(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc > 1) {
+		int on = on_off_arg(sh, argv[1], "data [on|off]");
+
+		if (on < 0) {
+			return on;
+		}
+		payloads_on = on;
+	}
+	shell_print(sh, "payload records %s", payloads_on ? "on" : "off");
+	return 0;
+}
+
+static int cmd_budget(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc > 1) {
+		long v = strtol(argv[1], NULL, 10);
+
+		if (v < 10 || v > 90) {
+			shell_error(sh, "usage: budget [10-90]");
+			return -EINVAL;
+		}
+		budget_pct = (uint8_t)v;
+	}
+	shell_print(sh, "budget %u%% of %u baud per %u ms tick = %u bytes", budget_pct,
+		    uart_baud, TICK_MS, uart_baud / 10 * TICK_MS / 1000 * budget_pct / 100);
 	return 0;
 }
 
@@ -1195,7 +1885,7 @@ static int cmd_flash(const struct shell *sh, size_t argc, char **argv)
 		if (on < 0) {
 			return on;
 		}
-		if (flash_mode_set(on, FLASH_MODE_S) != 0) {
+		if (flash_mode_set(on, FLASH_MODE_S, bletracker_Event_Source_CONSOLE, false) != 0) {
 			shell_error(sh, "flash mode failed to start");
 			return -EIO;
 		}
@@ -1213,7 +1903,7 @@ static int cmd_reboot(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_inject(const struct shell *sh, size_t argc, char **argv)
 {
-	uint8_t buf[32];
+	uint8_t buf[CMD_ENC_MAX + 1];
 	size_t n = hex2bin(argv[1], strlen(argv[1]), buf, sizeof(buf));
 
 	if (n == 0) {
@@ -1293,17 +1983,22 @@ static int cmd_stream(const struct shell *sh, size_t argc, char **argv)
 		}
 		frame_dump = true;
 	}
-	shell_print(sh, "gateway uart21 (D6 TX): %s, sent=%u skipped=%u seq=%u",
-		    device_is_ready(gw_uart) ? "ready" : "NOT READY", frames_sent,
-		    frames_skipped, frame_seq);
+	shell_print(sh, "gateway uart21 (D6 TX): %s, buckets sent=%u skipped=%u seq=%u",
+		    device_is_ready(gw_uart) ? "ready" : "NOT READY", buckets_sent,
+		    buckets_skipped, tick_seq);
 	return 0;
 }
 
-SHELL_CMD_ARG_REGISTER(status, NULL, "Version, settings, flash mode, image state", cmd_status,
-		       1, 0);
-SHELL_CMD_ARG_REGISTER(sector, NULL, "Show or set the sector ID: sector [0-254]", cmd_sector,
-		       1, 1);
+SHELL_CMD_ARG_REGISTER(status, NULL, "Version, settings, flash mode, stream", cmd_status, 1, 0);
+SHELL_CMD_ARG_REGISTER(sector, NULL, "Show or set the sector claim: sector [0-254|unset]",
+		       cmd_sector, 1, 1);
 SHELL_CMD_ARG_REGISTER(scan, NULL, "Show or start/stop listening: scan [on|off]", cmd_scan, 1, 1);
+SHELL_CMD_ARG_REGISTER(active, NULL, "Active scanning (scan responses): active [on|off]",
+		       cmd_active, 1, 1);
+SHELL_CMD_ARG_REGISTER(data, NULL, "Payload records to the gateway: data [on|off]", cmd_data,
+		       1, 1);
+SHELL_CMD_ARG_REGISTER(budget, NULL, "Stream budget, % of the line: budget [10-90]",
+		       cmd_budget, 1, 1);
 SHELL_CMD_ARG_REGISTER(chan, NULL, "Primary channels scanned: chan [auto|37|38|39|rot [1-31]]",
 		       cmd_chan, 1, 2);
 SHELL_CMD_ARG_REGISTER(flash, NULL, "BLE update mode: flash [on|off]", cmd_flash, 1, 1);
@@ -1311,7 +2006,7 @@ SHELL_CMD_ARG_REGISTER(reboot, NULL, "Restart", cmd_reboot, 1, 0);
 SHELL_CMD_ARG_REGISTER(inject, NULL, "Feed hex bytes to the D7 command decoder: inject <hex>",
 		       cmd_inject, 2, 0);
 SHELL_CMD_ARG_REGISTER(cmdlog, NULL, "Last rejected D7 command frames", cmd_cmdlog, 1, 0);
-SHELL_CMD_ARG_REGISTER(stream, NULL, "Gateway frames: stream [dump]", cmd_stream, 1, 1);
+SHELL_CMD_ARG_REGISTER(stream, NULL, "Gateway buckets: stream [dump]", cmd_stream, 1, 1);
 SHELL_CMD_ARG_REGISTER(list, NULL, "Per-device table each second: list on|csv|off", cmd_list,
 		       2, 0);
 SHELL_CMD_ARG_REGISTER(minrssi, NULL, "Hide weaker devices in the list: minrssi <dBm>",
@@ -1323,12 +2018,15 @@ SHELL_CMD_ARG_REGISTER(print, NULL, "Raw advert lines: print on|off", cmd_print,
 int main(void)
 {
 	struct adv_evt evt;
-	int64_t next;
+	int64_t next_tick;
+	int64_t tick_start;
+	uint32_t ticks = 0;
 	int err;
 
 	printk("\nsector scanner %s\n", APP_VERSION_STRING);
 	k_msgq_init(&adv_q, adv_q_buf, sizeof(struct adv_evt), ADV_Q_LEN);
 	k_msgq_init(&cmd_q, cmd_q_buf, sizeof(struct cmd_msg), 4);
+	k_msgq_init(&event_q, event_q_buf, sizeof(bletracker_Event), EVENT_Q_LEN);
 	k_work_init(&cmd_work, cmd_work_handler);
 	k_work_init(&adv_work, adv_work_handler);
 
@@ -1350,14 +2048,20 @@ int main(void)
 	if (err == 0) {
 		err = settings_load_subtree("scanner");
 	}
-	printk("settings: %s, sector %u\n", err ? "NOT LOADED" : "loaded", sector_id);
+	if (sector_id == SECTOR_UNSET) {
+		printk("settings: %s, sector NOT SET\n", err ? "NOT LOADED" : "loaded");
+	} else {
+		printk("settings: %s, sector %u\n", err ? "NOT LOADED" : "loaded", sector_id);
+	}
+	boot_events();
 
 	err = antenna_init();
 	printk("rf switch: %s, antenna %s\n", err ? "NOT READY" : "on",
 	       ant_external ? "ext" : "int");
 
 	err = gw_uart_init();
-	printk("gateway uart: %s\n", err ? "NOT READY" : "uart21, D6 TX / D7 RX (commands)");
+	printk("gateway uart: %s, %u baud\n", err ? "NOT READY" : "uart21, D6 TX / D7 RX (commands)",
+	       uart_baud);
 
 	err = bt_enable(NULL);
 	if (err) {
@@ -1370,29 +2074,36 @@ int main(void)
 		printk("scan start failed (%d)\n", err);
 		return 0;
 	}
-	printk("scanning: passive, 100%% duty, duplicates kept\n");
+	printk("scanning: passive, 100%% duty, duplicates kept; buckets every %u ms, "
+	       "payloads off\n", TICK_MS);
 
 	if (img_confirmed) {
 		printk("flash mode: off (serial command \"flash on\" opens it)\n");
 	} else {
-		err = flash_mode_set(true, FLASH_TEST_WINDOW_S);
+		err = flash_mode_set(true, FLASH_TEST_WINDOW_S,
+				     bletracker_Event_Source_TEST_WINDOW, false);
 		printk("flash mode: %s\n", err ? "FAILED to start" : "on for 2 min (test image)");
 	}
 
-	next = k_uptime_get() + 1000;
+	tick_start = k_uptime_get();
+	next_tick = tick_start + TICK_MS;
 	for (;;) {
 		int64_t now = k_uptime_get();
 
-		if (now >= next) {
-			report_second();
-			housekeeping(now);
-			if (led.port) {
-				gpio_pin_toggle_dt(&led);
+		if (now >= next_tick) {
+			tick_send(now, tick_start);
+			tick_start = next_tick;
+			next_tick += TICK_MS;
+			if (++ticks % TICKS_PER_S == 0) {
+				report_second();
+				housekeeping(now);
+				if (led.port) {
+					gpio_pin_toggle_dt(&led);
+				}
 			}
-			next += 1000;
 			continue;
 		}
-		if (k_msgq_get(&adv_q, &evt, K_MSEC(next - now)) == 0) {
+		if (k_msgq_get(&adv_q, &evt, K_MSEC(next_tick - now)) == 0) {
 			handle_adv(&evt);
 		}
 	}

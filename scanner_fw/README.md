@@ -1,9 +1,12 @@
 # Sector scanner firmware (XIAO nRF54L15)
 
-nRF Connect SDK (Zephyr) app behind MCUboot. It does a passive scan, controls the RF switch and
-groups adverts per device each second. Once a second it sends a binary frame on the header UART
-for the gateway. The gateway sends commands back on the same UART: listen on/off, flash mode,
-antenna and sector. Each scanner's TX (D6) has its own gateway RX pin, which is how the gateway
+nRF Connect SDK (Zephyr) app behind MCUboot. It scans (passive, or active on command), controls
+the RF switch and every 200 ms sends the gateway a protobuf bucket on the header UART: RSSI per
+address, and optionally each address's raw advert and scan response bytes, plus status, events
+(security ones included) and counters. A byte budget and a throttle keep it inside the line,
+shedding payloads before RSSI. The gateway sends commands back on the same UART: listen, flash
+mode, antenna, sector, payloads, active scanning, intervals and budget. The stream is specified
+in [PROTOCOL.md](PROTOCOL.md) and [proto/bletracker.proto](proto/bletracker.proto). Each scanner's TX (D6) has its own gateway RX pin, which is how the gateway
 knows the sector; the gateway's one TX drives all three scanners' RX (D7) through the bus board,
 so commands are addressed by chip ID. In flash mode the scanner takes signed firmware updates
 over BLE, so it can be updated with the box sealed. The sector ID and antenna choice are kept in flash.
@@ -99,9 +102,11 @@ loader, so write both hex files with OpenOCD and the fixed load instead:
 openocd -s C:\ncs\v3.4.1\zephyr\boards\seeed\xiao_nrf54l15\support -f openocd.cfg -c "source {C:/fw/scanner_fw/support/scanner-load.tcl}" -c init -c "reset halt" -c "scanner-load C:/fw/scanner_fw/build/mcuboot/zephyr/zephyr.hex" -c "scanner-load C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.signed.hex" -c "verify_image C:/fw/scanner_fw/build/mcuboot/zephyr/zephyr.hex" -c "verify_image C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.signed.hex" -c reset -c shutdown
 ```
 
-No sector setup is needed: the gateway learns each scanner's chip ID from the RX pin its frames
-arrive on and sends it its sector (cmd 4). It is saved in flash and shows in the frame header and
-the flash-mode BLE name. On the bench without a gateway, `sector 0|1|2` on the console does the same.
+**Set the sector at assembly** (since 0.4.0): `sector 0|1|2` on the USB console, matching the
+antenna this board is wired to. It is saved in flash and sent in every bucket as the scanner's
+claim, and shows in the flash-mode BLE name. The gateway no longer sets it: it checks the claim
+against the RX pin and raises an error on a mismatch, which catches swapped wires or boards. A
+new board reports 255 (not set) and warns every minute until it is set.
 
 The app's version comes from `VERSION`. Bump it for every release so `status` and the update app
 show which image is running.
@@ -131,7 +136,7 @@ show which image is running.
 
 3. **The scanner reboots into the new image as a test.** MCUboot swaps it in. If the new image
    runs for 60 s with scanning and flash-mode advertising working, it confirms itself (`image
-   confirmed` on the console; header flag bit5 clears). If it crashes or hangs before then, the
+   confirmed` on the console; `Status.test_image` goes false and an `IMAGE_CONFIRMED` event is sent). If it crashes or hangs before then, the
    next reset puts the old image back.
 
 Only images signed with your key are accepted. Anyone in range during flash mode could connect,
@@ -182,7 +187,8 @@ What you see and type:
 - Every second: `[1s] ant=int ch=all adverts=37 devices=12 dropped=0` = adverts and distinct
   addresses heard in that second. `ch` is the primary channel scanned (`all` = the controller
   rotates 37-39); `switch=850us` follows it in a second that started with a channel change.
-- `print on`: one line per advert, e.g. `C1:7D:2B:AC:03:BC (random) rssi=-48 type=0`.
+- `print on`: one line per advert with its bytes, e.g.
+  `C1:7D:2B:AC:03:BC (random) rssi=-48 type=0 ad=0201060fff...`.
   `type` is the advert type: 0 connectable, 1 directed, 2 scannable, 3 non-connectable
   (most beacons), 4 scan response, 5 extended. `print off` to stop; it scrolls fast.
 - `list on`: a table each second, one row per device heard in that second, strongest first:
@@ -190,30 +196,40 @@ What you see and type:
   advertised 1 m power (iBeacon, or Eddystone UID/URL 0 m power minus 41; blank if none),
   advert type. Up to 64 devices; the median uses that second's last 32 adverts.
   `minrssi -80` hides weaker devices (`minrssi -127` shows all). `list off` to stop.
-- `list csv`: the same data in the gateway line format
-  `sector_id,address,addr_type,rssi_med,rssi_max,count,tx_1m` (sector_id is 0 until it's stored
-  in flash).
-- `stream`: gateway frame stats (sent, skipped, seq). `stream dump`: prints the next frame's
-  bytes in hex; `python tools/decode_frames.py --hex dump.txt` decodes a saved console log.
+- `list csv`: the same data as CSV
+  `sector_id,address,addr_type,rssi_med,rssi_max,count,tx_1m` (sector_id 255 = not set).
+- `stream`: bucket stats (sent, skipped, seq). `stream dump`: prints the next bucket's bytes in
+  hex; `python tools/decode_frames.py --hex dump.txt` decodes a saved console log.
+- `data on|off`: payload records (raw advert and scan response bytes) in the buckets. Off after
+  boot; the gateway turns them on.
+- `active on|off`: active scanning, which asks scannable devices for their scan response (names
+  are usually there). The scanner then transmits scan requests. Passive after boot.
+- `budget 10-90`: share of the line the buckets may use per tick (default 70). `budget 10` on
+  the bench forces the throttle (load levels in the `[1s]` line and as events).
 - `filter C1:7D:2B:AC:03:BC`: track one device; prints `n`, mean, min and max RSSI each second.
   `filter off` to go back.
 - `ant` / `ant int` / `ant ext`: show or switch antenna. The choice is saved in flash; a new
   board boots on `int` (onboard).
-- `status`: version, whether the image is confirmed, chip ID, sector, antenna, listening, flash
-  mode (time left, client connected) and gateway command counts (ok, bad, for other scanners).
-- `sector` / `sector 2`: show or set the sector ID (0-254, saved in flash). It goes in every
-  frame header and in the flash-mode BLE name.
-- `scan on|off`: start or stop listening. Frames keep coming with no devices and header flag bit2
-  set. Every boot starts listening.
+- `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts, sector,
+  antenna, listening (passive/active), payloads, flash mode (time left, client connected), the
+  stream (tick, baud, budget, load level, intervals, payload and trim counts) and gateway command
+  counts (ok, bad, for other scanners).
+- `sector` / `sector 2` / `sector unset`: show or set the sector claim (0-254, saved in flash).
+  It goes in every bucket and in the flash-mode BLE name. A change is a security event.
+- `scan on|off`: start or stop listening. Buckets keep coming with no RSSI records. Every boot
+  starts listening.
 - `flash on|off`: enter or leave flash mode (see above).
 - `reboot`: restart.
-- `chan auto|37|38|39|rot [s]`: primary channels scanned (bench test for frame v3, not saved,
+- `chan auto|37|38|39|rot [s]`: primary channels scanned (bench test, not saved,
   every boot is `auto`). `37`-`39` = that channel only; `rot 1` = 37, 38, 39 in turn, changing at
   the 1 s boundary. The controller only takes a new channel map when scanning starts, so each
   change stops and restarts the scan (`switch=` shows how long). `tools/chan_test.py` compares
   the modes.
 - `inject <hex>`: feed bytes to the D7 command decoder as if the gateway sent them. Get the hex
   from `python tools/decode_frames.py --cmd "flash on" --id <chip ID>` (no `--id` = all scanners).
+- `cmdlog`: the last rejected D7 command frames and why.
+- Events print as they happen, e.g. `[SECURITY WARN] flash mode on for 600 s (gateway)` or
+  `[WARN] load level 1: payload refresh slowed`.
 - `help`: lists all commands, including Zephyr's built-ins (`kernel uptime`, `device list`).
 
 Phones and most tags use random addresses that change every few minutes, so filter on a
@@ -221,62 +237,34 @@ fixed-address beacon for antenna tests.
 
 ## Gateway stream (header UART)
 
-Each second the scanner sends one binary frame of that second's per-device table on `uart21`:
-**D6 = TX, D7 = RX** (commands from the gateway, below), 115200 8N1, 3.3 V.
+Protocol 3 since 0.4.0 (it replaces the v2 one-frame-per-second format; a v2 gateway can't read
+it). Full spec: [PROTOCOL.md](PROTOCOL.md), schema: [proto/bletracker.proto](proto/bletracker.proto).
 
-Wiring (since v0.3.0): each scanner's D6 goes to its own gateway RX pin, and the gateway takes
-the sector from that pin. The gateway's single TX drives every scanner's D7 (bus-board row 1), so
-all scanners hear every command and each one acts only on commands for its chip ID.
+- `uart21`: **D6 = TX, D7 = RX**, 115200 8N1, 3.3 V. Each scanner's D6 goes to its own gateway
+  RX pin; the gateway's single TX drives every scanner's D7, so commands are addressed by chip ID.
+- Every 200 ms one `Bucket` (protobuf + CRC-16 + COBS + 0x00): chip ID, sector claim, tick seq,
+  uptime, channel, load level, then records: events, status (1 s), counters (10 s), RSSI per
+  address (every tick: sum, count and max, so the mean is exact), and, once the gateway turns
+  them on, changed advert / scan response bytes plus a refresh every 10 s.
+- Commands are protobuf too: listen, flash, antenna, sector, reboot, payloads, active scanning,
+  intervals, budget. Each is acknowledged with an event in the next bucket.
 
-The USB console is separate and unchanged. Every device heard is sent, strongest median first (`minrssi` only trims
-the console list).
+The firmware builds its C code from the schema with nanopb (in NCS, `CONFIG_NANOPB`). For the
+Python tools, `tools/bletracker_pb2.py` is generated with the toolchain's protoc:
 
-- Frames are COBS-encoded, so a frame never contains 0x00, and each is followed by a 0x00
-  delimiter. Little-endian.
-- Header, 16 bytes: `ver` (2), `sector`, `seq` (+1 per second, wraps; a gap = lost frame),
-  `flags`, `adverts` (u16), `n_devs`, `dropped`, `chip_id` (8 bytes: the nRF FICR device ID from
-  Zephyr's `hwinfo_get_device_id()`, sent and printed in the same byte order).
-  - v1 (before 0.3.0) had the same first 8 bytes and no `chip_id`.
-  - `flags`: bit0 external antenna, bit1 table full, bit2 listening off, bit3 flash mode,
-    bit4 update client connected, bit5 test image (not confirmed yet).
-  - Bits 2-5 were added in v0.2.0. A v0.1 reader just ignores them.
-- Record, 11 bytes each: address (6 bytes, most significant first, as printed), `flags`
-  (bit0 random address, bits1-3 advert type, bit4 tx_1m valid), `rssi_med`, `rssi_max`
-  (int8 dBm), `count` (adverts that second, max 255), `tx_1m` (int8, 0 when not valid).
-- CRC, 2 bytes: CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF, check "123456789" = 0x29B1) of
-  header + records. The receiver drops any frame whose CRC or length doesn't match.
+```bash
+C:\ncs\toolchains\4f5b6ad6dd\opt\nanopb\generator-bin\protoc.exe -Iproto --python_out=tools proto/bletracker.proto
+```
 
-Size: 16 + 11 x devices + 2, plus about 1 byte in 254 for COBS. 64 devices = about 720 bytes,
-roughly 60 ms of each second at 115200.
-
-To watch it from a PC, wire D6 to the RX of a 3.3 V USB-serial adapter (and GND), then:
+To watch it from a PC, wire D6 to the RX of a 3.3 V USB-serial adapter (and GND), then
+(`pip install protobuf pyserial`):
 
 ```bash
 python tools/decode_frames.py --port COM5
 ```
 
-### Commands (gateway -> scanner, D7)
-
-Commands use the same framing as frames: COBS, a 0x00 after each, and CRC-16/CCITT-FALSE. Each
-decodes to 13 bytes: `ver` (2), `target` (8 bytes), `cmd`, `arg`, then the CRC (LE) of the first 11.
-`target` is a chip ID from a frame header, or all zeros for every scanner. Sector can't go to all
-(it would give every scanner the same sector). A valid command for another chip ID is ignored and
-counted as "for others" in `status`. v1 commands (5 bytes, no target) are rejected as wrong length.
-
-| cmd | meaning | arg |
-| --- | --- | --- |
-| 1 | listen | 0 stop, 1 start |
-| 2 | flash mode | 0 leave, 1 enter (10 min, extended by each enter) |
-| 3 | antenna (saved) | 0 onboard, 1 external |
-| 4 | sector (saved) | 0-254 |
-| 5 | reboot | 0xA5 (anything else is rejected) |
-
-There is no reply: the result shows in the next frame's header (sector byte, flags bits 0, 2, 3).
-Frames with a bad CRC, an unknown command or a bad argument are counted as bad (`status`) and
-ignored.
-
-`python tools/decode_frames.py --cmd "flash on" --id 1a2b3c4d5e6f7081` prints a command's bytes
-for `inject`. With `--port COM5` (adapter TX wired to D7) it sends them.
+Without an adapter, `stream dump` on the console prints one bucket and
+`python tools/decode_frames.py --hex log.txt` decodes it.
 
 ## Bench tests
 
