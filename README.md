@@ -12,7 +12,7 @@ Passive RSSI only: it works with any beacon, with no pairing and no Channel Soun
 | Folder | What it is |
 | --- | --- |
 | [`scanner_fw/`](scanner_fw/README.md) | Scanner firmware: nRF Connect SDK / Zephyr behind MCUboot, with signed BLE updates. Build, flash, console commands; gateway protocol in `scanner_fw/PROTOCOL.md`. |
-| [`gateway/`](gateway/README.md) | ESPHome package, per-mast example config and the `sector_scanner` external component: binary UART frames in, JSON over MQTT out; sets each scanner's sector and passes commands to it. |
+| [`gateway/`](gateway/README.md) | ESPHome package, per-mast example config and the `sector_scanner` external component: protocol 3 buckets in, MQTT layout v3 out (batched RSSI, Theengs-style adverts, status, events, security stream, retained scanner state); checks each scanner's sector claim, keeps its settings applied and passes commands to it. |
 | [`shield_deck/`](shield_deck/README.md) | Copper shield deck PCB (Gerbers for PCBWay) and printable 1:1 drilling templates, generated from Python scripts. |
 | [`experiments/`](experiments/kicad_deck/README.md) | Side experiments (the deck redone in KiCad). |
 

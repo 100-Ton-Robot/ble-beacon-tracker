@@ -3,13 +3,15 @@
 # packages/bletracker-gateway.yaml.
 
 substitutions:
-  # Short, lowercase, no spaces: goes into the MQTT topics (bletracker/<mast>/<sector>) and
+  # Short, lowercase, no spaces: goes into the MQTT topics (bletracker/<mast>/...) and
   # the device name, so every mast needs its own.
   mast: example
   name: bletracker-${mast}
   friendly_name: BLE Tracker Example
   # API encryption key (also the OTA key). Give each mast its own secret, e.g. api_key_garage.
   api_key: !secret api_key
+  # Optional: a local NTP server instead of pool.ntp.org
+  # ntp_server: 192.0.2.1
 
 packages:
   gateway: !include packages/bletracker-gateway.yaml

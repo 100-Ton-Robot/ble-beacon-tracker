@@ -1,13 +1,16 @@
 # BLE tracker mast gateway, shared by every mast: ESP32-S3 + W5500 Ethernet, 3 sector
-# scanners on UART -> MQTT. Needs scanner firmware 0.3.0 or later (frame and command v2,
-# ../../scanner_fw/README.md). Each scanner's frames become one JSON message per second on
-# bletracker/<mast>/<sector>. Home Assistant gets the gateway's own entities over the
-# ESPHome API; MQTT carries only the beacon data and the commands.
+# scanners on UART -> MQTT. Needs scanner firmware 0.4.0 or later (protocol 3, protobuf
+# buckets every 200 ms: ../../scanner_fw/PROTOCOL.md). MQTT layout v3 under
+# bletracker/<mast>/ (topics and payloads: ../README.md "MQTT output"). Home Assistant gets
+# the gateway's own entities over the ESPHome API; MQTT carries only the beacon data, events
+# and commands.
 #
 # Not a device config on its own: each mast has a small file (see ../example-mast.yaml)
 # that sets mast, name, friendly_name and api_key, then includes this with `packages:`.
 
 substitutions:
+  # NTP server; a mast file can set a local one (a LAN server keeps "t" within a few ms)
+  ntp_server: pool.ntp.org
   # Pins: Waveshare ESP32-S3-ETH pinout (docs.waveshare.com/ESP32-S3-ETH). W5500 is on
   # GPIO 9-14. Not usable for the scanners: GPIO 4-7 (TF card), 0/3/45/46 (strapping),
   # 19/20 (USB), 33-37 (octal PSRAM on the S3R8), 43/44 (UART0 header pins, kept free).
@@ -61,12 +64,67 @@ ota:
     encryption:
       key: ${api_key}
 
-# Beacon data and commands only: no MQTT devices or entities in Home Assistant
+# SNTP, not Home Assistant time: HA sets the clock in whole seconds, and "t" in the MQTT
+# messages (and the planned frame v3 window sync) needs the sub-second phase
+time:
+  - platform: sntp
+    id: sntp_time
+    servers:
+      - ${ntp_server}
+
+# Mast-level topics; the sector topics come from sector_scanner below.
+#   bletracker/<mast>/online  retained online/offline (birth, will, shutdown)
+#   bletracker/<mast>/info    retained, at connect and on "clear"
+#   bletracker/<mast>/cmd     gateway commands: "reboot", "clear" (delete and republish the
+#                             retained topics). Scanner commands stay on <sector>/cmd, all/cmd.
+# Beacon data and commands only: no MQTT devices or entities in Home Assistant.
 mqtt:
   broker: !secret mqtt_broker
   username: !secret mqtt_username
   password: !secret mqtt_password
   discovery: false
+  birth_message:
+    topic: bletracker/${mast}/online
+    payload: online
+    retain: true
+  will_message:
+    topic: bletracker/${mast}/online
+    payload: offline
+    retain: true
+  shutdown_message:
+    topic: bletracker/${mast}/online
+    payload: offline
+    retain: true
+  on_connect:
+    - script.execute: publish_info
+  on_message:
+    - topic: bletracker/${mast}/cmd
+      then:
+        - lambda: |-
+            if (x == "reboot") {
+              ESP_LOGI("bletracker", "Reboot requested over MQTT");
+              App.safe_reboot();
+            } else if (x == "clear") {
+              id(scanners).clear_retained();
+              id(publish_info).execute();
+            } else {
+              ESP_LOGW("bletracker", "Unknown gateway command '%s'", x.c_str());
+            }
+
+script:
+  - id: publish_info
+    then:
+      - mqtt.publish:
+          topic: bletracker/${mast}/info
+          retain: true
+          payload: !lambda |-
+            char buf[96];
+            snprintf(buf, sizeof(buf), "{\"format\":3,\"esphome\":\"%s\",\"build\":%lld}", ESPHOME_VERSION,
+                     (long long) App.get_build_time());
+            return std::string(buf);
+
+sensor:
+  - id: !remove RSSI
 
 text_sensor:
   - platform: ethernet_info
@@ -75,109 +133,137 @@ text_sensor:
     mac_address:
       name: "MAC Address"
 
+
 # Sector 0's UART also carries the one command TX that every scanner hears; sectors 1
-# and 2 are RX-only. Commands are addressed by chip ID, so only the target acts.
+# and 2 are RX-only. Commands are addressed by chip ID, so only the target acts. A bucket can
+# reach ~2.3 KB, hence 4096-byte RX buffers.
 uart:
   - id: uart_s0
     rx_pin: ${s0_rx}
     tx_pin: ${cmd_tx}
     baud_rate: 115200
-    rx_buffer_size: 2048
+    rx_buffer_size: 4096
   - id: uart_s1
     rx_pin: ${s1_rx}
     baud_rate: 115200
-    rx_buffer_size: 2048
+    rx_buffer_size: 4096
   - id: uart_s2
     rx_pin: ${s2_rx}
     baud_rate: 115200
-    rx_buffer_size: 2048
+    rx_buffer_size: 4096
 
+# The RX pin is the sector. Each scanner's own sector claim (set at assembly) is checked on
+# every bucket: a mismatch is a SECURITY error, marks that sector's data suspect and turns on
+# "Sector N mismatch". expected_chip (16 hex digits) per sector adds a board check.
+# payloads / active_scan / budget / intervals: what the gateway keeps applied on every scanner
+# (they forget these at boot); MQTT commands change them until the gateway reboots.
 sector_scanner:
-  - id: scanner_s0
-    uart_id: uart_s0
-    command_uart_id: uart_s0
-    sector: 0
-    topic: bletracker/${mast}/0
-    command_topic: bletracker/${mast}/0/cmd
-    broadcast_command_topic: bletracker/${mast}/all/cmd
-    devices:
-      name: Sector 0 devices
-      filters:
-        - throttle: 10s
-    lost_frames:
-      name: Sector 0 lost frames
-      filters:
-        - throttle: 60s
-    bad_frames:
-      name: Sector 0 bad frames
-    chip:
-      name: Sector 0 chip
-  - id: scanner_s1
-    uart_id: uart_s1
-    command_uart_id: uart_s0
-    sector: 1
-    topic: bletracker/${mast}/1
-    command_topic: bletracker/${mast}/1/cmd
-    devices:
-      name: Sector 1 devices
-      filters:
-        - throttle: 10s
-    lost_frames:
-      name: Sector 1 lost frames
-      filters:
-        - throttle: 60s
-    bad_frames:
-      name: Sector 1 bad frames
-    chip:
-      name: Sector 1 chip
-  - id: scanner_s2
-    uart_id: uart_s2
-    command_uart_id: uart_s0
-    sector: 2
-    topic: bletracker/${mast}/2
-    command_topic: bletracker/${mast}/2/cmd
-    devices:
-      name: Sector 2 devices
-      filters:
-        - throttle: 10s
-    lost_frames:
-      name: Sector 2 lost frames
-      filters:
-        - throttle: 60s
-    bad_frames:
-      name: Sector 2 bad frames
-    chip:
-      name: Sector 2 chip
+  id: scanners
+  mast: ${mast}
+  topic_prefix: bletracker/${mast}
+  command_uart_id: uart_s0
+  payloads: true
+  active_scan: false
+  budget: 70
+  self_test: true
+  gateway_load:
+    name: Gateway load
+  self_test_result:
+    name: Self test
+  sectors:
+    - id: scanner_s0
+      uart_id: uart_s0
+      sector: 0
+      load:
+        name: Sector 0 load
+      lost_buckets:
+        name: Sector 0 lost buckets
+        filters:
+          - throttle: 60s
+      bad_frames:
+        name: Sector 0 bad frames
+        filters:
+          - throttle: 60s
+      devices:
+        name: Sector 0 devices
+        filters:
+          - throttle: 10s
+      mismatch:
+        name: Sector 0 mismatch
+      chip:
+        name: Sector 0 chip
+    - id: scanner_s1
+      uart_id: uart_s1
+      sector: 1
+      load:
+        name: Sector 1 load
+      lost_buckets:
+        name: Sector 1 lost buckets
+        filters:
+          - throttle: 60s
+      bad_frames:
+        name: Sector 1 bad frames
+        filters:
+          - throttle: 60s
+      devices:
+        name: Sector 1 devices
+        filters:
+          - throttle: 10s
+      mismatch:
+        name: Sector 1 mismatch
+      chip:
+        name: Sector 1 chip
+    - id: scanner_s2
+      uart_id: uart_s2
+      sector: 2
+      load:
+        name: Sector 2 load
+      lost_buckets:
+        name: Sector 2 lost buckets
+        filters:
+          - throttle: 60s
+      bad_frames:
+        name: Sector 2 bad frames
+        filters:
+          - throttle: 60s
+      devices:
+        name: Sector 2 devices
+        filters:
+          - throttle: 10s
+      mismatch:
+        name: Sector 2 mismatch
+      chip:
+        name: Sector 2 chip
 
-# Addressed to the chip last seen on that sector's UART
+# Addressed to the chip last seen on that sector's RX pin
 button:
   - platform: template
     name: Sector 0 flash mode
     entity_category: config
     on_press:
-      - lambda: id(scanner_s0).send_command(sector_scanner::CMD_FLASH, 1);
+      - lambda: id(scanner_s0).command("flash on");
   - platform: template
     name: Sector 0 reboot scanner
     entity_category: config
     on_press:
-      - lambda: id(scanner_s0).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
+      - lambda: id(scanner_s0).command("reboot");
   - platform: template
     name: Sector 1 flash mode
     entity_category: config
     on_press:
-      - lambda: id(scanner_s1).send_command(sector_scanner::CMD_FLASH, 1);
+      - lambda: id(scanner_s1).command("flash on");
   - platform: template
     name: Sector 1 reboot scanner
     entity_category: config
     on_press:
-      - lambda: id(scanner_s1).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
+      - lambda: id(scanner_s1).command("reboot");
   - platform: template
     name: Sector 2 flash mode
     entity_category: config
     on_press:
-      - lambda: id(scanner_s2).send_command(sector_scanner::CMD_FLASH, 1);
+      - lambda: id(scanner_s2).command("flash on");
   - platform: template
     name: Sector 2 reboot scanner
     entity_category: config
     on_press:
-      - lambda: id(scanner_s2).send_command(sector_scanner::CMD_REBOOT, sector_scanner::REBOOT_ARG);
+      - lambda: id(scanner_s2).command("reboot");
