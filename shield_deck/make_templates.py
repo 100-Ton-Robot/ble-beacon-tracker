@@ -1,5 +1,6 @@
 """1:1 printable PDF templates: shield deck drill template, electronics plate (both discs drawn the same way
-round, plate 12 o'clock up), the plate wiring diagram, then the back panel (reflector face).
+round, plate 12 o'clock up), the plate wiring diagram, the alt split plate, the flange plate and its stack views, then the back panel
+(reflector face).
 
 Uses the same geometry as make_shield_deck.py. Run:  python make_templates.py
 Print at 100% / "Actual size" and check the 100 mm scale bar with a ruler.
@@ -14,7 +15,7 @@ from reportlab.pdfgen import canvas
 import make_shield_deck as g
 
 PAGE_W, PAGE_H = letter
-FACE_H = 120.0                 # back panel height: square 120 x 120 faces so the core fits the bucket
+FACE_H = 120.0                 # back panel height: square 120 x 120 faces so the core fits the enclosure
 DIPOLE_HOLE = 6.5              # RP-SMA bulkhead at the face centre (DIY dipole option)
 # Printed-dipole panel board (measured 60 x 50 mm) taken out of its housing and turned 90 deg,
 # long bar vertical, centred across the face. Its own coax and stalk plug into the deck's P2 jack,
@@ -45,7 +46,7 @@ BOARD_CY_C = 73.0              # rows at 59 / 94 mm, clear of the A rows at 53 /
 # at 3, 7 and 11 o'clock on the plate, clear of the parts.
 PLATE_DIAMETER = 152.0
 PLATE_TURN = 30.0
-PLATE_M4 = 4.5
+PLATE_M4 = g.HOLE_M4
 PIGTAIL_HOLE = 10.0            # three coax + one MHF4 plug at a time; +-3 mm slack on the connector position
 PIGTAIL_DX = 1.15             # hole this far left of the strip middle: between the yellow and the S1 / S2 lanes
 IPEX_DY = 6.0                  # IPEX4 connector above the XIAO centre line (top view); ASSUMED, check on the board
@@ -116,9 +117,21 @@ def deck_page(c):
         path.lineTo(x * mm, y * mm)
     path.close()
     c.drawPath(path)
+    # M4 nuts under the deck, flush in the core corners (two flats on the faces' inner sides)
+    hr = g.NUT_AF / math.sqrt(3)
+    for d, x, y, lab in g.holes:
+        if lab == "M4 mount":
+            hexa = [P((x + hr * math.sin(math.radians(a)), y + hr * math.cos(math.radians(a))))
+                    for a in range(30, 390, 60)]
+            path = c.beginPath()
+            path.moveTo(hexa[0][0] * mm, hexa[0][1] * mm)
+            for hx, hy in hexa[1:]:
+                path.lineTo(hx * mm, hy * mm)
+            path.close()
+            c.drawPath(path)
     c.setDash()
 
-    letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
+    letters ={"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
     for d, x, y, lab in g.holes:
         if lab == "via":
             continue
@@ -127,6 +140,10 @@ def deck_page(c):
         c.circle(px * mm, py * mm, d / 2 * mm)
         c.setLineWidth(0.2)
         crosshair(c, px, py, d / 2)
+        if lab == "core feed":     # centre hole: the disc's centre crosshair marks it
+            c.setFont("Helvetica-Bold", 7)
+            c.drawString((px + d / 2 + 2) * mm, (py + 2) * mm, f"core {d:g}")
+            continue
         tag = "M4" if lab == "M4 mount" else letters[lab.split(" ", 1)[1]]
         # label just below each hole; patch holes sit close to the face line, so label them on the outer side
         c.setFont("Helvetica-Bold", 7)
@@ -157,12 +174,13 @@ def deck_page(c):
         "Solid circle = cut line (146 mm).  Dashed triangle = where the 120 mm back panels stand, copper side out.",
         f"D 6.5 mm = rubber duck / monopole ({g.DUCK_SPACING:g} mm in front of face)    "
         f"P / P2 6.5 mm = patch ({g.PATCH_OFFSET:g} mm in front of face; P2 {g.PATCH_END_INSET:g} mm from the face end)",
-        "C 10 mm = dipole coax pass-through (inside core)    M4 4.5 mm = bolts to the electronics plate (inside core)",
+        f"C 10 mm = dipole coax pass-through (inside core)    M4 {g.HOLE_M4:g} mm = bolts to the plate, nut flush in each core corner",
+        "Core 10 mm at the centre = antenna coax into the core; open it up with a hole saw (centre mark) if needed.",
         "Arrow points to Sector 0. Holes are symmetric, so the template also works flipped (labels read mirrored).",
         f"Drawn the same way round as the plate (page 2): plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it.",
     ]
     for n, t in enumerate(lines):
-        c.drawString(15 * mm, (52 - n * 5) * mm, t)
+        c.drawString(15 * mm, (57 - n * 5) * mm, t)
     scale_bar(c, 15, 22)
 
 
@@ -272,6 +290,32 @@ def plate_holes():
     return out
 
 
+# CA2100C 1/2" pipe flange under the plate, centred, holding the rod for the PoE splitter and ESP32 inside the core
+# (2026-11-01). Only its width is known (no drawing): the template gives a trace outline, the flange is set in it
+# with its 4 holes on the guide lines and marked through.
+FLANGE_OD = 3.53 * 25.4
+FLANGE_ROT = 45.0              # guide lines for the flange's 4 holes, clockwise from 12 o'clock
+
+
+def flange_trace(c, P, ox, oy):
+    r = FLANGE_OD / 2
+    c.saveState()
+    c.setStrokeColorRGB(0.0, 0.35, 0.8)
+    c.setFillColorRGB(0.0, 0.35, 0.8)
+    c.setLineWidth(0.5)
+    c.setDash(4, 2)
+    c.circle(*P(0, 0), r * mm)
+    c.setDash()
+    c.setLineWidth(0.25)
+    for k in range(4):
+        a = math.radians(FLANGE_ROT + 90 * k)
+        c.line(*P(0.3 * r * math.sin(a), 0.3 * r * math.cos(a)), *P((r + 3) * math.sin(a), (r + 3) * math.cos(a)))
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawCentredString(*P(0, -r + 9), f"CA2100C flange, underside ({FLANGE_OD:.1f} mm): set it in this circle,")
+    c.drawCentredString(*P(0, -r + 6.5), "holes on the 4 lines, mark through them")
+    c.restoreState()
+
+
 def plate_page(c):
     ox, oy = PAGE_W / mm / 2, 140
 
@@ -315,6 +359,7 @@ def plate_page(c):
         c.setFont("Helvetica", 6)
         c.drawCentredString(*P(XIAO_X + XIAO_L / 2 - 2.5, yc - 1), "USB")
         c.drawCentredString(*P(XIAO_X - XIAO_L / 2 + 3.5, yc + IPEX_DY - 1), "IPEX4")
+    flange_trace(c, P, ox, oy)
 
     for d, x, y, tag in plate_holes():
         c.setLineWidth(0.5)
@@ -687,21 +732,35 @@ def jst_head(c, x0, top):
 # pigtail before it bends to its deck jack. ESP32 and bus board on the top face; the PoE splitter goes in a 4" round
 # electrical box (1" hole), fed by a 90 deg adapter on the ESP32's RJ45. Each XIAO's 4-wire tail goes up through
 # its own harness hole to the JST pair on the top. Same plate frame as above: 12 o'clock up, M4 bolts unchanged.
-# Placed by search (2026-10-31): each XIAO is held by VHB plus one zip tie across it, so its tie holes and the
-# strap's run over the top face stay clear of the ESP32 and bus board, and the ESP32's straps under the plate
-# miss the XIAOs.
-ALT_XIAOS = ((-7.0, 26.0, 45.0), (-4.0, -34.0, 285.0), (-37.0, 26.0, 135.0))  # S0-S2: centre, angle of IPEX4 end
-ALT_XIAO_TIE_S = (2.0, -3.0, -3.0)  # tie across each XIAO this far along its axis (+ toward the IPEX4 end)
+# Layout (user, 2026-10-31): S0 parallel to the ESP32, S1 / S2 are S0 turned -120 / +120 deg about the plate
+# centre, so each radio sits the same way to its own deck jacks and bolts. Positions fine-tuned by search: each
+# XIAO is held by VHB plus one zip tie across it, its tie holes and the strap's run over the top face stay clear
+# of the ESP32 and bus board, the ESP32's straps under the plate miss the XIAOs, holes stay 3 mm inside the rim,
+# and the underside keeps clear of the deck's centre hole into the core.
+ALT_S0 = (47.5, 29.0, 202.0)  # S0 centre and angle of its IPEX4 end
+
+
+def _turned(p, d):
+    a = math.radians(d)
+    return (round(p[0] * math.cos(a) - p[1] * math.sin(a), 2), round(p[0] * math.sin(a) + p[1] * math.cos(a), 2),
+            (p[2] + d) % 360)
+
+
+ALT_XIAOS = tuple(_turned(ALT_S0, d) for d in (0, -120, 120))   # S0-S2: centre, angle of IPEX4 end
+ALT_XIAO_TIE_S = (2.0, 2.0, 2.0)  # tie across each XIAO this far along its axis (+ toward the IPEX4 end)
 ALT_IPEX = (8.25, 3.9)        # IPEX4 centre from the XIAO centre: toward its end, toward the pin edge (measured)
 ALT_MOUNT = 18.25             # tie mount centre along the XIAO axis (1.5 mm past the board end)
 ALT_MOUNT_SIDE = 12.5         # HS-100 adhesive mount, 3.2 mm slots
 ALT_HARNESS_S = 15.0          # harness hole on the XIAO axis, this far back from its centre (past the USB-C end)
 ALT_HARNESS_HOLE = 5.0        # 4 wires through; chamfer both edges
-ALT_ESP32 = (-24.0, 0.0)      # ESP32-S3-ETH centre, long axis east-west, RJ45 / USB-C end east (toward the centre),
-                              # so the header (VBUS 40 at the east end) is the south edge, facing the bus board
-ALT_ESP32_TIES = (-52.0, 0.0)  # tie x positions, holes ESP32_W / 2 + TIE_CLEAR above and below
-ALT_BUS = (-24.0, -21.0)      # bus board centre, long side east-west, hole at the east end
-ALT_BUS_HOLE = (-18.2, -21.0)
+ALT_ESP32 = (-32.0, -11.0)    # ESP32-S3-ETH centre
+ALT_ESP32_ANGLE = ALT_S0[2] - 180   # parallel to S0; RJ45 / USB-C end this way (toward 2 o'clock), so the header
+                                    # (VBUS 40 at that end) is the right-hand edge, facing the bus board
+ALT_ESP32_TIES = (-28.0, 24.0)  # ties along the ESP32 from its centre, holes ESP32_W / 2 + TIE_CLEAR either side
+ALT_BUS = (30.9, -18.1)       # bus board centre (user's spot, 2026-10-31: by the RJ45 end, where VBUS 40 is)
+ALT_BUS_ANGLE = 320.0         # its long axis; M3 hole this way along it
+ALT_BUS_HOLE_S = 5.8
+ALT_CORE_HOLE = 30.0          # keep-out round the deck's 10 mm centre hole, in case it is opened up with a hole saw
 ALT_DECK_JACK = 9.2           # RP-SMA bulkhead hex across corners: drawn where each deck jack sits under the plate
 
 
@@ -725,8 +784,14 @@ def alt_xiao(cx, cy, a, tie_s=0.0):
     return alt_quad(cx, cy, XIAO_L / 2, XIAO_W / 2, a), ipex, mount, usb, harness, ties
 
 
+def alt_at(cx, cy, a, s, n=0.0):
+    """Point s along and n left of a part's axis (angle a) from its centre."""
+    ux, uy = math.cos(math.radians(a)), math.sin(math.radians(a))
+    return cx + s * ux - n * uy, cy + s * uy + n * ux
+
+
 def alt_plate_holes():
-    out = [(PLATE_M3, *ALT_BUS_HOLE, "power")]
+    out = [(PLATE_M3, *alt_at(*ALT_BUS, ALT_BUS_ANGLE, ALT_BUS_HOLE_S), "power")]
     for v in g.VERTICES:
         a = math.radians(v + PLATE_TURN)
         out.append((PLATE_M4, g.MOUNT_RADIUS * math.sin(a), g.MOUNT_RADIUS * math.cos(a), "M4"))
@@ -734,9 +799,9 @@ def alt_plate_holes():
         *_, harness, ties = alt_xiao(*x, tie_s)
         out.append((ALT_HARNESS_HOLE, *harness, f"S{i} harness"))
         out += [(TIE_HOLE, tx, ty, f"S{i} tie") for tx, ty in ties]
-    for tx in ALT_ESP32_TIES:
+    for ts in ALT_ESP32_TIES:
         for sy in (-1, 1):
-            out.append((TIE_HOLE, tx, ALT_ESP32[1] + sy * (ESP32[2] / 2 + TIE_CLEAR), "tie"))
+            out.append((TIE_HOLE, *alt_at(*ALT_ESP32, ALT_ESP32_ANGLE, ts, sy * (ESP32[2] / 2 + TIE_CLEAR)), "tie"))
     return out
 
 
@@ -775,12 +840,14 @@ def alt_plate_page(c):
     letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
     turn = math.radians(PLATE_TURN)
     for d, x, y, lab in g.holes:
-        if lab in ("via", "M4 mount"):
+        if lab in ("via", "M4 mount", "core feed"):
             continue
         dx, dy = x - g.CX, y - g.CY
         px, py = dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn)
         c.circle(*P(px, py), ALT_DECK_JACK / 2 * mm)
         c.drawCentredString(*P(px, py - 1), f"{lab[:2]} {letters[lab.split(' ', 1)[1]]}")
+    c.circle(*P(0, 0), ALT_CORE_HOLE / 2 * mm)
+    c.drawCentredString(*P(0, -ALT_CORE_HOLE / 2 + 2), "deck centre 10 mm (hole saw room)")
     c.setDash()
 
     # underside: XIAOs, IPEX4 dots, tie mounts, coax start
@@ -807,24 +874,31 @@ def alt_plate_page(c):
         c.setFont("Helvetica-Bold", 9)
         c.drawCentredString(*P(cx, cy - 1.5), f"S{i}")
         c.setFont("Helvetica", 5.5)
-        c.drawCentredString(*P(*usb), "USB")
         c.drawCentredString(*P(mx, my - 0.8), "mount")
     c.setStrokeGray(0)
     c.setFillGray(0)
+    flange_trace(c, P, ox, oy)
 
     # top face: ESP32 and bus board
     c.setLineWidth(0.5)
-    ex, ey = ALT_ESP32
-    c.rect(*P(ex - ESP32[3] / 2, ey - ESP32[2] / 2), ESP32[3] * mm, ESP32[2] * mm)
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(*P(ex - 6, ey - 1), "ESP32-S3-ETH (top)")
-    c.setFont("Helvetica", 6)
-    c.drawRightString(*P(ex + ESP32[3] / 2 - 1.5, ey + 1.5), "RJ45 + 90 deg")
-    c.drawRightString(*P(ex + ESP32[3] / 2 - 1.5, ey - 3.5), "USB-C under")
-    c.drawCentredString(*P(ex - 6, ey - ESP32[2] / 2 + 1.5), "header pins 21-40 this edge, VBUS (40) east")
-    bx, by = ALT_BUS
-    c.rect(*P(bx - POWER[3] / 2, by - POWER[2] / 2), POWER[3] * mm, POWER[2] * mm)
-    c.drawCentredString(*P(bx - 2, by - 1), "bus (top)")
+    for (px, py), ang, draw in ((ALT_ESP32, ALT_ESP32_ANGLE, "esp"), (ALT_BUS, ALT_BUS_ANGLE, "bus")):
+        c.saveState()                                             # drawn in each part's own frame
+        c.translate(*P(px, py))
+        c.rotate(ang)
+        if draw == "esp":
+            L, W = ESP32[3] * mm, ESP32[2] * mm
+            c.rect(-L / 2, -W / 2, L, W)
+            c.setFont("Helvetica-Bold", 8)
+            c.drawCentredString(-6 * mm, -1 * mm, "ESP32-S3-ETH (top)")
+            c.setFont("Helvetica", 6)
+            c.drawRightString(L / 2 - 1.5 * mm, 1.5 * mm, "RJ45 + 90 deg")
+            c.drawRightString(L / 2 - 1.5 * mm, -3.5 * mm, "USB-C under")
+            c.drawCentredString(-6 * mm, -W / 2 + 1.5 * mm, "header pins 21-40 this edge, VBUS (40) at the RJ45 end")
+        else:
+            w, h = POWER[3] * mm, POWER[2] * mm
+            c.rect(-w / 2, -h / 2, w, h)
+            c.drawCentredString(-2 * mm, -1 * mm, "bus (top)")
+        c.restoreState()
 
     for d, x, y, tag in alt_plate_holes():
         c.setLineWidth(0.5)
@@ -832,16 +906,12 @@ def alt_plate_page(c):
         c.setLineWidth(0.2)
         crosshair(c, x + ox, y + oy, d / 2)
         c.setFont("Helvetica-Bold", 7)
-        if tag == "M4" and y > 0:              # top-left bolt: tie holes below and right, label on the left
-            c.drawRightString(*P(x - d / 2 - 2.5, y - 1), "M4")
-        elif tag == "M4":
+        if tag == "M4":
             c.drawCentredString(*P(x, y - d / 2 - 5), "M4")
-        elif tag.endswith("harness"):          # S0 and S2 holes sit side by side: S2 labelled left, others right
+        elif tag.endswith("harness"):          # labelled toward the plate centre
             c.setFont("Helvetica", 6)
-            if tag.startswith("S2"):
-                c.drawRightString(*P(x - d / 2 - 1.5, y - 1), "S2 wires")
-            else:
-                c.drawString(*P(x + d / 2 + 1.5, y - 1), f"{tag.split()[0]} wires")
+            k = 1 - (d / 2 + 5) / math.hypot(x, y)    # lands on the USB-C end of the board
+            c.drawCentredString(*P(x * k, y * k - 1), f"{tag.split()[0]} wires")
 
     c.setFont("Helvetica", 8.5)
     notes = [
@@ -851,13 +921,331 @@ def alt_plate_page(c):
         "XIAO, two across the ESP32.",
         "Underside (grey): XIAOs on VHB + a zip tie (grey bar), IPEX4 dot -> orange flat coax run -> HS-100 tie mount,",
         "which clamps it; bend only after the mount, down to its deck jack. Dotted circles: deck jacks below, not drilled.",
-        "Top: ESP32 RJ45 / USB-C end east, near the centre. A 90 deg adapter turns the RJ45 up; patch cable and the USB-C",
-        "power lead run through the 4\" box's 1\" hole to the PoE splitter. USB-C is under the board: slim plug.",
-        "Spacers 25-30 mm: the radios and the bulkhead backs share that gap.",
+        "Top: ESP32 parallel to S0, RJ45 / USB-C end toward 2 o'clock. A 90 deg adapter turns the RJ45 up; patch + USB-C",
+        "lead run through the 4\" box's 1\" hole to the PoE splitter. USB-C is under the board: slim plug. Spacers 25-30 mm.",
+        f"S1 / S2 are S0 turned 120 deg about the centre. Underside keeps clear of the deck's centre hole "
+        f"({ALT_CORE_HOLE:g} mm, assumed).",
     ]
     for n, t in enumerate(notes):
         c.drawString(15 * mm, (58 - n * 4.5) * mm, t)
     scale_bar(c, 15, 22)
+
+
+# Flange plate (2026-11-01): the PoE splitter and ESP32 hang inside the core on a 1/2" pipe screwed into the CA2100C
+# flange under the plate's centre, so the plate carries only the three XIAOs and the bus board, on top, in the ring
+# between the flange (89.7 mm) and the rim. Each XIAO sits over its own sector, between the M4 bolts, long axis
+# radial, USB-C toward the rim and IPEX4 end inward. Its pigtail comes up through its own hole beside that end; its
+# D6 wire goes back down the same hole to its ESP32 RX pin in the core; 5V / GND / D7 run over the top to the bus
+# board, which is fed (TX, GND, VBUS) up through the feed hole beside it. The pipe carries the ESP antenna's
+# pigtail and is capped (stack views), so the PoE cable passes the plate rim instead: no centre hole.
+FL_XIAO_R = 59.5              # XIAO centre radius: board 49-70 mm, clear of the flange and the rim
+FL_TIE_S = -4.0               # tie across each XIAO this far along its axis (+ toward the IPEX4 end)
+FL_PIGTAIL = (8.25, 14.9)     # pigtail hole from the XIAO centre: along toward IPEX4, beside it (IPEX4 side)
+FL_IPEX_SIDE = -1             # IPEX4 on the right, top view with USB-C toward you (user, 2026-11-01); 1 = left
+FL_BUS = (60.0, 60.0)         # bus board: clock angle, centre radius; long axis radial, M3 hole toward the rim
+FL_FEED = (75.0, 52.0, 6.0)   # ESP32 feed hole (TX, GND, VBUS up from the core): clock angle, radius, diameter
+
+
+def clock(r, a):
+    return r * math.sin(math.radians(a)), r * math.cos(math.radians(a))
+
+
+def fl_xiaos():
+    """Centre, angle of the IPEX4 end (inward, maths convention) and clock angle for S0-S2."""
+    out = []
+    for s in g.SECTORS:
+        a = s + PLATE_TURN                          # each XIAO over its own sector (bolts at the corners)
+        cx, cy = clock(FL_XIAO_R, a)
+        out.append((cx, cy, math.degrees(math.atan2(-cy, -cx)), a))
+    return out
+
+
+def fl_plate_holes():
+    out = []
+    for v in g.VERTICES:
+        a = math.radians(v + PLATE_TURN)
+        out.append((PLATE_M4, g.MOUNT_RADIUS * math.sin(a), g.MOUNT_RADIUS * math.cos(a), "M4"))
+    for i, (cx, cy, a, _) in enumerate(fl_xiaos()):
+        *_, ties = alt_xiao(cx, cy, a, FL_TIE_S)
+        out += [(TIE_HOLE, x, y, f"S{i} tie") for x, y in ties]
+        out.append((PIGTAIL_HOLE, *alt_at(cx, cy, a, FL_PIGTAIL[0], FL_IPEX_SIDE * FL_PIGTAIL[1]), f"S{i} pigtail"))
+    bx, by = clock(FL_BUS[1], FL_BUS[0])
+    out.append((PLATE_M3, *alt_at(bx, by, 90 - FL_BUS[0], ALT_BUS_HOLE_S), "power"))
+    out.append((FL_FEED[2], *clock(FL_FEED[1], FL_FEED[0]), "feed"))
+    return out
+
+
+def fl_plate_page(c):
+    ox, oy = PAGE_W / mm / 2, 140
+
+    def P(x, y):
+        return (x + ox) * mm, (y + oy) * mm
+
+    def poly(pts):
+        p = c.beginPath()
+        p.moveTo(*P(*pts[0]))
+        for q in pts[1:]:
+            p.lineTo(*P(*q))
+        p.close()
+        c.drawPath(p)
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
+                 f"FLANGE electronics plate - {PLATE_DIAMETER:g} mm disc - PRINT AT 100% (Actual size)")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                 "Viewed from the TOP. XIAOs + bus on top, flange underneath; PoE splitter + ESP32 inside the core.")
+    scale_bar(c, 15, PAGE_H / mm - 32)
+
+    c.setLineWidth(0.8)
+    c.circle(*P(0, 0), PLATE_DIAMETER / 2 * mm)
+    c.setLineWidth(0.3)
+    crosshair(c, ox, oy, 4)
+    flange_trace(c, P, ox, oy)
+
+    c.setLineWidth(0.4)
+    for i, (cx, cy, a, ca) in enumerate(fl_xiaos()):
+        board, ipex, *_, ties = alt_xiao(cx, cy, a, FL_TIE_S)
+        poly(board)
+        c.setStrokeGray(0.6)                 # its zip tie: strap over the board, through both holes
+        c.setLineWidth(1.2)
+        c.line(*P(*ties[0]), *P(*ties[1]))
+        c.setStrokeGray(0)
+        c.setLineWidth(0.4)
+        ix, iy = alt_at(cx, cy, a, ALT_IPEX[0], FL_IPEX_SIDE * ALT_IPEX[1])
+        c.circle(*P(ix, iy), 0.9 * mm, fill=1, stroke=0)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(*P(*alt_at(cx, cy, a, -1, 0)), f"S{i}")
+        c.setFont("Helvetica", 5.5)
+        c.drawCentredString(*P(*alt_at(cx, cy, a, -7.5, 0)), "USB")
+        c.drawCentredString(*P(*alt_at(cx, cy, a, ALT_IPEX[0] - 2.2, FL_IPEX_SIDE * ALT_IPEX[1])), "IPEX4")
+    bx, by = clock(FL_BUS[1], FL_BUS[0])
+    c.saveState()
+    c.translate(*P(bx, by))
+    c.rotate(90 - FL_BUS[0])
+    c.rect(-POWER[3] / 2 * mm, -POWER[2] / 2 * mm, POWER[3] * mm, POWER[2] * mm)
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(-3 * mm, -1 * mm, "bus")
+    c.restoreState()
+
+    for d, x, y, tag in fl_plate_holes():
+        c.setLineWidth(0.5)
+        c.circle(*P(x, y), d / 2 * mm)
+        c.setLineWidth(0.2)
+        crosshair(c, x + ox, y + oy, d / 2)
+        c.setFont("Helvetica-Bold", 7)
+        r = math.hypot(x, y)
+        if tag == "M4":
+            c.drawCentredString(*P(x * (r + 8) / r, y * (r + 8) / r - 1), "M4")
+        elif tag.endswith("pigtail"):
+            c.setFont("Helvetica", 6)
+            k = (r - d / 2 - 4) / r                   # toward the centre, clear of the board
+            c.drawCentredString(*P(x * k, y * k - 1), f"{tag.split()[0]} coax + D6")
+        elif tag == "feed":
+            c.setFont("Helvetica", 6)
+            c.drawCentredString(*P(x, y - d / 2 - 3), "ESP feed")
+
+    c.setFont("Helvetica", 8.5)
+    notes = [
+        f"Drill: 3 x {PLATE_M4:g} mm (M4) bolts to the deck, same as page 2; {PLATE_M3:g} mm (M3) bus board; "
+        f"3 x {PIGTAIL_HOLE:g} mm pigtail holes;",
+        f"{FL_FEED[2]:g} mm ESP feed hole (TX, GND, VBUS up from the core to the bus); {TIE_HOLE:g} mm pairs: one tie "
+        "across each XIAO.",
+        "Flange underneath (blue): set it in the circle, holes on the lines, mark through. Keep top-side parts out of the",
+        "circle: flange bolt heads. The PoE cable passes the plate rim (the pipe is capped: see the stack views).",
+        "Each XIAO sits over its own sector: pigtail up its hole to IPEX4, its D6 wire back down the same hole to its",
+        "ESP32 RX pin; 5V, GND and D7 over the top to the bus. IPEX4 (dot) is on the right seen from the top with",
+        "USB-C toward you, so each pigtail hole is on that side. USB-C toward the rim, clear of the M4 bolts.",
+    ]
+    for n, t in enumerate(notes):
+        c.drawString(15 * mm, (58 - n * 4.5) * mm, t)
+    scale_bar(c, 15, 22)
+
+
+# Stack views for the flange plate (2026-11-01): a 1/2" PVC pipe from the flange (via a male adapter) runs through
+# the deck's 2-1/4" centre hole the full height of the core and is capped flush with the core's far end. The cap
+# carries the ESP32's antenna (RP-SMA bulkhead, U.FL pigtail from the board down the pipe) and anchors the copper
+# end plate that closes the core (its shape, which must leave access, is still open). The PoE splitter and ESP32
+# hang on the pipe toward two of the core's corners, where the triangle is widest; the third corner is left for the
+# antenna pigtail and cables. Drawn to scale (STACK_SCALE), not a drilling template; flange, splitter, board depths
+# and the antenna are estimates.
+STACK_SCALE = 0.6
+PLATE_T = 3.0                 # acrylic plate, assumed
+SPACER = 27.0                 # plate underside -> deck top (25-30 mm spacers)
+DECK_T = 1.6
+FLANGE_H, FLANGE_HUB = 14.0, 32.0   # flange height and hub width, estimated (no drawing)
+PIPE_OD, PIPE_ID = 21.3, 15.8       # 1/2" Sch 40 PVC
+CAP_OD, CAP_H = 27.0, 22.0          # 1/2" PVC cap, approx.
+BOARD_OFF = 2.0               # board back off the pipe (zip ties over a thin spacer)
+BOARD_DROP = 8.0              # board top below the deck
+ESP_DEPTH = 15.0              # ESP32-S3-ETH, PCB + RJ45 height
+SPL_DEPTH = 20.0              # PoE splitter, estimated
+ESP_CLOCK, SPL_CLOCK = 90.0, 210.0  # corner directions (plate clock) they face
+ESP_ANT_L = 100.0             # ESP antenna below the cap, depends on the antenna
+
+
+def stack_page(c):
+    k = STACK_SCALE
+    tx, ty = 55.0, 178.0                       # top view centre (page mm)
+    sx, sy = 140.0, PAGE_H / mm - 52           # side view: plate top surface
+
+    def T(x, y):
+        return (tx + x * k) * mm, (ty + y * k) * mm
+
+    def S(x, z):
+        return (sx + x * k) * mm, (sy + z * k) * mm
+
+    def rect(F, x0, y0, x1, y1, dash=None, fill=None):
+        if dash:
+            c.setDash(*dash)
+        (a, b), (p, q) = F(x0, y0), F(x1, y1)
+        if fill is not None:
+            c.setFillGray(fill)
+        c.rect(min(a, p), min(b, q), abs(p - a), abs(q - b), fill=fill is not None)
+        c.setFillGray(0)
+        c.setDash()
+
+    def label(F, x, y, s, size=6, anchor="c"):
+        c.setFont("Helvetica", size)
+        {"c": c.drawCentredString, "l": c.drawString, "r": c.drawRightString}[anchor](*F(x, y), s)
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Flange stack - top and side views - scale 0.6 (NOT a drilling template)")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                 "Indoor way up: electronics plate on top, core and antennas below. Same plate frame as page 5 (12 o'clock up).")
+
+    # ---- top view: a cut through the core below the deck, looking down ----
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(tx * mm, (ty + 54) * mm, "TOP: inside the core, looking down")
+    tri_o = [clock(g.CIRCUMRADIUS, v + PLATE_TURN) for v in g.VERTICES]
+    tri_i = [clock(2 * (g.INRADIUS - g.FACE_THICK), v + PLATE_TURN) for v in g.VERTICES]
+    for pts, w in ((tri_o, 1.0), (tri_i, 0.3)):
+        c.setLineWidth(w)
+        p = c.beginPath()
+        p.moveTo(*T(*pts[0]))
+        for q in pts[1:]:
+            p.lineTo(*T(*q))
+        p.close()
+        c.drawPath(p)
+    c.setLineWidth(0.3)
+    c.setDash(1, 1.5)
+    c.circle(*T(0, 0), FLANGE_OD / 2 * k * mm)                 # above the deck
+    c.circle(*T(0, 0), 2.25 * 25.4 / 2 * k * mm)               # deck centre hole
+    c.setDash()
+    c.circle(*T(0, 0), PIPE_OD / 2 * k * mm)
+    c.circle(*T(0, 0), PIPE_ID / 2 * k * mm)
+    hr = g.NUT_AF / math.sqrt(3)
+    c.setDash(1, 1)
+    for v in g.VERTICES:                                       # M4 nuts in the corners, under the deck
+        nx, ny = clock(g.MOUNT_RADIUS, v + PLATE_TURN)
+        hexa = [T(nx + hr * math.sin(math.radians(a)), ny + hr * math.cos(math.radians(a))) for a in range(30, 390, 60)]
+        p = c.beginPath()
+        p.moveTo(*hexa[0])
+        for q in hexa[1:]:
+            p.lineTo(*q)
+        p.close()
+        c.drawPath(p)
+    c.setDash()
+    for ang, depth, half, name in ((ESP_CLOCK, ESP_DEPTH, ESP32[2] / 2, "ESP32"),
+                                   (SPL_CLOCK, SPL_DEPTH, SPLITTER[2] / 2, "PoE")):
+        r0 = PIPE_OD / 2 + BOARD_OFF
+        ux, uy = clock(1, ang)
+        vx, vy = uy, -ux
+        quad = [(ux * r + vx * t, uy * r + vy * t) for r, t in ((r0, -half), (r0 + depth, -half),
+                                                                (r0 + depth, half), (r0, half))]
+        c.setFillGray(0.85)
+        p = c.beginPath()
+        p.moveTo(*T(*quad[0]))
+        for q in quad[1:]:
+            p.lineTo(*T(*q))
+        p.close()
+        c.drawPath(p, fill=1)
+        c.setFillGray(0)
+        label(T, ux * (r0 + depth + 7), uy * (r0 + depth + 7) - 1, name, 6.5)
+    for i, s in enumerate(g.SECTORS):
+        label(T, *clock(g.INRADIUS + 9, s + PLATE_TURN), f"S{i} face", 6)
+    fx, fy = clock(42, 330.0)
+    label(T, fx, fy, "free corner:", 5.5)
+    label(T, fx, fy - 4, "antenna pigtail, cables", 5.5)
+    c.setFont("Helvetica", 5.5)
+    for n, t in enumerate(["dotted: flange (above the deck)", "and the 2-1/4\" deck hole;",
+                           "dotted hexes: M4 nuts under the deck"]):
+        c.drawString((tx - 45) * mm, (ty - 50 - n * 3) * mm, t)
+
+    # ---- side view: a cut through the centre along 3 o'clock - 9 o'clock ----
+    zd = -(PLATE_T + SPACER)                   # deck top
+    zc = zd - DECK_T - FACE_H                  # core far end
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(sx * mm, (sy + 10) * mm, "SIDE: cut through 3 - 9 o'clock")
+    c.setLineWidth(0.6)
+    rect(S, -PLATE_DIAMETER / 2, 0, PLATE_DIAMETER / 2, -PLATE_T, fill=0.92)
+    c.rect(*S(-FL_XIAO_R - XIAO_L / 2, 3.5), XIAO_L * k * mm, 3.5 * k * mm)   # S2 XIAO on top (9 o'clock)
+    label(S, -FL_XIAO_R, 9, "S2 XIAO", 5.5)
+    hole = 2.25 * 25.4 / 2
+    rect(S, -g.R, zd, -hole, zd - DECK_T, fill=0.6)
+    rect(S, hole, zd, g.R, zd - DECK_T, fill=0.6)
+    label(S, -g.R + 1, zd + 2, "deck", 5.5, "l")
+    rect(S, -FLANGE_OD / 2, -PLATE_T, FLANGE_OD / 2, -PLATE_T - 5)
+    rect(S, -FLANGE_HUB / 2, -PLATE_T - 5, FLANGE_HUB / 2, -PLATE_T - FLANGE_H)
+    label(S, -FLANGE_OD / 2 - 1, -PLATE_T - 6, "flange (height est.)", 5.5, "r")
+    # M4 bolt at 3 o'clock: spacer, bolt, nut in the corner under the deck
+    rect(S, g.MOUNT_RADIUS - 4, -PLATE_T, g.MOUNT_RADIUS + 4, zd)
+    c.setLineWidth(0.3)
+    c.line(*S(g.MOUNT_RADIUS, 1.5), *S(g.MOUNT_RADIUS, zd - DECK_T - 3.2))
+    rect(S, g.MOUNT_RADIUS - g.NUT_AF / 2, zd - DECK_T, g.MOUNT_RADIUS + g.NUT_AF / 2, zd - DECK_T - 3.2, fill=0.4)
+    label(S, g.MOUNT_RADIUS + 5, zd + 5, "M4 + spacer", 5.5, "l")
+    # core: the S2 face on the left, the corner between S0 and S1 on the right
+    for x0, x1 in ((-g.INRADIUS, -g.INRADIUS + g.FACE_THICK), (2 * (g.INRADIUS - g.FACE_THICK), g.CIRCUMRADIUS)):
+        rect(S, x0, zd - DECK_T, x1, zc, fill=0.55)
+    label(S, -g.INRADIUS - 2, zd - 40, "S2 face", 5.5, "r")
+    label(S, g.CIRCUMRADIUS + 2, zd - 40, "corner", 5.5, "l")
+    c.setLineWidth(1.4)
+    c.setDash(3, 2)
+    c.line(*S(-g.INRADIUS + g.FACE_THICK, zc), *S(2 * (g.INRADIUS - g.FACE_THICK), zc))
+    c.setDash()
+    label(S, 25, zc - 5, "copper end plate (shape TBD)", 5.5, "l")
+    # pipe, cap, antenna
+    c.setLineWidth(0.5)
+    rect(S, -PIPE_OD / 2, -PLATE_T - FLANGE_H, PIPE_OD / 2, zc + CAP_H - 3)
+    rect(S, -CAP_OD / 2, zc + CAP_H, CAP_OD / 2, zc, fill=0.8)
+    label(S, -CAP_OD / 2 - 1, zc + 8, "1/2\" cap", 5.5, "r")
+    label(S, -PIPE_OD / 2 - 9, zd - 70, "1/2\" PVC", 5.5, "r")
+    c.setLineWidth(1.2)
+    c.setDash(2, 1.5)
+    c.line(*S(0, zc), *S(0, zc - ESP_ANT_L))
+    c.setDash()
+    label(S, 2, zc - ESP_ANT_L + 4, "ESP antenna (RP-SMA in the cap)", 5.5, "l")
+    # boards on the pipe: ESP32 in the cut (3 o'clock), splitter behind (7 o'clock, dashed)
+    r0 = PIPE_OD / 2 + BOARD_OFF
+    zb = zd - DECK_T - BOARD_DROP
+    c.setLineWidth(0.5)
+    rect(S, r0, zb, r0 + ESP_DEPTH, zb - ESP32[3], fill=0.85)
+    label(S, r0 + ESP_DEPTH / 2, zb - 6, "RJ45", 5)
+    label(S, r0 + ESP_DEPTH / 2, zb - ESP32[3] / 2, "ESP32", 6)
+    sxx = [clock(r, SPL_CLOCK)[0] for r in (r0, r0 + SPL_DEPTH)]
+    rect(S, min(sxx), zb, max(sxx), zb - SPLITTER[3], dash=(2, 1.5))
+    label(S, sum(sxx) / 2, zb - SPLITTER[3] / 2, "PoE", 5.5)            # dashed: behind the cut
+
+    c.setFont("Helvetica", 8.5)
+    notes = [
+        f"Pipe: 1/2\" PVC ({PIPE_OD:g} mm OD) from the flange (male adapter) through the 2-1/4\" deck hole, ~{-zc - PLATE_T - FLANGE_H + 10:.0f} mm long "
+        "(check the flange's",
+        "thread depth), capped flush with the core's far end. The cap holds the ESP antenna's RP-SMA bulkhead; a U.FL pigtail",
+        "runs from the ESP32 through a hole in the pipe wall down to it. The cap also anchors the copper end plate (shape TBD).",
+        "Splitter and ESP32 zip-tied to the pipe facing the 3 and 7 o'clock corners (widest room), RJ45 / USB-C end up;",
+        "the 11 o'clock corner is left for the antenna pigtail and cables. PoE cable: down past the plate rim, through the deck hole.",
+        "Side: dashed box = PoE splitter, behind the cut. XIAOs, pigtail holes, bus board: as page 5. Estimates: flange height,",
+        "splitter size, board depths, antenna length.",
+    ]
+    for n, t in enumerate(notes):
+        c.drawString(15 * mm, (60 - n * 4.5) * mm, t)
+    c.setLineWidth(0.6)                        # 50 mm at drawing scale
+    c.line(15 * mm, 20 * mm, (15 + 50 * k) * mm, 20 * mm)
+    for t in (0, 25, 50):
+        c.line((15 + t * k) * mm, 20 * mm, (15 + t * k) * mm, 22.5 * mm)
+    c.setFont("Helvetica", 7)
+    c.drawString((18 + 50 * k) * mm, 19.5 * mm, "50 mm at drawing scale")
 
 
 def main():
@@ -865,7 +1253,7 @@ def main():
     out = os.path.join(here, "shield_deck_templates.pdf")
     c = canvas.Canvas(out, pagesize=letter)
     c.setTitle("Shield deck, back panel, electronics plate templates and plate wiring")
-    for page in (deck_page, plate_page, wiring_page, alt_plate_page, face_page):  # discs together, panel last
+    for page in (deck_page, plate_page, wiring_page, alt_plate_page, fl_plate_page, stack_page, face_page):  # discs together, panel last
         page(c)
         c.showPage()
     c.save()

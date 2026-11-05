@@ -8,7 +8,7 @@ import os
 import zipfile
 
 # ---------------- PARAMETERS (mm) ----------------
-DISC_DIAMETER = 146.0      # 6" pipe (~150-154 mm ID); tape the edge gap
+DISC_DIAMETER = 146.0      # fits the enclosure; tape any edge gap
 FACE_WIDTH = 120.0         # triangular reflector core face width
 DUCK_SPACING = 31.0        # antenna axis -> copper face (rubber duck / monopole hole)
 PATCH_OFFSET = 7.0         # patch connector axis -> copper face. Measured panel: axis in line with
@@ -16,7 +16,12 @@ PATCH_OFFSET = 7.0         # patch connector axis -> copper face. Measured panel
 PATCH_END_INSET = 14.0     # second patch hole per face: same offset, this far in from the face's end
                            # (the counter-clockwise end seen from the top)
 COAX_PASS_RADIUS = 20.0    # dipole coax pass-through, inside the core
-MOUNT_RADIUS = 45.0        # M4 bolts to the electronics plate, inside the core, toward the corners
+HOLE_CORE = 10.0           # centre hole into the core for antenna coax (2026-10-31); opened up with a hole
+                           # saw if more coax has to pass
+FACE_THICK = 1.6           # core face board (copper clad) thickness: the nuts sit against its inner side
+NUT_AF = 7.0               # M4 nut across flats (3.2 mm thick). One per core corner, under the deck, two
+                           # alternate flats flush against the faces and soldered to deck and faces (2026-11-01)
+NUT_GAP = 0.0              # extra room per face (e.g. for a seam fillet in the corner)
 EDGE_CLEAR = 0.5           # copper pull-back from the board edge
 RIM_MASK_WIDTH = 4.0       # exposed copper ring at the rim (copper-tape edge seal)
 SEAM_STRIP = 6.0           # exposed strip on the bottom for soldering the core seams
@@ -26,7 +31,7 @@ STITCH_COUNT = 36
 
 HOLE_RPSMA = 6.5           # RP-SMA bulkhead
 HOLE_COAX = 10.0           # coax + RP-SMA end pass-through
-HOLE_M4 = 4.5
+HOLE_M4 = 4.8              # M4 bolt, slightly loose so it finds the soldered nut
 HOLE_VIA = 0.6
 # -------------------------------------------------
 
@@ -34,6 +39,10 @@ R = DISC_DIAMETER / 2
 CX = CY = R                     # board origin at lower-left of the bounding square
 INRADIUS = FACE_WIDTH / (2 * math.sqrt(3))
 CIRCUMRADIUS = 2 * INRADIUS
+# M4 bolts to the electronics plate, one per inside corner of the core: a hex nut in a 60 deg corner has its
+# centre twice its flat-to-face distance from the corner
+MOUNT_RADIUS = 2 * (INRADIUS - FACE_THICK - NUT_AF / 2 - NUT_GAP)
+NUT_PAD = 9.0              # bottom mask opening round each M4 hole (nut across corners ~8.1 mm) for the solder
 SECTORS = [0.0, 120.0, 240.0]   # face normals, clockwise from +Y (Sector 0 up)
 VERTICES = [60.0, 180.0, 300.0]
 
@@ -64,6 +73,7 @@ for i, s in enumerate(SECTORS):
     holes.append((HOLE_RPSMA, *pol(INRADIUS + PATCH_OFFSET, s), f"S{i} patch"))
     holes.append((HOLE_RPSMA, *face_pt(s, PATCH_OFFSET, FACE_WIDTH / 2 - PATCH_END_INSET), f"S{i} patch end"))
     holes.append((HOLE_COAX, *pol(COAX_PASS_RADIUS, s), f"S{i} dipole coax"))
+holes.append((HOLE_CORE, CX, CY, "core feed"))
 for v in VERTICES:
     holes.append((HOLE_M4, *pol(MOUNT_RADIUS, v), "M4 mount"))
 for k in range(STITCH_COUNT):
@@ -98,7 +108,7 @@ def text_strokes(s, cx, cy, h=4.0):
 
 
 silk = []
-silk += text_strokes("TOP", CX, CY)
+silk += text_strokes("TOP", *pol(10, 180))     # below the centre hole
 for i, s in enumerate(SECTORS):
     silk += text_strokes(f"S{i}", *pol(60, s + 20), h=5)
     silk += text_strokes("D", *pol(INRADIUS + DUCK_SPACING, s - 12))
@@ -162,13 +172,15 @@ def copper(name, func):
 def mask(name, func, bottom):
     lines = header(name, func, "Negative")
     lines += [f"%ADD11C,{PAD_EXPOSE:.3f}*%", f"%ADD12C,{RIM_MASK_WIDTH:.3f}*%",
-              f"%ADD13C,{SEAM_STRIP:.3f}*%"]
+              f"%ADD13C,{SEAM_STRIP:.3f}*%", f"%ADD15C,{NUT_PAD:.3f}*%"]
     lines += circle_stroke(R - RIM_MASK_WIDTH / 2, "D12")
     lines.append("D11*")
     for d, x, y, _ in holes:
         if d == HOLE_RPSMA:
             lines.append(f"{xy((x, y))}D03*")
     if bottom:
+        lines.append("D15*")
+        lines += [f"{xy((x, y))}D03*" for d, x, y, lab in holes if lab == "M4 mount"]
         lines.append("D13*")
         for a, b in seams:
             lines += polyline([a, b])
