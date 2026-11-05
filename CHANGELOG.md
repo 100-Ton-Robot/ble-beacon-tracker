@@ -66,6 +66,27 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
+### 0.4.0 (2026-11-02)
+
+Breaking: protocol 3 replaces frame and command v2, so a gateway needs protocol 3 to read this
+version or send it commands.
+
+- Stream: one protobuf `Bucket` every 200 ms with RSSI, optional advert and scan response bytes,
+  status, counters and events. Spec: `scanner_fw/PROTOCOL.md`.
+- A byte budget and a throttle keep the stream inside the line, shedding payloads before RSSI.
+- Commands are protobuf and acknowledged with an event. New ones: payloads, active scanning,
+  intervals and budget.
+- The sector is now set once at assembly (`sector 0|1|2` on the USB console) and checked by the
+  gateway. A board with no saved sector now reports "not set" (255); before this version it
+  showed 0, so a board that shows 0 on 0.3.x can show "not set" after updating.
+- Image: `scanner_fw/release/scanner_fw-0.4.0-dfu.zip`.
+
+### 0.3.1
+
+- Added the `chan` console command and `tools/chan_test.py`, a bench test of primary channel
+  scanning.
+- No image in `scanner_fw/release/`.
+
 ### 0.3.0 (2026-10-31)
 
 Breaking: a gateway from before this version can't read these frames, and its commands are

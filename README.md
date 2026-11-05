@@ -24,9 +24,10 @@ MCUboot was built with the same signing key, so build your own from source with 
 ## Status
 
 Work in progress:
-- Scanner firmware 0.3.0 runs on hardware.
-- The gateway (frame and command v2, needs scanner firmware 0.3.0 or later) runs on a board,
-  but hasn't received scanner frames on real wiring yet.
+- Scanner firmware 0.4.0 (protocol 3) runs on three boards, checked over the USB console. Its
+  D6 output and BLE update path haven't been tested on this version yet.
+- The gateway (protocol 3, needs scanner firmware 0.4.0 or later) passes its boot self-test on
+  a board, but hasn't received scanner data on real wiring yet.
 - The Home Assistant tracker isn't written yet.
 
 ## Bugs and contributions

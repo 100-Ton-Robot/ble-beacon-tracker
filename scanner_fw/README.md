@@ -102,6 +102,11 @@ loader, so write both hex files with OpenOCD and the fixed load instead:
 openocd -s C:\ncs\v3.4.1\zephyr\boards\seeed\xiao_nrf54l15\support -f openocd.cfg -c "source {C:/fw/scanner_fw/support/scanner-load.tcl}" -c init -c "reset halt" -c "scanner-load C:/fw/scanner_fw/build/mcuboot/zephyr/zephyr.hex" -c "scanner-load C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.signed.hex" -c "verify_image C:/fw/scanner_fw/build/mcuboot/zephyr/zephyr.hex" -c "verify_image C:/fw/scanner_fw/build/scanner_fw/zephyr/zephyr.signed.hex" -c reset -c shutdown
 ```
 
+**Later updates over USB:** write and verify only `zephyr.signed.hex` with the same command.
+MCUboot stays in place and the saved settings survive. With several boards attached, add
+`-c "adapter serial <probe serial>"` after `-f openocd.cfg`. The probe serial is the last part of
+the board's USB parent device ID, and `status` afterwards confirms the chip ID and version.
+
 **Set the sector at assembly** (since 0.4.0): `sector 0|1|2` on the USB console, matching the
 antenna this board is wired to. It is saved in flash and sent in every bucket as the scanner's
 claim, and shows in the flash-mode BLE name. The gateway no longer sets it: it checks the claim
