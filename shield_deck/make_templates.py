@@ -189,12 +189,12 @@ def deck_page(c):
         f"C 10 mm = dipole coax pass-through (inside core)    M4 {g.HOLE_M4:g} mm = bolts to the plate, nut flush in each core corner",
         "Core 10 mm at the centre = antenna coax into the core; open it up with a hole saw (centre mark) if needed.",
         f"Blue dashed {PIPE_SAW:.1f} mm (2-1/4\" hole saw) = pipe layout only (page 4): the pipe passes into the core;",
-        "it removes the C holes. Other layouts keep the 10 mm core hole.",
+        "it removes the C holes. Other layouts keep the 10 mm core hole. EU: a 57 mm hole saw is the same size.",
         "Arrow points to Sector 0. Holes are symmetric, so the template also works flipped (labels read mirrored).",
         f"Drawn the same way round as the plates: plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it.",
     ]
     for n, t in enumerate(lines):
-        c.drawString(15 * mm, (62 - n * 4.6) * mm, t)
+        c.drawString(15 * mm, (62 - n * 4.4) * mm, t)
     scale_bar(c, 15, 22)
 
 
@@ -1087,6 +1087,7 @@ def fl_plate_page(c):
         "across each XIAO.",
         f"Centre (blue): {ADAPTER_HOLE:g} mm (7/8\") hole for the 1/2\" male adapter's thread, which also goes through the",
         "enclosure bottom; the nut on top (dashed, size est.) clamps both. The PoE cable passes the plate rim (pipe is capped).",
+        "EU: a 20 mm x 1/2\" BSP male adaptor (R 1/2, 21 mm thread) fits the same 22 mm hole, held by a 1/2\" BSP backnut.",
         "Each XIAO sits over its own sector: pigtail up its hole to IPEX4, its D6 wire back down the same hole to its",
         "ESP32 RX pin; 5V, GND and D7 over the top to the bus. IPEX4 (dot) is on the right seen from the top with",
         "USB-C toward you, so each pigtail hole is on that side. USB-C toward the rim, clear of the M4 bolts.",
@@ -1094,8 +1095,8 @@ def fl_plate_page(c):
         "on the pipe inside the core (page 5: then skip the bus M3 and feed holes; 5V, GND, D7 go down the pigtail holes).",
     ]
     for n, t in enumerate(notes):
-        c.drawString(15 * mm, (59.5 - n * 4.0) * mm, t)
-    scale_bar(c, 15, 22)
+        c.drawString(15 * mm, (59.5 - n * 3.8) * mm, t)
+    scale_bar(c, 15, 12)
 
 
 # Stack views for the pipe plate (2026-11-01; flange replaced 2026-11-09): a 1/2" PVC male adapter's thread goes up
@@ -1321,15 +1322,18 @@ def stack_page(c):
         "OPTION: the bus board can go on the pipe (dashed, 11 o'clock, opposite the ESP32 and splitter) instead of on the plate.",
         "Side: dashed box = PoE splitter, behind the cut. XIAOs, pigtail holes: as page 4. Estimates: adapter, nut,",
         "enclosure bottom, splitter size, board depths, antenna length.",
+        "EU parts: 20 mm PVC-U pressure pipe (20 mm OD, 1.3 mm under 1/2\" Sch 40; same holes), a 20 mm solvent-weld end cap,",
+        "a 20 mm x 1/2\" BSP male adaptor and a 1/2\" BSP backnut, and a 57 mm hole saw for the deck. The RP-SMA bulkhead's",
+        "thread is 1/4\"-36 UNS everywhere: if that tap is hard to find, drill the cap 6.5 mm and use the bulkhead's own nut.",
     ]
     for n, t in enumerate(notes):
-        c.drawString(15 * mm, (64 - n * 4.2) * mm, t)
+        c.drawString(15 * mm, (70 - n * 3.8) * mm, t)
     c.setLineWidth(0.6)                        # 50 mm at drawing scale
-    c.line(15 * mm, 20 * mm, (15 + 50 * k) * mm, 20 * mm)
+    c.line(15 * mm, 14 * mm, (15 + 50 * k) * mm, 14 * mm)
     for t in (0, 25, 50):
-        c.line((15 + t * k) * mm, 20 * mm, (15 + t * k) * mm, 22.5 * mm)
+        c.line((15 + t * k) * mm, 14 * mm, (15 + t * k) * mm, 16.5 * mm)
     c.setFont("Helvetica", 7)
-    c.drawString((18 + 50 * k) * mm, 19.5 * mm, "50 mm at drawing scale")
+    c.drawString((18 + 50 * k) * mm, 13.5 * mm, "50 mm at drawing scale")
 
 
 def main():
