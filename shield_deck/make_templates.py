@@ -13,27 +13,21 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 import make_shield_deck as g
+import params
+
+# Every number lives in parameters.csv (all groups but "deck", which make_shield_deck.py reads). Only values derived
+# from others are computed here.
+globals().update(params.load(exclude=["deck"]))
 
 PAGE_W, PAGE_H = letter
-FACE_H = 120.0                 # back panel height: square 120 x 120 faces so the core fits the enclosure
-DIPOLE_HOLE = 6.5              # RP-SMA bulkhead at the face centre (DIY dipole option)
 # Printed-dipole panel board (measured 60 x 50 mm) taken out of its housing and turned 90 deg,
 # long bar vertical, centred across the face. Its own coax and stalk plug into the deck's P2 jack,
 # which is on the right seen from the front, so the coax notch faces right.
-BOARD_W, BOARD_H = 50.0, 60.0  # as mounted: short side across, long side down
-BOARD_CY = 65.0                # board centre below the deck (A), 35-95 mm: as low as the coax reaches P2
-                               # (position B, one hole pitch lower, was dropped: it ran to 119 mm on a 120 mm face)
-BOARD_GAP = 7.0                # measured board -> foil reflector (8 mm over the post, minus 1 mm)
-POST_X, POST_Y = 35.0, 24.0    # post hole centres across / down (measured 35 short side, 24 long side)
-BOARD_HOLE = 2.45              # measured with a hole gauge: 2.4-2.5 mm (M2 clearance)
-POST_HOLE = 2.4                # face hole: M2 nylon screws, 14 mm, on 6-8 mm standoffs
-POST_EDGE = 2.8                # measured: board edge away from the notch -> edge of the nearest holes
 POST_SHIFT = BOARD_W / 2 - (POST_EDGE + BOARD_HOLE / 2 + POST_X / 2)  # ~3.5 mm: hole pattern off the board
                                                                       # centre, away from the coax notch
 # Test position C: board as it sat in the housing (long bar horizontal), coax notch up toward the deck.
 # Placed so its holes keep >= 5.5 mm (an M3 head) from the A holes. P2 sits 25 mm off the face centre (moved in
 # 2026-11-10), so the coax reaches it from either position without extending.
-BOARD_CY_C = 73.0              # rows at 59 / 94 mm, clear of the A rows at 53 / 77 mm
 
 # Electronics plate (separate ~152 mm acrylic disc). Top view: PoE splitter + ESP32 gateway on the left,
 # 3 bare XIAOs on the right, all three pigtails through one hole in the strip between the ESP32 and the XIAOs,
@@ -45,29 +39,6 @@ BOARD_CY_C = 73.0              # rows at 59 / 94 mm, clear of the A rows at 53 /
 # Three M4 bolts on spacers tie the plate to the deck through the deck's mount holes. The plate is turned
 # so its 12 o'clock is PLATE_TURN deg counter-clockwise of the deck's S0 arrow (top view); the bolts then land
 # at 3, 7 and 11 o'clock on the plate, clear of the parts.
-PLATE_DIAMETER = 152.0
-PLATE_TURN = 30.0
-PLATE_M4 = g.HOLE_M4
-PIGTAIL_HOLE = 10.0            # three coax + one MHF4 plug at a time; +-3 mm slack on the connector position
-PIGTAIL_DX = 1.15             # hole this far left of the strip middle: between the yellow and the S1 / S2 lanes
-IPEX_DY = 6.0                  # IPEX4 connector above the XIAO centre line (top view); ASSUMED, check on the board
-JST_YS = (33.0, 5.0, -13.0)    # mated JST pairs in the strip: S0 under the bus board, S1 / S2 below the hole
-TIE_HOLE = PLATE_M4            # zip tie holes: same 4.8 mm drill as the M4 bolts (user, 2026-11-09; ties are 2.5 mm)
-TIE_CLEAR = 3.0                # part edge -> tie hole centre
-XIAO_L, XIAO_W = 21.0, 17.8    # long axis radial, USB-C toward the rim, U.FL end toward the pigtail strip
-XIAO_X = 30.5                  # XIAO centre, right of the plate centre
-XIAO_YS = (37.0, 13.0, -13.0)  # S0, S1, S2; USB-C plugs pass above and below the 3 o'clock bolt
-XIAO_TIE_DX = (4.0, -4.0, 4.0)  # tie offset along each XIAO so neighbouring tie holes don't meet
-POWER = (4.0, 40.0, 12.7, 19.6)         # MBSS 4x4 pad board (0.5 x 0.77 in), top of the pigtail strip, hole end up
-POWER_HOLE = (10.35, 55.6)              # its hole, ~4 mm in from the top end
-PLATE_M3 = 3.4
-SPLITTER = (-58.0, -43.0, 29.0, 86.0)   # x0, y0, w, h - estimated from a photo, place by eye
-ESP32 = (-16.5, -36.0, 21.0, 72.8)      # Waveshare ESP32-S3-ETH, 72.8 x 21 mm (CNX spec list); RJ45 side up, RJ45 +
-                                        # USB-C end at the top (north), so VBUS (pin 40) is the top right header pin
-SPLITTER_TIES = (30.0, -30.0)           # tie y positions (ties run across the part)
-ESP32_TIES = (-4.0, -30.0)             # right-hand holes in the gaps between the S1 / S2 JST pairs and below
-JST_L, JST_W = 15.0, 12.0              # mated inline pair, estimated; lies across the strip
-JST_PITCH = 2.5                        # pin rows inside the mated pair, pin 1 at the top
 
 
 def scale_bar(c, x, y):
@@ -337,9 +308,6 @@ def plate_holes():
 # thread) under the plate, its thread up through the enclosure bottom and the plate's centre hole, a nut on top
 # clamping both. The 1/2" pipe in its socket hangs into the core. Hole: 7/8" for the 1/2" thread (21.3 mm OD);
 # the nut's size is an estimate (keep top-side parts clear of it).
-PIPE_SAW = 2.25 * 25.4         # deck centre hole for the pipe layout (hole saw by hand)
-ADAPTER_HOLE = 22.2            # 7/8" drill, 1/2" male pipe thread
-NUT_OD = 34.0                  # nut across corners, estimated
 
 
 def adapter_trace(c, P, ox, oy):
@@ -437,48 +405,25 @@ def plate_page(c):
 # 2026-10-31). Pad positions are approximate.
 # Wires run in straight lanes (see the lane constants below); the JST pair sits in the wire (pin number in the
 # XIAO-end label).
-XIAO_ROW = 7.6                 # pad rows +- this from the XIAO centre line
 ESP_PAD_X = ESP32[0] + ESP32[2] - 1.3   # header pads just inside the ESP32's right edge
 ESP_PIN40_Y = ESP32[1] + ESP32[3] - 2.5
-BUS_ROWS = (50.6, 48.1, 45.6, 43.1)     # pad rows A-D, top to bottom; A = ESP TX (every D7), B = GND, D = 5V
 BUS_COLS = tuple(POWER[0] + POWER[2] / 2 + k * 2.54 for k in (-1.5, -0.5, 0.5, 1.5))  # cols 1-4: ESP, S0, S1, S2
 RED, BLACK, YELLOW, GREEN = (0.85, 0.0, 0.0), (0.0, 0.0, 0.0), (0.85, 0.65, 0.0), (0.0, 0.6, 0.2)  # JST wire colours
 JST_PINS = ((RED, "red", "5V (14)"), (BLACK, "black", "GND (13)"), (YELLOW, "yellow", "D6 TX (7)"),
             (GREEN, "green", "D7 RX (8)"))   # JST pins 1-4, crimp side, key peg up, left to right
-SECTOR_PINS = ((34, 17), (32, 16), (31, 18))  # ESP32 RX for each sector's D6 (TX): header pin, GPIO; RX on 31-34,
-                                               # then TX (35), GND (38), VBUS (40): grouped by function
-ESP_TX = (35, 21)                              # ESP32 TX to the bus TX row, which feeds every XIAO's D7 (RX)
-WIRING_SCALE = 2.0             # enlarged for reading; not a drilling template
-WIRING_VIEW = (-15.0, -27.0, 68.0, 62.0)   # plate area shown: x0, y0, x1, y1
-WIRING_XIAO_X = XIAO_X + 6.0   # wiring page only: XIAOs drawn further right than on the retired plate, so the
-                               # far tails' lanes and the XIAO boards have room between them (user, 2026-11-09)
-WIRING_JST_YS = (25.0,) + JST_YS[1:]   # wiring page: S0's far half lower, below the S1 / S2 wires turning left
-                                       # under the bus (TOP_TURNS), so it covers none of them (user, 2026-11-09)
-WIRING_IPEX = (8.25, 3.9)      # IPEX4 from the XIAO centre: toward the far end, toward the D0-D6 row (measured)
+SECTOR_PINS = tuple(zip(SECTOR_RX_PINS, SECTOR_RX_GPIOS))   # (header pin, GPIO) of each sector's ESP32 RX
+WIRING_XIAO_X = XIAO_X + WIRING_XIAO_DX
 
 
 def esp_pin_y(n):
     return ESP_PIN40_Y - (40 - n) * 2.54
 
 
-JST_HALF = 5.0                 # one half of the pair as drawn on the wiring page (halves drawn apart)
-FAR_X0 = 10.8                  # far halves sit a little right of the strip middle, leaving lanes on both sides
-XIAO_JST_GAP = 6.0             # XIAO USB end -> XIAO half: room for the 4 tail lanes
-
 # Wiring page lanes, plate mm. Wires run straight in fixed lanes, so each bundle stays together:
 # - XIAO tail: yellow over the top edge of the XIAO, the rest under its bottom edge, then up the gap to the JST.
 # - Far tail: yellow left to its ESP32 RX pin; red up its bus column, black / green up lanes just left / right of
 #   it. S1 and S2 red / black / green go up the strip's right side, past the far halves above, then left under
 #   the bus. The ESP TX feed (green) goes up left of the bus and into the TX row from the side.
-XT_LANES = (1.0, 2.2, 3.4, 4.6)          # XIAO tail verticals right of the USB end: yellow, red, black, green
-XT_STEP = 0.6                            # lane spacing above / below the XIAO
-YELLOW_LANES = (6.0, 6.0, 5.2)           # yellow verticals to the ESP32 RX pins (S2 apart: it ends just below S1's)
-FEED_TX_LANE = 4.8                       # ESP TX feed vertical, left of the bus board's pads
-BUS_LANE = 0.85                          # black lane this far left of its bus column, green this far right
-RISE = (0.6, 1.3, 2.0)                   # S1 / S2 green, red, black: rise above the far half before turning right
-GREEN_RISE_X = 10.0                      # S1 / S2 green rises here, between the red rise and the far half
-RIGHT_LANES = (16.2, 16.85, 17.5, 18.15, 18.8, 19.45)  # S1 black, red, green, S2 black, red, green, up the right
-TOP_TURNS = (36.6, 37.4, 38.2, 39.0, 39.8, 40.6)       # same wires, turning left under the bus board
 
 
 def jst_halves(i):
@@ -652,7 +597,7 @@ def wiring_page(c):
         c.drawCentredString(*P(WIRING_XIAO_X + 2.0, yc + 3.3), f"S{i} XIAO")
         c.setFont("Helvetica", 5.5)
         c.drawRightString(*P(xr - 0.6, yc + 5.4), "USB-C")
-        ix, iy = WIRING_XIAO_X - WIRING_IPEX[0], yc + WIRING_IPEX[1]     # IPEX4: two rings, not a pad
+        ix, iy = WIRING_XIAO_X - XIAO_IPEX[0], yc + XIAO_IPEX[1]     # IPEX4: two rings, not a pad
         c.setStrokeColorRGB(0.1, 0.3, 0.75)
         c.setLineWidth(0.8)
         c.circle(*P(ix, iy), R(1.1))
@@ -821,38 +766,11 @@ def jst_head(c, x0, top):
 # XIAO is held by VHB plus one zip tie across it, its tie holes and the strap's run over the top face stay clear
 # of the ESP32 and bus board, the ESP32's straps under the plate miss the XIAOs, holes stay 3 mm inside the rim,
 # and the underside keeps clear of the deck's centre hole into the core.
-ALT_S0 = (53.56, 19.5, 110.0)  # S0 centre and angle of its IPEX4 end. Re-searched 2026-11-10 (user): the radios sit
-                                # in the empty space between the sectors' antenna holes (same spots as the pipe plate),
-                                # >= 8 mm from every antenna hole (the stiff coax comes straight up from its jack, the
-                                # spacer gap is its bend), coax flowing IPEX4 -> mount -> on to its own sector's holes
 
 
-def _turned(p, d):
-    a = math.radians(d)
-    return (round(p[0] * math.cos(a) - p[1] * math.sin(a), 2), round(p[0] * math.sin(a) + p[1] * math.cos(a), 2),
-            (p[2] + d) % 360)
+ALT_XIAOS = (ALT_S0, ALT_S1, ALT_S2)   # S0-S2: centre x, y and angle of the IPEX4 end
 
 
-ALT_XIAOS = tuple(_turned(ALT_S0, d) for d in (0, -120, 120))   # S0-S2: centre, angle of IPEX4 end
-ALT_XIAO_TIE_S = (-2.0, -2.0, -2.0)  # tie across each XIAO this far along its axis (+ toward the IPEX4 end)
-ALT_IPEX = (8.25, 3.9)        # IPEX4 centre from the XIAO centre: toward its end, toward the pin edge (measured)
-ALT_MOUNT = 18.25             # tie mount centre along the XIAO axis (1.5 mm past the board end)
-ALT_MOUNT_SIDE = 12.5         # HS-100 adhesive mount, 3.2 mm slots
-ALT_HARNESS_S = 15.0          # harness hole on the XIAO axis, this far back from its centre (past the USB-C end)
-ALT_HARNESS_HOLE = 5.0        # 4 wires through; chamfer both edges
-ALT_ESP32 = (10.0, 16.0)      # ESP32-S3-ETH centre. Re-searched 2026-11-10 with the antenna-hole keep-out (8 mm)
-                              # and the coax runs (2 mm): the only room left is across the middle, so the 30 mm
-                              # keep-out round the deck centre hole is dropped for this plate (it only clears the
-                              # 10 mm hole: don't open the alt deck up with a hole saw). Gaps are tight (~0.5 mm over
-                              # the margins): check with the real parts
-ALT_ESP32_ANGLE = 150.0       # RJ45 / USB-C end this way, hung RJ45 side down
-ALT_ESP32_TIES = (-15.0, 15.0)  # ties along the ESP32 from its centre, holes ESP32_W / 2 + TIE_CLEAR either side
-ALT_BUS = (-28.0, 16.0)       # bus board centre, ~19 mm from the ESP32's RJ45 end (VBUS 40)
-ALT_BUS_ANGLE = 150.0         # its long axis; M3 hole this way along it
-ALT_BUS_HOLE_S = 5.8
-ALT_CORE_HOLE = 10.0          # the deck's 10 mm centre hole, kept clear (was a 30 mm hole-saw keep-out until 2026-11-10:
-                              # no room left for it once the parts keep 8 mm off the antenna holes)
-ALT_DECK_JACK = 9.2           # RP-SMA bulkhead hex across corners: drawn where each deck jack sits under the plate
 
 
 def alt_quad(cx, cy, hl, hw, a):
@@ -864,7 +782,7 @@ def alt_quad(cx, cy, hl, hw, a):
 def alt_xiao(cx, cy, a, tie_s=0.0):
     """Board outline, IPEX4 point, tie mount outline, USB-end point, harness hole, tie holes for one XIAO."""
     ux, uy = math.cos(math.radians(a)), math.sin(math.radians(a))
-    along, side = ALT_IPEX
+    along, side = XIAO_IPEX
     ipex = (cx + along * ux - side * uy, cy + along * uy + side * ux)
     mount = alt_quad(cx + ALT_MOUNT * ux - side * uy, cy + ALT_MOUNT * uy + side * ux,
                      ALT_MOUNT_SIDE / 2, ALT_MOUNT_SIDE / 2, a)
@@ -1052,7 +970,7 @@ def alt_plate_page(c):
         "ESP32: across the middle, RJ45 / USB-C end toward 10 o'clock, hung RJ45 side down; USB-C then faces the plate: standoffs or a",
         "slim right-angle plug. A 90 deg adapter turns the RJ45 sideways; patch + USB-C lead to the PoE splitter's 4\" box.",
         "Bus by the ESP32's RJ45 end (VBUS 40). Spacers 25-30 mm. Clearances are tight (~2-3 mm): check with the real parts.",
-        "S1 / S2 are S0 turned 120 deg about the centre. The ESP32 only clears the deck's 10 mm centre hole: no hole saw there.",
+        "Positions: parameters.csv (lay out in plate_layout.svg). The ESP32 only clears the deck's 10 mm centre hole: no hole saw.",
         "OPTIONS (builder's choice): this alt split plate or the pipe plate (page 3). Wiring: page 6.",
     ]
     for n, t in enumerate(notes):
@@ -1068,20 +986,8 @@ def alt_plate_page(c):
 # hole to the deck jack. 5V / GND / D7 run over the top to the bus board; D6 runs over the top to the feed hole and
 # down it to its ESP32 RX pin in the core, beside TX, GND and VBUS coming up to the bus. The pipe carries the ESP antenna's
 # pigtail and is capped (stack views), so the PoE cable passes the plate rim instead.
-FL_XIAO_R = 57.0              # XIAO centre radius
-FL_XIAO_DA = 40.0             # XIAO centres this far (clock deg) off their sector axis. Searched 2026-11-10 (user):
-                              # parts sit in the empty space, >= 8 mm from every antenna hole (the stiff coax comes
-                              # straight up from its jack through the spacer gap, so nothing sits in its path), and
-                              # the coax flows one way: IPEX4 -> tie mount -> on toward its own sector's holes
-                              # (mount within 50 deg of the way to them, no other part in between, ~21-26 mm across
-                              # to the D and P jacks: room to bend in the 25-30 mm gap)
-FL_XIAO_ROT = -90.0           # long axis along the rim (tangential), IPEX4 end leading toward its own sector
-FL_TIE_S = -2.0               # tie across each XIAO this far along its axis (+ toward the IPEX4 end)
-FL_IPEX_SIDE = -1             # IPEX4 on the right, top view with USB-C toward you (user, 2026-11-01); 1 = left
 FL_UNDER_SIDE = -FL_IPEX_SIDE  # the XIAOs hang component side down under the plate (user, 2026-11-10), so seen
                                # from the top through the plate the IPEX4 is on the other side
-FL_BUS = (60.0, 30.0)         # bus board: clock angle, centre radius; long axis radial, M3 hole toward the rim
-                              # (moved in beside the nut, user 2026-11-09; option: on the pipe instead, stack view)
 # No feed hole since 2026-11-10: the bus is under the plate, so TX, GND, VBUS and the three D6 pass the deck's
 # 2-1/4" centre hole between the core and the bus without crossing the plate.
 
@@ -1176,8 +1082,8 @@ def fl_plate_page(c):
         ants.setdefault(tag.split()[0], []).append((hx, hy))
     for i, (cx, cy, a, ca) in enumerate(fl_xiaos()):
         board, ipex, *_, ties = alt_xiao(cx, cy, a, FL_TIE_S)
-        ix, iy = alt_at(cx, cy, a, ALT_IPEX[0], FL_UNDER_SIDE * ALT_IPEX[1])
-        mx, my = alt_at(cx, cy, a, ALT_MOUNT, FL_UNDER_SIDE * ALT_IPEX[1])     # 1/2" tie mount past the IPEX4 end
+        ix, iy = alt_at(cx, cy, a, XIAO_IPEX[0], FL_UNDER_SIDE * XIAO_IPEX[1])
+        mx, my = alt_at(cx, cy, a, ALT_MOUNT, FL_UNDER_SIDE * XIAO_IPEX[1])     # 1/2" tie mount past the IPEX4 end
         c.setStrokeColorRGB(0.9, 0.55, 0.1)       # coax options: mount -> each of its sector's antenna holes
         c.setLineWidth(0.6)
         c.setDash(1.5, 1)
@@ -1212,13 +1118,13 @@ def fl_plate_page(c):
         c.line(*P(*ties[0]), *P(*ties[1]))
         c.setStrokeGray(0)
         c.setLineWidth(0.4)
-        ix, iy = alt_at(cx, cy, a, ALT_IPEX[0], FL_UNDER_SIDE * ALT_IPEX[1])
+        ix, iy = alt_at(cx, cy, a, XIAO_IPEX[0], FL_UNDER_SIDE * XIAO_IPEX[1])
         c.circle(*P(ix, iy), 0.9 * mm, fill=1, stroke=0)
         c.setFont("Helvetica-Bold", 9)
         c.drawCentredString(*P(*alt_at(cx, cy, a, -1, 0)), f"S{i}")
         c.setFont("Helvetica", 5.5)
         c.drawCentredString(*P(*alt_at(cx, cy, a, -7.5, 0)), "USB")
-        c.drawCentredString(*P(*alt_at(cx, cy, a, ALT_IPEX[0] - 2.2, FL_UNDER_SIDE * ALT_IPEX[1])), "IPEX4")
+        c.drawCentredString(*P(*alt_at(cx, cy, a, XIAO_IPEX[0] - 2.2, FL_UNDER_SIDE * XIAO_IPEX[1])), "IPEX4")
     bx, by = clock(FL_BUS[1], FL_BUS[0])
     c.saveState()
     c.translate(*P(bx, by))
@@ -1282,25 +1188,6 @@ def fl_plate_page(c):
 # hang on the pipe toward two of the core's corners, where the triangle is widest; the third corner is left for the
 # antenna pigtail and cables. Drawn to scale (STACK_SCALE), not a drilling template; adapter, nut, splitter, board depths
 # and the antenna are estimates.
-STACK_SCALE = 0.6
-PLATE_T = 3.0                 # acrylic plate, assumed
-SPACER = 27.0                 # plate underside -> deck top (25-30 mm spacers)
-DECK_T = 1.6
-ENC_T = 2.0                   # enclosure bottom (HDPE) under the plate, assumed
-NUT_H = 7.0                   # nut on the adapter thread, estimated
-ADP_HEX_W, ADP_HEX_H = 30.0, 8.0    # adapter hex / shoulder under the enclosure bottom, estimated
-ADP_SOCK_OD, ADP_SOCK_H = 27.0, 22.0  # adapter socket the pipe glues into, estimated
-PIPE_OD, PIPE_ID = 21.3, 15.8       # 1/2" Sch 40 PVC
-CAP_OD, CAP_H = 27.0, 22.0          # 1/2" PVC cap, approx.
-NOTCH_H = 6.0                       # pigtail notch in the cap rim, assumed
-BOARD_OFF = 2.0               # board back off the pipe (zip ties over a thin spacer)
-BOARD_DROP = 8.0              # board top below the deck
-ESP_DEPTH = 15.0              # ESP32-S3-ETH, PCB + RJ45 height
-SPL_DEPTH = 20.0              # PoE splitter, estimated
-ESP_CLOCK, SPL_CLOCK = 90.0, 210.0  # corner directions (plate clock) they face
-BUS_CLOCK, BUS_DEPTH = 330.0, 5.0   # option: bus board on the pipe, the third side: 11 o'clock corner, opposite
-                                    # the ESP32 and splitter (user, 2026-11-09); board + pads
-ESP_ANT_L = 100.0             # ESP antenna below the cap, depends on the antenna
 
 
 def stack_page(c):

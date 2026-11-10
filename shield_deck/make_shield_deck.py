@@ -1,42 +1,17 @@
 """Generate PCBWay-ready Gerber + Excellon files for the round copper shield deck.
 
-Edit the PARAMETERS block and re-run:  python make_shield_deck.py
+Edit the "deck" rows of parameters.csv and re-run:  python make_shield_deck.py
 Output: shield_deck_gerbers.zip (upload to PCBWay) and shield_deck_preview.svg.
 """
 import math
 import os
 import zipfile
 
-# ---------------- PARAMETERS (mm) ----------------
-DISC_DIAMETER = 146.0      # fits the enclosure; tape any edge gap
-FACE_WIDTH = 120.0         # triangular reflector core face width
-DUCK_SPACING = 31.0        # antenna axis -> copper face (rubber duck / monopole hole)
-PATCH_OFFSET = 7.0         # patch connector axis -> copper face. Measured panel: axis in line with
-                           # the housing back, so the panel stands this far off the face (plug nut clearance)
-PATCH_END_INSET = 35.0     # second patch hole per face: same offset, this far in from the face's end
-                           # (the counter-clockwise end seen from the top). Moved in from 14 on 2026-11-10 (user)
-                           # to 25 mm off the face centre: straight above the panel board's notch edge in
-                           # back-panel position A and 25 mm across from its notch in position C, so one coax
-                           # length reaches from both (notch assumed centred on the board's long edge)
-COAX_PASS_RADIUS = 20.0    # dipole coax pass-through, inside the core
-HOLE_CORE = 10.0           # centre hole into the core for antenna coax (2026-10-31); opened up with a hole
-                           # saw if more coax has to pass
-FACE_THICK = 1.6           # core face board (copper clad) thickness: the nuts sit against its inner side
-NUT_AF = 7.0               # M4 nut across flats (3.2 mm thick). One per core corner, under the deck, two
-                           # alternate flats flush against the faces and soldered to deck and faces (2026-11-01)
-NUT_GAP = 0.0              # extra room per face (e.g. for a seam fillet in the corner)
-EDGE_CLEAR = 0.5           # copper pull-back from the board edge
-RIM_MASK_WIDTH = 4.0       # exposed copper ring at the rim (copper-tape edge seal)
-SEAM_STRIP = 6.0           # exposed strip on the bottom for soldering the core seams
-PAD_EXPOSE = 12.0          # exposed copper around each RP-SMA hole (nut contact)
-STITCH_RADIUS = 71.0       # ring of stitching vias tying top and bottom copper
-STITCH_COUNT = 36
+import params
 
-HOLE_RPSMA = 6.5           # RP-SMA bulkhead
-HOLE_COAX = 10.0           # coax + RP-SMA end pass-through
-HOLE_M4 = 4.8              # M4 bolt, slightly loose so it finds the soldered nut
-HOLE_VIA = 0.6
-# -------------------------------------------------
+# Every number lives in parameters.csv (group "deck"): DISC_DIAMETER, FACE_WIDTH, DUCK_SPACING, PATCH_OFFSET,
+# PATCH_END_INSET, COAX_PASS_RADIUS, HOLE_*, FACE_THICK, NUT_AF, NUT_GAP, NUT_PAD, mask / stitch sizes.
+globals().update(params.load(["deck"]))
 
 R = DISC_DIAMETER / 2
 CX = CY = R                     # board origin at lower-left of the bounding square
@@ -45,7 +20,6 @@ CIRCUMRADIUS = 2 * INRADIUS
 # M4 bolts to the electronics plate, one per inside corner of the core: a hex nut in a 60 deg corner has its
 # centre twice its flat-to-face distance from the corner
 MOUNT_RADIUS = 2 * (INRADIUS - FACE_THICK - NUT_AF / 2 - NUT_GAP)
-NUT_PAD = 9.0              # bottom mask opening round each M4 hole (nut across corners ~8.1 mm) for the solder
 SECTORS = [0.0, 120.0, 240.0]   # face normals, clockwise from +Y (Sector 0 up)
 VERTICES = [60.0, 180.0, 300.0]
 

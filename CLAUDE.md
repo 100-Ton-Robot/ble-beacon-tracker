@@ -11,6 +11,8 @@ in Home Assistant. See `README.md` and each folder's README.
 - `gateway/`: ESPHome package `packages/bletracker-gateway.yaml`, per-mast `example-mast.yaml`
   and external component `components/sector_scanner/`. Frame and command
   formats are defined in `scanner_fw/README.md`; keep both sides in step.
-- `shield_deck/`: regenerate Gerbers and templates from `make_shield_deck.py` and
-  `make_templates.py` (needs `reportlab`) rather than hand-editing outputs.
+- `shield_deck/`: every number lives in `parameters.csv` (loaded by `params.py`); change values there,
+  not in the scripts. Regenerate Gerbers and templates from `make_shield_deck.py` and
+  `make_templates.py` (needs `reportlab`) rather than hand-editing outputs. Plate layouts round-trip
+  through Inkscape: `make_plate_svg.py` -> edit -> `read_plate_svg.py` (writes the CSV, checks rules).
 - Never commit `secrets.yaml`, signing keys or personal notes (`*.local.md` is ignored).

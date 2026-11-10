@@ -1,0 +1,135 @@
+name,value,unit,source,group,note
+DISC_DIAMETER,146.0,mm,design,deck,"copper shield deck disc; fits the enclosure, tape any edge gap"
+FACE_WIDTH,120.0,mm,design,deck,triangular reflector core face width
+DUCK_SPACING,31.0,mm,design,deck,D hole: antenna axis -> copper face (rubber duck / monopole)
+PATCH_OFFSET,7.0,mm,measured,deck,"P / P2 holes: patch connector axis -> copper face. Measured panel: axis in line with the housing back, so the panel stands this far off the face (plug nut clearance)"
+PATCH_END_INSET,35.0,mm,design,deck,"P2 hole: same offset, this far in from the face's counter-clockwise end (top view), i.e. 25 mm off the face centre. Moved in from 14 on 2026-11-10 (user) so one coax length reaches from back-panel positions A and C (notch assumed centred on the board's long edge)"
+COAX_PASS_RADIUS,20.0,mm,design,deck,"C hole: dipole coax pass-through, inside the core"
+HOLE_CORE,10.0,mm,design,deck,centre hole into the core for antenna coax (2026-10-31); open up with a hole saw if more coax has to pass
+FACE_THICK,1.6,mm,spec,deck,core face board (copper clad) thickness: the M4 nuts sit against its inner side
+NUT_AF,7.0,mm,spec,deck,"M4 nut across flats (3.2 mm thick). One per core corner under the deck, two flats flush against the faces, soldered to deck and faces (2026-11-01)"
+NUT_GAP,0.0,mm,design,deck,extra room per face (e.g. for a seam fillet in the corner)
+NUT_PAD,9.0,mm,design,deck,bottom mask opening round each M4 hole for the nut solder (nut across corners ~8.1 mm)
+EDGE_CLEAR,0.5,mm,design,deck,copper pull-back from the board edge
+RIM_MASK_WIDTH,4.0,mm,design,deck,exposed copper ring at the rim (copper-tape edge seal)
+SEAM_STRIP,6.0,mm,design,deck,exposed strip on the bottom for soldering the core seams
+PAD_EXPOSE,12.0,mm,design,deck,exposed copper round each RP-SMA hole (nut contact)
+STITCH_RADIUS,71.0,mm,design,deck,ring of stitching vias tying top and bottom copper
+STITCH_COUNT,36,count,design,deck,
+HOLE_RPSMA,6.5,mm,spec,deck,RP-SMA bulkhead (thread OD 6.3 mm)
+HOLE_COAX,10.0,mm,design,deck,coax + RP-SMA end pass-through
+HOLE_M4,4.8,mm,design,deck,"M4 bolt, slightly loose so it finds the soldered nut"
+HOLE_VIA,0.6,mm,design,deck,
+FACE_H,120.0,mm,design,panel,back panel height: square 120 x 120 faces so the core fits the enclosure
+DIPOLE_HOLE,6.5,mm,spec,panel,RP-SMA bulkhead at the face centre (DIY dipole option)
+BOARD_W,50.0,mm,measured,panel,printed-dipole panel board as mounted (turned 90 deg): short side across
+BOARD_H,60.0,mm,measured,panel,same board: long side down
+BOARD_CY,65.0,mm,design,panel,"position A: board centre below the deck (35-95 mm), as low as its coax reaches P2. Position B (one hole pitch lower) dropped with the 120 mm faces"
+BOARD_GAP,7.0,mm,measured,panel,"board -> foil reflector (8 mm over the post, minus 1 mm of post through the board)"
+POST_X,35.0,mm,measured,panel,post hole centres across (short side)
+POST_Y,24.0,mm,measured,panel,post hole centres down (long side)
+BOARD_HOLE,2.45,mm,measured,panel,"board post holes, hole gauge 2.4-2.5 mm (M2 clearance)"
+POST_HOLE,2.4,mm,design,panel,"face hole: M2 nylon screws, 14 mm, on 6-8 mm standoffs"
+POST_EDGE,2.8,mm,measured,panel,board edge away from the notch -> edge of the nearest holes
+BOARD_CY_C,73.0,mm,design,panel,"position C (bar horizontal, notch up): rows at 59 / 94 mm, >= 5.5 mm (an M3 head) from the A rows at 53 / 77 mm"
+PLATE_DIAMETER,152.0,mm,design,plate,"electronics / module plate, acrylic disc"
+PLATE_TURN,30.0,deg,design,plate,"plate 12 o'clock is this far counter-clockwise of the deck's S0 arrow (top view): M4 bolts at 3, 7, 11 o'clock"
+PLATE_M4,4.8,mm,design,plate,plate holes for the M4 bolts to the deck (same drill as the deck's)
+PLATE_M3,3.4,mm,design,plate,bus board M3 hole
+TIE_HOLE,4.8,mm,design,plate,zip tie holes: same drill as the M4 bolts (user 2026-11-09); any 3.0-4.8 mm fits a 2.5 mm tie
+TIE_CLEAR,3.0,mm,design,plate,part edge -> tie hole centre
+XIAO_L,21.0,mm,spec,plate,Seeed XIAO nRF54L15 board length
+XIAO_W,17.8,mm,spec,plate,XIAO board width
+XIAO_IPEX,8.25 3.9,mm,measured,plate,"IPEX4 (MHF4) centre from the XIAO centre: along toward its end, across toward the D0-D6 pin edge"
+ESP32,-16.5 -36.0 21.0 72.8,mm,spec,plate,"x0 y0 w h. Waveshare ESP32-S3-ETH, 72.8 x 21 mm (CNX spec list); w and h are used everywhere, x0 y0 only by the retired plate and wiring pages (RJ45 side up, RJ45 + USB-C end north, VBUS pin 40 top right)"
+POWER,4.0 40.0 12.7 19.6,mm,spec,plate,"x0 y0 w h. Bus board: MBSS 4x4 pad board (0.5 x 0.77 in); w and h used everywhere, x0 y0 on the wiring page"
+POWER_HOLE,10.35 55.6,mm,design,plate,"retired plate page: bus M3 hole, ~4 mm in from the top end"
+SPLITTER,-58.0 -43.0 29.0 86.0,mm,estimated,plate,"x0 y0 w h. PoE splitter, estimated from a photo (retired plate page)"
+SPLITTER_TIES,30.0 -30.0,mm,design,plate,retired plate page: tie y positions across the splitter
+ESP32_TIES,-4.0 -30.0,mm,design,plate,retired plate page: tie y positions across the ESP32
+PIGTAIL_HOLE,10.0,mm,design,plate,retired plate page: one hole for all three coax + one MHF4 plug at a time
+PIGTAIL_DX,1.15,mm,design,plate,retired plate page: hole this far left of the strip middle
+IPEX_DY,6.0,mm,assumed,plate,retired plate page: IPEX4 above the XIAO centre line (top view); not measured (see XIAO_IPEX)
+JST_YS,33.0 5.0 -13.0,mm,design,plate,mated JST pair y per sector in the strip (retired plate page)
+XIAO_X,30.5,mm,design,plate,retired plate / wiring page: XIAO centre x
+XIAO_YS,37.0 13.0 -13.0,mm,design,plate,retired plate / wiring page: XIAO centre y for S0-S2
+XIAO_TIE_DX,4.0 -4.0 4.0,mm,design,plate,retired plate page: tie offset along each XIAO
+JST_L,15.0,mm,estimated,plate,mated inline JST pair length
+JST_W,12.0,mm,estimated,plate,mated inline JST pair width
+JST_PITCH,2.5,mm,estimated,plate,"pin rows inside the mated pair, pin 1 at the top"
+SECTOR_RX_PINS,34 32 31,pin,design,wiring,"ESP32 header pin receiving each sector's D6 (TX), S0-S2"
+SECTOR_RX_GPIOS,17 16 18,pin,design,wiring,the same pins as GPIO numbers
+ESP_TX,35 21,pin,design,wiring,"ESP32 TX to the bus TX row (every XIAO's D7): header pin, GPIO"
+XIAO_ROW,7.6,mm,estimated,wiring,XIAO pad rows +- this from the centre line
+BUS_ROWS,50.6 48.1 45.6 43.1,mm,drawing,wiring,"bus pad rows A-D, top to bottom: A ESP TX (every D7), B GND, D 5V"
+WIRING_SCALE,2.0,ratio,drawing,wiring,wiring page is enlarged for reading; not a drilling template
+WIRING_VIEW,-15.0 -27.0 68.0 62.0,mm,drawing,wiring,plate area shown: x0 y0 x1 y1
+WIRING_XIAO_DX,6.0,mm,drawing,wiring,XIAOs drawn this much right of XIAO_X so the tails have room (user 2026-11-09)
+WIRING_JST_YS,25.0 5.0 -13.0,mm,drawing,wiring,"far JST halves y: S0 lower than JST_YS, below the S1 / S2 wires turning left under the bus (user 2026-11-09)"
+JST_HALF,5.0,mm,drawing,wiring,one half of the pair as drawn (halves drawn apart)
+FAR_X0,10.8,mm,drawing,wiring,far halves a little right of the strip middle
+XIAO_JST_GAP,6.0,mm,drawing,wiring,XIAO USB end -> XIAO half: room for the 4 tail lanes
+XT_LANES,1.0 2.2 3.4 4.6,mm,drawing,wiring,"XIAO tail verticals right of the USB end: yellow, red, black, green"
+XT_STEP,0.6,mm,drawing,wiring,lane spacing above / below the XIAO
+YELLOW_LANES,6.0 6.0 5.2,mm,drawing,wiring,yellow verticals to the ESP32 RX pins
+FEED_TX_LANE,4.8,mm,drawing,wiring,"ESP TX feed vertical, left of the bus pads"
+BUS_LANE,0.85,mm,drawing,wiring,"black lane this far left of its bus column, green this far right"
+RISE,0.6 1.3 2.0,mm,drawing,wiring,"S1 / S2 green, red, black rise above the far half before turning right"
+GREEN_RISE_X,10.0,mm,drawing,wiring,S1 / S2 green rises here
+RIGHT_LANES,16.2 16.85 17.5 18.15 18.8 19.45,mm,drawing,wiring,"S1 black, red, green, S2 black, red, green, up the right"
+TOP_TURNS,36.6 37.4 38.2 39.0 39.8 40.6,mm,drawing,wiring,"same wires, turning left under the bus board"
+ALT_S0,53.56 19.5 110.0,mm mm deg,design,alt,"S0 XIAO: centre x y (plate frame, 12 o'clock up, y up) and direction of its IPEX4 end (deg CCW from +x). Re-searched 2026-11-10: between the sectors' antenna holes, >= 8 mm from each, coax IPEX4 -> mount -> own sector's holes. Placed in Inkscape: read_plate_svg.py"
+ALT_S1,-9.89 -56.13 350.0,mm mm deg,design,alt,"S1 XIAO, as ALT_S0 (currently S0 turned -120 deg about the centre)"
+ALT_S2,-43.67 36.63 230.0,mm mm deg,design,alt,"S2 XIAO, as ALT_S0 (currently S0 turned +120 deg)"
+ALT_XIAO_TIE_S,-2.0 -2.0 -2.0,mm,design,alt,zip tie across each XIAO this far along its axis (+ toward the IPEX4 end)
+ALT_MOUNT,18.25,mm,design,alt,HS-100 tie mount centre along the XIAO axis (1.5 mm past the board end)
+ALT_MOUNT_SIDE,12.5,mm,spec,alt,"1/2 in HS-100 adhesive tie mount, 3.2 mm slots"
+ALT_HARNESS_S,15.0,mm,design,alt,harness hole on the XIAO axis this far back from its centre (not drilled since 2026-11-10)
+ALT_HARNESS_HOLE,5.0,mm,design,alt,harness hole size (not drilled since 2026-11-10)
+ALT_ESP32,10.0 16.0,mm,design,alt,"ESP32-S3-ETH centre. Re-searched 2026-11-10 with the 8 mm antenna-hole keep-out: only room is across the middle, so only the deck's 10 mm centre hole is kept clear. Gaps ~0.5 mm over the margins"
+ALT_ESP32_ANGLE,150.0,deg,design,alt,direction of the RJ45 / USB-C end; hung RJ45 side down
+ALT_ESP32_TIES,-15.0 15.0,mm,design,alt,ties across the ESP32 at these distances along it from its centre
+ALT_BUS,-28.0 16.0,mm,design,alt,"bus board centre, ~19 mm from the ESP32's RJ45 end (VBUS 40)"
+ALT_BUS_ANGLE,150.0,deg,design,alt,bus long axis; its M3 hole is this way along it
+ALT_BUS_HOLE_S,5.8,mm,design,alt,bus M3 hole along its axis from its centre (alt and pipe plates)
+ALT_CORE_HOLE,10.0,mm,design,alt,"the deck's centre hole, kept clear (30 mm hole-saw keep-out dropped 2026-11-10)"
+ALT_DECK_JACK,9.2,mm,spec,alt,"RP-SMA bulkhead hex across corners, drawn where each C jack sits under the plate"
+PIPE_SAW,2.25,in,spec,pipe,deck centre hole for the pipe layout: 2-1/4 in hole saw (EU: 57 mm)
+ADAPTER_HOLE,22.2,mm,spec,pipe,7/8 in drill for the 1/2 in male pipe adapter thread (21.3 mm OD)
+NUT_OD,34.0,mm,estimated,pipe,adapter nut across corners; keep parts clear of it
+FL_XIAO_R,57.0,mm,design,pipe,XIAO centre radius. The three XIAOs are one part turned 120 deg: move S0 in Inkscape
+FL_XIAO_DA,40.0,deg,design,pipe,"XIAO centres this far (clock deg) off their sector axis. Searched 2026-11-10: >= 8 mm from every antenna hole, coax IPEX4 -> mount -> own sector's holes (mount within 50 deg of them, ~21-26 mm across)"
+FL_XIAO_ROT,-90.0,deg,design,pipe,"XIAO long axis off radial: -90 = along the rim, IPEX4 end leading toward its own sector"
+FL_TIE_S,-2.0,mm,design,pipe,tie across each XIAO this far along its axis (+ toward the IPEX4 end)
+FL_IPEX_SIDE,-1,sign,measured,pipe,IPEX4 on the right seen from the top with USB-C toward you (user 2026-11-01); 1 = left. Flipped in the drawing because the XIAOs hang component side down
+FL_BUS,60.0 30.0,deg mm,design,pipe,"bus board: clock angle, centre radius; long axis radial, M3 hole toward the rim (user 2026-11-09)"
+STACK_SCALE,0.6,ratio,drawing,stack,
+PLATE_T,3.0,mm,assumed,stack,acrylic plate thickness
+SPACER,27.0,mm,design,stack,plate underside -> deck top (25-30 mm spacers; RP-SMA bulkhead backs need >= 25)
+DECK_T,1.6,mm,spec,stack,
+ENC_T,2.0,mm,assumed,stack,enclosure wall (HDPE) at the plate
+NUT_H,7.0,mm,estimated,stack,nut on the adapter thread
+ADP_HEX_W,30.0,mm,estimated,stack,adapter hex / shoulder width
+ADP_HEX_H,8.0,mm,estimated,stack,adapter hex / shoulder height
+ADP_SOCK_OD,27.0,mm,estimated,stack,adapter socket the pipe glues into
+ADP_SOCK_H,22.0,mm,estimated,stack,
+PIPE_OD,21.3,mm,spec,stack,1/2 in Sch 40 PVC
+PIPE_ID,15.8,mm,spec,stack,1/2 in Sch 40 PVC
+CAP_OD,27.0,mm,estimated,stack,1/2 in PVC cap
+CAP_H,22.0,mm,estimated,stack,
+NOTCH_H,6.0,mm,assumed,stack,pigtail notch in the cap rim
+BOARD_OFF,2.0,mm,design,stack,board back off the pipe (zip ties over a thin spacer)
+BOARD_DROP,8.0,mm,design,stack,board top below the deck
+ESP_DEPTH,15.0,mm,estimated,stack,"ESP32-S3-ETH, PCB + RJ45 height"
+SPL_DEPTH,20.0,mm,estimated,stack,PoE splitter depth
+ESP_CLOCK,90.0,deg,design,stack,corner direction (plate clock) the ESP32 faces on the pipe
+SPL_CLOCK,210.0,deg,design,stack,corner direction the PoE splitter faces
+BUS_CLOCK,330.0,deg,design,stack,"option: bus board on the pipe, 11 o'clock corner (user 2026-11-09)"
+BUS_DEPTH,5.0,mm,estimated,stack,bus board + pads
+ESP_ANT_L,100.0,mm,estimated,stack,ESP antenna below the cap; depends on the antenna
+RULE_ANT_CLEAR,8.0,mm,rule,rules,"nothing within this of an antenna hole edge (part outlines, tie mounts, plate holes): the stiff coax rises straight from its jack through the spacer gap (user 2026-11-10)"
+RULE_COAX_CLEAR,2.0,mm,rule,rules,each coax run (IPEX4 -> tie mount -> its sector's antenna holes) keeps this far from every other part
+RULE_PART_GAP,1.5,mm,rule,rules,between parts (a XIAO and its own tie mount excepted)
+RULE_HOLE_GAP,2.0,mm,rule,rules,edge to edge between drilled plate holes
+RULE_RIM_HOLE,3.0,mm,rule,rules,hole edge -> plate rim
+RULE_RIM_PART,3.0,mm,rule,rules,part outline -> plate rim
