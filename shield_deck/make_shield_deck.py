@@ -13,8 +13,11 @@ FACE_WIDTH = 120.0         # triangular reflector core face width
 DUCK_SPACING = 31.0        # antenna axis -> copper face (rubber duck / monopole hole)
 PATCH_OFFSET = 7.0         # patch connector axis -> copper face. Measured panel: axis in line with
                            # the housing back, so the panel stands this far off the face (plug nut clearance)
-PATCH_END_INSET = 14.0     # second patch hole per face: same offset, this far in from the face's end
-                           # (the counter-clockwise end seen from the top)
+PATCH_END_INSET = 35.0     # second patch hole per face: same offset, this far in from the face's end
+                           # (the counter-clockwise end seen from the top). Moved in from 14 on 2026-11-10 (user)
+                           # to 25 mm off the face centre: straight above the panel board's notch edge in
+                           # back-panel position A and 25 mm across from its notch in position C, so one coax
+                           # length reaches from both (notch assumed centred on the board's long edge)
 COAX_PASS_RADIUS = 20.0    # dipole coax pass-through, inside the core
 HOLE_CORE = 10.0           # centre hole into the core for antenna coax (2026-10-31); opened up with a hole
                            # saw if more coax has to pass

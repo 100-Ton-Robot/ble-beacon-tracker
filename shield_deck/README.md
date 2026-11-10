@@ -33,7 +33,7 @@ Top = electronics side. Bottom = antenna side (the triangle seam strip is there)
 | --- | --- | --- | --- |
 | Duck / monopole RP-SMA (x3) | 6.5 mm | 65.6 mm (31 mm in front of each face) | Sector 0 / 120 / 240 deg |
 | Patch RP-SMA (x3) | 6.5 mm | 41.6 mm (7 mm in front of each face) | Sector 0 / 120 / 240 deg |
-| Patch-end RP-SMA "P2" (x3) | 6.5 mm | 62.1 mm (7 mm in front of each face, 14 mm in from its counter-clockwise end) | 312.2 / 72.2 / 192.2 deg |
+| Patch-end RP-SMA "P2" (x3) | 6.5 mm | 48.6 mm (7 mm in front of each face, 25 mm off its centre toward its counter-clockwise end; moved in from 14 mm off the end on 2026-11-10 so the panel board's coax reaches it in back-panel positions A and C) | 329.0 / 89.0 / 209.0 deg |
 | Dipole coax pass-through (x3) | 10 mm | 20 mm (inside the core) | Sector 0 / 120 / 240 deg |
 | M4 bolt to the electronics plate (x3) | 4.8 mm | 59.1 mm (inside the core, in each corner) | Corners 60 / 180 / 300 deg |
 | Stitching vias (x36) | 0.6 mm | 71 mm | Every 10 deg |

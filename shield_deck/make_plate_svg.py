@@ -1,7 +1,7 @@
 """Electronics plate as an Inkscape SVG for laying out by hand: one layer per part, each part's outline and the
 holes it needs in one group, so dragging / rotating the group moves its holes with it. The plate and its M4
-bolt holes (and the deck jacks below, for reference) are locked layers. Parts start where the alt split layout
-(page 4 of the templates) puts them, all overlapping the plate as assembled.
+bolt holes, the drilled-through antenna holes and the deck C holes (reference) are locked layers. Parts start where
+the alt split layout (page 2 of the templates: every part under the plate, dashed) puts them, all overlapping the plate as assembled.
 
 Run:  python make_plate_svg.py  ->  plate_layout.svg (1 user unit = 1 mm, top view, plate 12 o'clock up)
 """
@@ -58,52 +58,43 @@ def xiao(i):
     o = t.XIAO_W / 2 + t.TIE_CLEAR
     b = rect(0, 0, t.XIAO_L, t.XIAO_W, UNDER)
     b += rect(t.ALT_MOUNT, -side, t.ALT_MOUNT_SIDE, t.ALT_MOUNT_SIDE, UNDER.replace('fill="none"', 'fill="#3060a0" fill-opacity="0.12"'))
-    b += f'<circle cx="{along}" cy="{-side}" r="1" fill="#3060a0"/>'
+    b += f'<circle cx="{along}" cy="{-side}" r="1" fill="#000"/>'
     b += (f'<path d="M{along},{-side}H{t.ALT_MOUNT}" stroke="#e08000" stroke-width="0.8"/>')
-    b += f'<path d="M{s},{-o}V{o}" stroke="#3060a0" stroke-width="0.6" opacity="0.5"/>'     # zip tie
+    b += f'<path d="M{s},{-o}V{o}" stroke="#000" stroke-width="0.6" opacity="0.5"/>'     # zip tie
     b += hole(s, -o, t.TIE_HOLE, "tie") + hole(s, o, t.TIE_HOLE, "tie")
-    b += hole(-t.ALT_HARNESS_S, 0, t.ALT_HARNESS_HOLE, "harness")
-    b += text(0, 1, f"S{i}", 4, "#3060a0")
-    b += text(-t.XIAO_L / 2 + 2.2, 0.8, "USB", 1.6, "#3060a0")
-    b += text(along - 1, -side - 1.6, "IPEX4", 1.4, "#3060a0")
-    b += text(t.ALT_MOUNT, -side + 0.6, "tie mount", 1.6, "#3060a0")
+    b += text(0, 1, f"S{i}", 4, "#000")
+    b += text(-t.XIAO_L / 2 + 2.2, 0.8, "USB", 1.6, "#000")
+    b += text(along - 1, -side - 1.6, "IPEX4", 1.4, "#000")
+    b += text(t.ALT_MOUNT, -side + 0.6, "tie mount", 1.6, "#000")
     return layer(f"layer_s{i}", f"S{i} XIAO (underside)", part(f"s{i}", cx, cy, a, b))
 
 
 def esp32():
     ex, ey = t.ALT_ESP32
     L, W = t.ESP32[3], t.ESP32[2]
-    b = rect(0, 0, L, W, TOP)
-    b += rect(L / 2 - 9, -2, 16, 15, TOP.replace('stroke-width="0.35"', 'stroke-width="0.25"'))   # RJ45, approx
+    b = rect(0, 0, L, W, UNDER)
+    b += rect(L / 2 - 9, -2, 16, 15, UNDER.replace('stroke-width="0.35"', 'stroke-width="0.25"'))   # RJ45, approx
     b += text(L / 2 - 9, -1, "RJ45", 2.2)
-    b += text(L / 2 - 9, 7.5, "USB-C under", 1.6)
-    b += f'<path d="M{-L / 2 + 6},{W / 2 - 1.3}H{L / 2 - 4}" stroke="#000" stroke-width="0.8" stroke-dasharray="0.6,1.94"/>'
-    b += text(-6, W / 2 - 3, "header 21-40, VBUS (40) at RJ45 end", 1.8)
+    b += text(L / 2 - 9, 7.5, "RJ45 side down", 1.6)
+    b += f'<path d="M{-L / 2 + 6},{-W / 2 + 1.3}H{L / 2 - 4}" stroke="#000" stroke-width="0.8" stroke-dasharray="0.6,1.94"/>'
+    b += text(-6, -W / 2 + 4, "header 21-40 (hung RJ45 side down), VBUS (40) at RJ45 end", 1.8)
     b += text(-10, 0, "ESP32-S3-ETH", 3.5)
     for ts in t.ALT_ESP32_TIES:
         o = W / 2 + t.TIE_CLEAR
         b += hole(ts, -o, t.TIE_HOLE, "tie") + hole(ts, o, t.TIE_HOLE, "tie")
-    return layer("layer_esp32", "ESP32 (top)", part("esp32", ex, ey, t.ALT_ESP32_ANGLE, b))
+    return layer("layer_esp32", "ESP32 (underside)", part("esp32", ex, ey, t.ALT_ESP32_ANGLE, b))
 
 
 def bus():
     bx, by = t.ALT_BUS
     w, h = t.POWER[3], t.POWER[2]
-    b = rect(0, 0, w, h, TOP)
+    b = rect(0, 0, w, h, UNDER)
     for k in range(4):
         for j in range(4):
             b += f'<circle cx="{-5.5 + k * 2.54 - 1.9:.2f}" cy="{(j - 1.5) * 2.54:.2f}" r="0.5" fill="none" stroke="#000" stroke-width="0.15"/>'
     b += hole(t.ALT_BUS_HOLE_S, 0, t.PLATE_M3, "M3")
     b += text(-1.9, -h / 2 - 0.8, "bus", 2.2)
-    return layer("layer_bus", "Bus board (top)", part("bus", bx, by, t.ALT_BUS_ANGLE, b))
-
-
-def jst():
-    # the alt layout doesn't place them yet: parked in a row in the free space at the top
-    b = ""
-    for i, (x, y) in enumerate(((-12, 52), (2, 52), (16, 52))):
-        b += part(f"jst{i}", x, y, 90, rect(0, 0, t.JST_L, t.JST_W, TOP) + text(0, 1, f"JST S{i}", 2.2))
-    return layer("layer_jst", "JST pairs (top)", b)
+    return layer("layer_bus", "Bus board (underside)", part("bus", bx, by, t.ALT_BUS_ANGLE, b))
 
 
 def poe_box():
@@ -130,7 +121,10 @@ def m4():
         b += hole(x, -y, t.PLATE_M4, "M4 bolt to deck")
         b += f'<circle cx="{x:.2f}" cy="{-y:.2f}" r="4" {REF}/>'                 # spacer, approx
         b += text(x, -y + 7, "M4", 2.5, "#d40000")
-    return layer("layer_m4", "M4 mount holes (locked)", b, locked=True)
+    for d, x, y, tag in t.plate_antenna_holes():                               # drilled through, over the deck jacks
+        b += hole(x, -y, d, f"{tag[:-4]} antenna hole")
+        b += text(x, -y - d / 2 - 1, tag[:-4], 2, "#d40000")
+    return layer("layer_m4", "M4 + antenna holes (locked)", b, locked=True)
 
 
 def deck_jacks():
@@ -138,7 +132,7 @@ def deck_jacks():
     turn = math.radians(t.PLATE_TURN)
     b = ""
     for d, x, y, lab in g.holes:
-        if lab in ("via", "M4 mount", "core feed"):
+        if lab in ("via", "M4 mount", "core feed") or d == 6.5:   # 6.5 mm jacks: drilled holes, M4 layer
             continue
         dx, dy = x - g.CX, y - g.CY
         px, py = dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn)
@@ -152,7 +146,7 @@ def deck_jacks():
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     out = os.path.join(here, "plate_layout.svg")
-    body = (plate() + deck_jacks() + m4() + xiao(0) + xiao(1) + xiao(2) + poe_box() + esp32() + bus() + jst())
+    body = (plate() + deck_jacks() + m4() + xiao(0) + xiao(1) + xiao(2) + poe_box() + esp32() + bus())
     svg = ('<?xml version="1.0" encoding="UTF-8"?>\n'
            '<svg xmlns="http://www.w3.org/2000/svg" '
            'xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" '
