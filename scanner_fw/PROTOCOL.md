@@ -91,20 +91,20 @@ payloads (changed first, then refreshes).
 | `FLASH_MODE_ON` | SECURITY, WARN | Source (0 console, 1 gateway, 2 test-image window), flash-mode open count |
 | `FLASH_MODE_OFF` | SECURITY, INFO | 0 command, 1 timeout |
 | `CLIENT_CONNECTED` / `CLIENT_DISCONNECTED` | SECURITY, WARN / INFO | –, HCI reason |
-| `SETTING_CHANGED` | SECURITY, WARN (sector) / INFO (antenna) | Setting (1 sector, 2 antenna), new value, text = old -> new and source |
+| `SETTING_CHANGED` | SECURITY, INFO | Setting (2 antenna), new value, text = new value and source |
 | `BAD_COMMANDS` | SECURITY, WARN | 3 or more bad command frames on D7 within 10 s: count |
 | `CMD_OK` / `CMD_REJECTED` | COMMAND, INFO / WARN | Command action field number, `cmd_seq` = the command's `seq` |
 | `LOAD_LEVEL` | LOAD, INFO (back to 0), WARN (1-3), ERROR (4) | new level, reasons |
-| `SECTOR_NOT_SET` | GENERAL, WARN | at boot and every minute while the sector is 255 |
 | `EVENTS_LOST` | GENERAL, WARN | events dropped because the queue was full |
 
-## Sector claim
+## Sector
 
-`Bucket.sector` is the sector the scanner was **told at assembly** (USB console `sector <n>`,
-or an explicit `Command.sector` to that one chip ID), saved in flash. 255 = not set. The gateway
-does **not** set it automatically any more. It compares the claim with the sector its RX pin
-stands for, on every bucket, and treats a mismatch as a wiring or board-swap error (see the
-gateway's README). A command can't set the same sector on all scanners.
+The scanner doesn't know its sector. Each scanner's D6 is wired to its own gateway RX pin,
+and the gateway assigns the sector to that pin; wiring is the only source of truth. 0.4.x
+scanners sent a saved sector claim (`Bucket.sector`, field 2), had a `sector` command
+(field 6), a `SECTOR_NOT_SET` event (14) and a `SECTOR` setting (1); all are retired in 0.5.0
+(`reserved` in the schema, never reuse the numbers). A 0.5.0 scanner deletes the old saved
+value at boot. The chip ID in every bucket still lets the gateway notice a board swap.
 
 ## Budget and throttle
 
@@ -138,7 +138,6 @@ gateway's README). A command can't set the same sector on all scanners.
 | `listen` | bool | start/stop scanning |
 | `flash` | bool | open flash mode for 10 min (each open extends) / close it |
 | `ext_antenna` | bool | saved |
-| `sector` | 0-254 | saved; one scanner only |
 | `reboot` | 0xA5 | anything else is rejected |
 | `payloads` | bool | payload records on/off |
 | `active_scan` | bool | active scanning on/off |
@@ -146,7 +145,7 @@ gateway's README). A command can't set the same sector on all scanners.
 | `budget_pct` | 10-90 | |
 
 Every accepted command is answered with a `CMD_OK` event in the scanner's next bucket, every
-rejected one (bad argument, sector to all, rssi interval to one scanner) with `CMD_REJECTED`.
+rejected one (bad argument, rssi interval to one scanner) with `CMD_REJECTED`.
 Frames that don't decode are only counted (`Counters.cmds_bad`, the scanner's `cmdlog`) and
 raise a `BAD_COMMANDS` security event when three or more arrive within 10 s. Valid commands for
 another chip ID are counted in `cmds_other`.

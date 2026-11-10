@@ -1,5 +1,6 @@
 /*
- * Sector scanner:
+ * BLE scanner, one per sector. It doesn't know its sector: that is the gateway RX pin
+ * its D6 is wired to.
  *   1. boots, prints a banner, blinks the LED once a second
  *   2. passive scan at 100% duty, duplicates kept (active scanning on command)
  *   3. RF switch control so onboard vs external antenna can be compared
@@ -14,15 +15,13 @@
  *   7. flash mode: connectable BLE with MCUmgr SMP so MCUboot images can be
  *      uploaded with the box sealed; only on a serial command (and for 2 min
  *      after an update, while the new image is on trial)
- *   8. sector claim and antenna kept in flash; the sector is set at assembly (console
- *      or an explicit command) and the gateway checks it against the RX pin
+ *   8. antenna choice kept in flash
  *   9. security events (flash mode, updates, resets, settings, bad commands) with
  *      boot and flash-mode counts kept in flash
  *
  * Shell commands:
- *   status                 version, chip ID, sector, antenna, listening, flash mode, stream
+ *   status                 version, chip ID, antenna, listening, flash mode, stream
  *   ant [int|ext]          show or switch antenna (saved in flash)
- *   sector [0-254|unset]   show or set the sector claim (saved in flash)
  *   scan [on|off]          show or start/stop listening (always on after boot)
  *   active [on|off]        show or switch active scanning (passive after boot)
  *   data [on|off]          show or switch payload records (off after boot)
@@ -83,7 +82,6 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios
 #define TX_UNKNOWN INT8_MAX
 /* Legacy advert or scan response payload (extended adverts aren't scanned) */
 #define AD_MAX 31
-#define SECTOR_UNSET 255
 
 struct adv_evt {
 	bt_addr_le_t addr;
@@ -296,7 +294,8 @@ static void cmd_bad_note(enum cmd_bad_reason reason, const uint8_t *b, uint8_t l
 }
 
 /*
- * Flash mode: connectable advertising as "bletracker-s<sector>" with the SMP
+ * Flash mode: connectable advertising as "bletracker-<last 6 hex digits of
+ * the chip ID>" with the SMP
  * service, so nRF Connect Device Manager or smpmgr can upload a signed image.
  * Opened only by a serial command (gateway D7 or console), never at a normal
  * boot. Ends after FLASH_MODE_S without a connected client, or on command.
@@ -340,7 +339,6 @@ static bool scanning;
 static bool print_raw;
 static enum list_mode list_mode;
 static int8_t list_min_rssi = -127;
-static uint8_t sector_id = SECTOR_UNSET;
 static uint8_t chip_id[8];
 static char chip_id_str[17];
 static bool filter_on;
@@ -386,7 +384,8 @@ static void event_post(bletracker_Event_Category cat, bletracker_Event_Severity 
 	event_post(bletracker_Event_Category_SECURITY, bletracker_Event_Severity_##sev, \
 		   bletracker_Event_Code_##code, v, v2, 0, __VA_ARGS__)
 
-/* Settings under "scanner/": sector, ant (1 byte), boots, fopens (u32), ver (string) */
+/* Settings under "scanner/": ant (1 byte), boots, fopens (u32), ver (string).
+ * A "sector" key left by 0.4.x is ignored and deleted at boot. */
 static int settings_set_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	uint8_t v;
@@ -410,9 +409,7 @@ static int settings_set_cb(const char *key, size_t len, settings_read_cb read_cb
 	if (len != 1 || read_cb(cb_arg, &v, 1) != 1) {
 		return -EINVAL;
 	}
-	if (strcmp(key, "sector") == 0) {
-		sector_id = v;
-	} else if (strcmp(key, "ant") == 0) {
+	if (strcmp(key, "ant") == 0) {
 		ant_saved_external = v != 0;
 	}
 	return 0;
@@ -463,29 +460,6 @@ static int antenna_init(void)
 	ant_external = false;
 	antenna_select(ant_saved_external);
 	return 0;
-}
-
-static int flash_adv_start(void);
-
-static int sector_set(uint8_t id, bletracker_Event_Source src)
-{
-	uint8_t old = sector_id;
-	int err;
-
-	sector_id = id;
-	/* Re-advertise so the flash-mode name follows the new sector */
-	if (flash_mode && smp_conn == NULL) {
-		bt_le_adv_stop();
-		flash_adv_start();
-	}
-	err = settings_save_one("scanner/sector", &id, 1);
-	if (id != old) {
-		SECURITY_EVENT(WARN, SETTING_CHANGED, bletracker_Event_Setting_SECTOR, id,
-			       "sector %u -> %u (%s)%s", old, id,
-			       src == bletracker_Event_Source_GATEWAY ? "gateway" : "console",
-			       err ? " NOT SAVED" : "");
-	}
-	return err;
 }
 
 /* Pick the 1 m power out of iBeacon or Eddystone UID/URL adverts */
@@ -616,11 +590,7 @@ static int flash_adv_start(void)
 	struct bt_data sd[1];
 	int err;
 
-	if (sector_id == SECTOR_UNSET) {
-		snprintk(flash_name, sizeof(flash_name), "bletracker-s?");
-	} else {
-		snprintk(flash_name, sizeof(flash_name), "bletracker-s%u", sector_id);
-	}
+	snprintk(flash_name, sizeof(flash_name), "bletracker-%.6s", &chip_id_str[10]);
 	sd[0] = (struct bt_data)BT_DATA(BT_DATA_NAME_COMPLETE, flash_name, strlen(flash_name));
 	err = bt_le_adv_start(param, flash_ad, ARRAY_SIZE(flash_ad), sd, ARRAY_SIZE(sd));
 	if (err == -EALREADY) {
@@ -1018,12 +988,6 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 	case bletracker_Command_ext_antenna_tag:
 		antenna_set(c->action.ext_antenna, gw);
 		return c->action.ext_antenna ? "ant ext" : "ant int";
-	case bletracker_Command_sector_tag:
-		/* Every scanner would take the same sector */
-		if (to_all || c->action.sector > 254) {
-			return NULL;
-		}
-		return sector_set(c->action.sector, gw) ? "sector NOT SAVED" : "sector set";
 	case bletracker_Command_reboot_tag:
 		if (c->action.reboot != CMD_REBOOT_MAGIC) {
 			return NULL;
@@ -1330,7 +1294,6 @@ static void tick_send(int64_t now, int64_t t_start)
 
 	s = pb_ostream_from_buffer(frame_raw, sizeof(frame_raw) - 2);
 	memcpy(hdr.chip_id, chip_id, sizeof(chip_id));
-	hdr.sector = sector_id;
 	hdr.seq = seq;
 	hdr.t_ms = (uint32_t)t_start;
 	hdr.tick_ms = TICK_MS;
@@ -1452,8 +1415,8 @@ static void list_print(void)
 		}
 
 		if (list_mode == LIST_CSV) {
-			/* sector_id, address, addr_type, rssi_med, rssi_max, count, tx_1m */
-			printk("%u,%s,%s,%d,%d,%u,%s\n", sector_id, addr_str,
+			/* address, addr_type, rssi_med, rssi_max, count, tx_1m */
+			printk("%s,%s,%d,%d,%u,%s\n", addr_str,
 			       (d->addr.type & 1) ? "random" : "public", d->rssi_med,
 			       d->rssi_max, d->count, tx_str);
 		} else {
@@ -1534,11 +1497,6 @@ static void housekeeping(int64_t now)
 				       "%u bad command frames on D7 in 10 s", bad - bad_seen);
 		}
 		bad_seen = bad;
-	}
-	if (sector_id == SECTOR_UNSET && secs % 60 == 1) {
-		event_post(bletracker_Event_Category_GENERAL, bletracker_Event_Severity_WARN,
-			   bletracker_Event_Code_SECTOR_NOT_SET, 0, 0, 0,
-			   "sector not set (console: sector <n>)");
 	}
 }
 
@@ -1667,11 +1625,7 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 		    img_confirmed ? "confirmed" : "TEST (not confirmed yet)");
 	shell_print(sh, "chip ID %s, boot %u, flash mode opened %u times", chip_id_str,
 		    boot_count, flash_opens);
-	if (sector_id == SECTOR_UNSET) {
-		shell_print(sh, "sector NOT SET, antenna %s", ant_external ? "ext" : "int");
-	} else {
-		shell_print(sh, "sector %u, antenna %s", sector_id, ant_external ? "ext" : "int");
-	}
+	shell_print(sh, "antenna %s", ant_external ? "ext" : "int");
 	shell_print(sh, "listening %s (%s), payloads %s", scanning ? "on" : "off",
 		    scan_active ? "active" : "passive", payloads_on ? "on" : "off");
 	if (flash_mode) {
@@ -1746,29 +1700,6 @@ static int cmd_ant(const struct shell *sh, size_t argc, char **argv)
 		}
 	}
 	shell_print(sh, "antenna: %s", ant_external ? "ext" : "int");
-	return 0;
-}
-
-static int cmd_sector(const struct shell *sh, size_t argc, char **argv)
-{
-	if (argc > 1) {
-		char *end = "";
-		long v = strcmp(argv[1], "unset") == 0 ? SECTOR_UNSET : strtol(argv[1], &end, 10);
-
-		if (*end != '\0' || v < 0 || v > SECTOR_UNSET) {
-			shell_error(sh, "usage: sector [0-254|unset]");
-			return -EINVAL;
-		}
-		if (sector_set((uint8_t)v, bletracker_Event_Source_CONSOLE) != 0) {
-			shell_error(sh, "sector %ld NOT saved", v);
-			return -EIO;
-		}
-	}
-	if (sector_id == SECTOR_UNSET) {
-		shell_print(sh, "sector not set");
-	} else {
-		shell_print(sh, "sector %u", sector_id);
-	}
 	return 0;
 }
 
@@ -1990,8 +1921,6 @@ static int cmd_stream(const struct shell *sh, size_t argc, char **argv)
 }
 
 SHELL_CMD_ARG_REGISTER(status, NULL, "Version, settings, flash mode, stream", cmd_status, 1, 0);
-SHELL_CMD_ARG_REGISTER(sector, NULL, "Show or set the sector claim: sector [0-254|unset]",
-		       cmd_sector, 1, 1);
 SHELL_CMD_ARG_REGISTER(scan, NULL, "Show or start/stop listening: scan [on|off]", cmd_scan, 1, 1);
 SHELL_CMD_ARG_REGISTER(active, NULL, "Active scanning (scan responses): active [on|off]",
 		       cmd_active, 1, 1);
@@ -2023,7 +1952,7 @@ int main(void)
 	uint32_t ticks = 0;
 	int err;
 
-	printk("\nsector scanner %s\n", APP_VERSION_STRING);
+	printk("\nbletracker scanner %s\n", APP_VERSION_STRING);
 	k_msgq_init(&adv_q, adv_q_buf, sizeof(struct adv_evt), ADV_Q_LEN);
 	k_msgq_init(&cmd_q, cmd_q_buf, sizeof(struct cmd_msg), 4);
 	k_msgq_init(&event_q, event_q_buf, sizeof(bletracker_Event), EVENT_Q_LEN);
@@ -2048,11 +1977,9 @@ int main(void)
 	if (err == 0) {
 		err = settings_load_subtree("scanner");
 	}
-	if (sector_id == SECTOR_UNSET) {
-		printk("settings: %s, sector NOT SET\n", err ? "NOT LOADED" : "loaded");
-	} else {
-		printk("settings: %s, sector %u\n", err ? "NOT LOADED" : "loaded", sector_id);
-	}
+	printk("settings: %s\n", err ? "NOT LOADED" : "loaded");
+	/* 0.4.x kept a sector claim; the sector is the gateway RX pin now */
+	settings_delete("scanner/sector");
 	boot_events();
 
 	err = antenna_init();

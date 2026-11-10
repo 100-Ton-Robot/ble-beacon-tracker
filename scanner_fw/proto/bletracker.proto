@@ -13,7 +13,8 @@ package bletracker;
 // Scanner -> gateway, one per tick (200 ms by default) on D6.
 message Bucket {
   bytes chip_id = 1;             // 8 bytes, FICR device ID as hwinfo returns it
-  uint32 sector = 2;             // the scanner's saved sector claim, 0-254; 255 = not set
+  reserved 2;                    // was sector (scanner's saved sector claim, dropped in 0.5.0:
+  reserved "sector";             //   the sector is the gateway RX pin the scanner is wired to)
   uint32 seq = 3;                // tick number since boot (+1 per tick, a gap = lost bucket)
   uint32 t_ms = 4;               // scanner uptime at the start of the tick, ms (wraps)
   uint32 tick_ms = 5;            // tick length, ms
@@ -122,7 +123,8 @@ message Event {
     CMD_REJECTED = 11;           // value = action field number, text = why
     BAD_COMMANDS = 12;           // value = bad command frames in the last 10 s
     LOAD_LEVEL = 13;             // value = new LoadLevel, value2 = LoadReason bits
-    SECTOR_NOT_SET = 14;
+    reserved 14;                 // was SECTOR_NOT_SET (dropped in 0.5.0)
+    reserved "SECTOR_NOT_SET";
     EVENTS_LOST = 15;            // value = events dropped (queue full)
   }
   enum Source {
@@ -132,7 +134,8 @@ message Event {
   }
   enum Setting {
     NONE = 0;
-    SECTOR = 1;
+    reserved 1;                  // was SECTOR (dropped in 0.5.0)
+    reserved "SECTOR";
     ANTENNA = 2;
   }
 }
@@ -183,11 +186,12 @@ enum LoadReason {
 message Command {
   bytes target = 1;              // chip ID; empty or all zeros = every scanner
   uint32 seq = 2;                // echoed in the CMD_OK / CMD_REJECTED event
+  reserved 6;                    // was action sector (dropped in 0.5.0)
+  reserved "sector";
   oneof action {
     bool listen = 3;
     bool flash = 4;              // true = open flash mode for 10 min (each open extends)
     bool ext_antenna = 5;        // saved
-    uint32 sector = 6;           // 0-254, saved; single scanner only
     uint32 reboot = 7;           // must be 0xA5
     bool payloads = 8;           // payload records on/off (off after boot)
     bool active_scan = 9;        // off after boot

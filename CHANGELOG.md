@@ -66,6 +66,16 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
+### 0.5.0 (2026-11-10)
+
+- Removed: the sector claim. The scanner doesn't know its sector; the gateway RX pin its D6
+  is wired to decides it. Gone: `Bucket.sector`, the `sector` command and console command,
+  the `SECTOR_NOT_SET` event and the `SECTOR` setting (field numbers `reserved` in the
+  schema). The saved value from 0.4.x is deleted at boot. `list csv` loses its first column.
+- Changed: flash mode advertises as `bletracker-<last 6 hex digits of the chip ID>` instead
+  of `bletracker-s<sector>`.
+- The gateway's sector-claim check has to go with it (gateway not changed yet).
+
 ### 0.4.0 (2026-11-02)
 
 Breaking: protocol 3 replaces frame and command v2, so a gateway needs protocol 3 to read this

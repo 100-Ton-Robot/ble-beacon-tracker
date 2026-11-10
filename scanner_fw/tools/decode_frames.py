@@ -14,12 +14,12 @@ The gateway does the same steps: split on 0x00, COBS-decode, check the CRC-16 (l
 bytes, LE), then parse the rest as a protobuf Bucket.
 
 It also builds gateway -> scanner commands (D7). D7 is shared by all scanners, so a command
-goes to one chip ID (--id, as shown in buckets and `status`) or, without --id, to all of them
-(not allowed for sector). Without --port it prints the hex for the console's `inject`
+goes to one chip ID (--id, as shown in buckets and `status`) or, without --id, to all of them.
+Without --port it prints the hex for the console's `inject`
 command; with --port it sends them on the adapter's TX:
     python decode_frames.py --cmd "flash on" --id 1a2b3c4d5e6f7081
-    python decode_frames.py --cmd "sector 2" --id 1a2b3c4d5e6f7081 --port COM5
-Commands: listen on|off, flash on|off, ant int|ext, sector <0-254>, reboot,
+    python decode_frames.py --cmd "ant ext" --id 1a2b3c4d5e6f7081 --port COM5
+Commands: listen on|off, flash on|off, ant int|ext, reboot,
           payloads on|off, active on|off, budget <10-90>,
           intervals [rssi=N] [payload=N] [refresh=N] [status=N] [counters=N]   (ticks)
 --seq sets the command's seq (echoed in the scanner's CMD_OK / CMD_REJECTED event).
@@ -104,12 +104,6 @@ def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
         setattr(c, {"active": "active_scan"}.get(name, name), on_off[args[0]])
     elif name == "ant":
         c.ext_antenna = {"int": False, "ext": True}[args[0]]
-    elif name == "sector":
-        c.sector = int(args[0])
-        if not 0 <= c.sector <= 254:
-            raise ValueError("sector must be 0-254")
-        if not any(chip_id):
-            raise ValueError("sector needs --id (every scanner would take it)")
     elif name == "reboot":
         c.reboot = 0xA5
     elif name == "budget":
@@ -141,13 +135,12 @@ def addr(a: bytes) -> str:
 
 
 def show(b: pb.Bucket) -> None:
-    sector = "unset" if b.sector == 255 else b.sector
     kinds = {}
     for r in b.records:
         k = r.WhichOneof("kind")
         kinds[k] = kinds.get(k, 0) + 1
     summary = " ".join(f"{k}={n}" for k, n in kinds.items())
-    print(f"chip {b.chip_id.hex()} sector {sector} seq {b.seq} t={b.t_ms} ms "
+    print(f"chip {b.chip_id.hex()} seq {b.seq} t={b.t_ms} ms "
           f"ch={b.chan or 'all'} load={b.load} {summary}")
     for r in b.records:
         k = r.WhichOneof("kind")

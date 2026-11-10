@@ -1,15 +1,15 @@
-# Sector scanner firmware (XIAO nRF54L15)
+# Scanner firmware (XIAO nRF54L15)
 
 nRF Connect SDK (Zephyr) app behind MCUboot. It scans (passive, or active on command), controls
 the RF switch and every 200 ms sends the gateway a protobuf bucket on the header UART: RSSI per
 address, and optionally each address's raw advert and scan response bytes, plus status, events
 (security ones included) and counters. A byte budget and a throttle keep it inside the line,
 shedding payloads before RSSI. The gateway sends commands back on the same UART: listen, flash
-mode, antenna, sector, payloads, active scanning, intervals and budget. The stream is specified
+mode, antenna, payloads, active scanning, intervals and budget. The stream is specified
 in [PROTOCOL.md](PROTOCOL.md) and [proto/bletracker.proto](proto/bletracker.proto). Each scanner's TX (D6) has its own gateway RX pin, which is how the gateway
-knows the sector; the gateway's one TX drives all three scanners' RX (D7) through the bus board,
+knows the sector (the scanner itself doesn't); the gateway's one TX drives all three scanners' RX (D7) through the bus board,
 so commands are addressed by chip ID. In flash mode the scanner takes signed firmware updates
-over BLE, so it can be updated with the box sealed. The sector ID and antenna choice are kept in flash.
+over BLE, so it can be updated with the box sealed. The antenna choice is kept in flash.
 
 ## Setup (once)
 
@@ -107,11 +107,9 @@ MCUboot stays in place and the saved settings survive. With several boards attac
 `-c "adapter serial <probe serial>"` after `-f openocd.cfg`. The probe serial is the last part of
 the board's USB parent device ID, and `status` afterwards confirms the chip ID and version.
 
-**Set the sector at assembly** (since 0.4.0): `sector 0|1|2` on the USB console, matching the
-antenna this board is wired to. It is saved in flash and sent in every bucket as the scanner's
-claim, and shows in the flash-mode BLE name. The gateway no longer sets it: it checks the claim
-against the RX pin and raises an error on a mismatch, which catches swapped wires or boards. A
-new board reports 255 (not set) and warns every minute until it is set.
+**No sector setup.** The scanner doesn't know or store its sector (since 0.5.0): the sector is
+the gateway RX pin its D6 is wired to, so wiring alone decides it. Any board can go in any
+position. 0.4.x boards had a `sector` command and saved claim; 0.5.0 deletes it at boot.
 
 The app's version comes from `VERSION`. Bump it for every release so `status` and the update app
 show which image is running.
@@ -122,21 +120,21 @@ show which image is running.
    (the "Sector <n> flash mode" button in Home Assistant, or MQTT, see `../gateway/README.md`),
    or `flash on` on the USB console. A normal boot does not (since v0.2.4), so a power cycle won't
    help if the gateway can't send the command. The scanner then advertises as
-   `bletracker-s<sector>`.
+   `bletracker-<last 6 hex digits of the chip ID>` (0.4.x used `bletracker-s<sector>`).
    - Scanning carries on throughout.
    - Exception: a test image just after an update opens flash mode for 2 minutes. The
      self-check needs to see advertising work, and the uploading app can reconnect.
    - Each `flash on` gives 10 minutes. The timer only runs while no client is connected.
    - `flash off` ends it at once and drops any connection.
 2. **Upload the new image.** Either way works:
-   - Phone: **nRF Connect Device Manager** (Nordic, iOS/Android). Pick `bletracker-s<n>`, then
+   - Phone: **nRF Connect Device Manager** (Nordic, iOS/Android). Pick `bletracker-<chip ID tail>`, then
      Image -> Firmware Upgrade -> `dfu_application.zip`, mode "Test Only" (the scanner's own
      60 s check then decides; "Test and Confirm" would let the app confirm it instead).
    - PC with Bluetooth LE: `pip install smpmgr` (a venv is fine), then the command below.
      Not every adapter works: if bleak reports no BLE central role, use the phone app.
 
      ```bash
-     smpmgr --ble bletracker-s0 upgrade build/scanner_fw/zephyr/zephyr.signed.bin
+     smpmgr --ble bletracker-08df82 upgrade build/scanner_fw/zephyr/zephyr.signed.bin
      ```
 
 3. **The scanner reboots into the new image as a test.** MCUboot swaps it in. If the new image
@@ -202,7 +200,7 @@ What you see and type:
   advert type. Up to 64 devices; the median uses that second's last 32 adverts.
   `minrssi -80` hides weaker devices (`minrssi -127` shows all). `list off` to stop.
 - `list csv`: the same data as CSV
-  `sector_id,address,addr_type,rssi_med,rssi_max,count,tx_1m` (sector_id 255 = not set).
+  `address,addr_type,rssi_med,rssi_max,count,tx_1m`.
 - `stream`: bucket stats (sent, skipped, seq). `stream dump`: prints the next bucket's bytes in
   hex; `python tools/decode_frames.py --hex dump.txt` decodes a saved console log.
 - `data on|off`: payload records (raw advert and scan response bytes) in the buckets. Off after
@@ -215,12 +213,10 @@ What you see and type:
   `filter off` to go back.
 - `ant` / `ant int` / `ant ext`: show or switch antenna. The choice is saved in flash; a new
   board boots on `int` (onboard).
-- `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts, sector,
+- `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts,
   antenna, listening (passive/active), payloads, flash mode (time left, client connected), the
   stream (tick, baud, budget, load level, intervals, payload and trim counts) and gateway command
   counts (ok, bad, for other scanners).
-- `sector` / `sector 2` / `sector unset`: show or set the sector claim (0-254, saved in flash).
-  It goes in every bucket and in the flash-mode BLE name. A change is a security event.
 - `scan on|off`: start or stop listening. Buckets keep coming with no RSSI records. Every boot
   starts listening.
 - `flash on|off`: enter or leave flash mode (see above).
@@ -247,11 +243,11 @@ it). Full spec: [PROTOCOL.md](PROTOCOL.md), schema: [proto/bletracker.proto](pro
 
 - `uart21`: **D6 = TX, D7 = RX**, 115200 8N1, 3.3 V. Each scanner's D6 goes to its own gateway
   RX pin; the gateway's single TX drives every scanner's D7, so commands are addressed by chip ID.
-- Every 200 ms one `Bucket` (protobuf + CRC-16 + COBS + 0x00): chip ID, sector claim, tick seq,
+- Every 200 ms one `Bucket` (protobuf + CRC-16 + COBS + 0x00): chip ID, tick seq,
   uptime, channel, load level, then records: events, status (1 s), counters (10 s), RSSI per
   address (every tick: sum, count and max, so the mean is exact), and, once the gateway turns
   them on, changed advert / scan response bytes plus a refresh every 10 s.
-- Commands are protobuf too: listen, flash, antenna, sector, reboot, payloads, active scanning,
+- Commands are protobuf too: listen, flash, antenna, reboot, payloads, active scanning,
   intervals, budget. Each is acknowledged with an event in the next bucket.
 
 The firmware builds its C code from the schema with nanopb (in NCS, `CONFIG_NANOPB`). For the
