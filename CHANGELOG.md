@@ -66,7 +66,7 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
-### 0.6.0 (2026-11-11, bench-tested on one board by USB)
+### 0.6.0 (2026-11-11)
 
 - Added: ignore list. Up to 32 rules, each an address plus a mask (prefix `/24`, a full mask,
   or `*` bytes). Adverts that match are dropped in the scan callback, so they never reach
@@ -81,6 +81,11 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   containing `*`, so `ignore C1:7D:2B:*:*:*` never reached the command.
 - Gateway: parses and sends the new command words. It does not publish the new status or
   counters fields yet (that waits for its 0.5.0 update, which regenerates the self-test).
+- Flashed by USB (app only) on all three XIAOs and bench-tested on each: rules and masks,
+  saved rules across reboot, gateway commands via `inject` (accepted to all, rejected to one
+  chip). On the bench an unconnected D7 picks up noise that can corrupt an injected frame;
+  send it again.
+- Image: `scanner_fw/release/scanner_fw-0.6.0-dfu.zip`.
 
 ### 0.5.0 (2026-11-10)
 
