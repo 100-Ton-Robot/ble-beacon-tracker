@@ -1,4 +1,12 @@
-# Security acceptance log
+# Security
+
+## Reporting a vulnerability
+
+Report it in [Issues](../../issues), with the scanner firmware version (console `status`) or the
+gateway's commit, what you found and how to reproduce it. Leave out anything that would help
+someone attack a running installation (keys, addresses, broker details).
+
+## Accepted risks
 
 Known security gaps that have been reviewed and **accepted** as they are, with the reasons, what
 limits them today and what would reopen them. Anything not listed here and found later is
@@ -14,7 +22,7 @@ section).
 | 2 | Gateway -> scanner commands on D7 are not authenticated | Accepted | 2026-11-11 |
 | 3 | MQTT commands are authorised by the broker login only | Accepted | 2026-11-11 |
 
-## 1. MCUboot downgrade
+### 1. MCUboot downgrade
 
 **Gap.** `scanner_fw/sysbuild.conf` doesn't enable MCUboot's downgrade prevention. Any image
 signed with the project's key installs, including an older version with bugs fixed since
@@ -38,7 +46,7 @@ the same key); or a released version has a security fix worth enforcing. The fix
 downgrade prevention (`MCUBOOT_DOWNGRADE_PREVENTION`, with version numbers in the image
 header), tested on a board before release.
 
-## 2. D7 commands not authenticated
+### 2. D7 commands not authenticated
 
 **Gap.** Commands from the gateway to the scanners on the shared D7 serial line carry only a
 CRC-16, which catches corruption, not forgery. Anything that can drive D7 can send any
@@ -59,7 +67,7 @@ compares the scanners' ignore lists and raises `IGNORE_MISMATCH` when they diffe
 **Reopen if.** D7 leaves the enclosure (a cable run between boxes, a connector reachable from
 outside), or something other than the gateway shares the line.
 
-## 3. MQTT commands authorised by the broker login
+### 3. MQTT commands authorised by the broker login
 
 **Gap.** The gateway acts on any command published to `bletracker/<mast>/cmd`,
 `bletracker/<mast>/<sector>/cmd` or `bletracker/<mast>/all/cmd`. Who may publish there is up
