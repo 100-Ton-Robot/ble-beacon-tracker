@@ -14,7 +14,9 @@ v2 gateway can't read it.
   D6 has its own gateway RX pin. One gateway TX drives every scanner's D7.
 - Every message, in both directions: protobuf bytes, then a CRC-16/CCITT-FALSE of those bytes
   (poly 0x1021, init 0xFFFF, check "123456789" = 0x29B1, 2 bytes little-endian), COBS-encoded,
-  then a 0x00 delimiter. Drop anything whose COBS, CRC or protobuf doesn't decode.
+  then a 0x00 delimiter. Drop anything whose COBS, CRC or protobuf doesn't decode. The gateway
+  also drops a bucket whose chip ID isn't 8 bytes, and single records with a wrong-length
+  address or advert data over 31 bytes. Event text is printable ASCII (0.8.0+).
 - Scanner -> gateway: one `Bucket` per tick. Gateway -> scanner: one `Command` per frame
   (at most 62 bytes before COBS).
 

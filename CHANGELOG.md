@@ -19,8 +19,18 @@ Needs scanner firmware **0.4.0 or later** (protocol 3): v2 and v1 frames are dro
 - Changed (2026-11-11): `SECTOR_OK` is now `CHIP_OK` (the expected chip is back), and the
   binary sensors are "Sector N chip mismatch" (new Home Assistant entity IDs). Only
   `expected_chip` sets them.
+- Fixed (2026-11-11): input from the scanners is checked before it is published. A bucket whose
+  chip ID isn't 8 bytes is dropped (a bad frame; a shorter one used to be zero-padded); single
+  records with an address that isn't 6 bytes, advert data over 31 bytes, a known kind that isn't
+  a sub-message or an unknown kind above 63 are dropped and counted in the new `bad_records`
+  (status JSON; logged at most once a minute). Unknown kinds 9-63 still go to `raw/<n>`.
+  Scanner `version` and event `text` are cleaned like advert names (control characters as
+  `?`, non-ASCII as `?` unless valid UTF-8).
+- Fixed (2026-11-11): MQTT commands with control or non-ASCII characters or over 128
+  characters are dropped, and warnings no longer repeat the rejected text (log injection).
 - Fixed (2026-11-11): `tools/make_selftest.py` runs again; the self-test data is regenerated
-  from it and covers the retired claim field, `ignore list`, `debug` and `TxDrops`.
+  from it and covers the retired claim field, `ignore list`, `debug`, `TxDrops`, a short chip
+  ID, malformed records and unclean text.
 - Changed (2026-11-02): reads protocol 3 (protobuf `Bucket` every 200 ms, CRC + COBS) with a
   small hand-written wire-format reader (`pb_wire.h`); unknown fields are skipped and unknown
   record kinds published as hex on `<sector>/raw/<n>`. UART RX buffers 4096 bytes.
@@ -94,6 +104,10 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   `tx_1m_dropped`. `debug` commands on `<sector>/cmd` and `all/cmd`; `TxDrops` published on
   `<sector>/debug/tx_1m`, retained state `<sector>/debug`.
 - `decode_frames.py` builds the `debug` commands and shows `TxDrops` and `Status.debug`.
+- Fixed: event text is printable ASCII; anything else becomes `?` (the old version in
+  `VERSION_CHANGED` comes from flash and could hold any byte).
+- Fixed: the console's `budget`, `chan` and `minrssi` read the whole argument as a number
+  (`budget 50x` was taken as 50, `chan 38x` as 38).
 - Not built or flashed yet: no image in `scanner_fw/release/`.
 
 ### 0.7.0 (2026-11-11)

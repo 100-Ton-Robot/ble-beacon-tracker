@@ -99,6 +99,19 @@ def name_str(b):
         return "".join(chr(x) if x < 0x80 else "?" for x in b)
 
 
+def clean_text(b, limit):
+    """Scanner text as the gateway passes it on: at most `limit` bytes, control characters and
+    DEL as '?', every non-ASCII byte too unless the whole text is valid UTF-8."""
+    b = b[:limit]
+    try:
+        b.decode("utf-8")
+        utf8 = True
+    except UnicodeDecodeError:
+        utf8 = False
+    return bytes(0x3F if x < 0x20 or x == 0x7F or (x >= 0x80 and not utf8) else x
+                 for x in b).decode("utf-8")
+
+
 def uuid_str(b):
     if len(b) == 2:
         return f"0x{int.from_bytes(b, 'little'):04x}"
@@ -152,6 +165,7 @@ class Sector:
 
     def __init__(self, pin):
         self.pin, self.lost, self.bad, self.last_seq = pin, 0, 0, None
+        self.bad_records = 0
         self.rssi_interval = 1
         self.out = []
 
@@ -169,7 +183,10 @@ class Sector:
     def bad_frame(self):
         self.bad += 1
 
-    def bucket(self, b, unknown_records=()):
+    def bucket(self, b, unknown_records=(), extra=()):
+        """extra: records after b's own, in wire order: pb.Record, ("event", cat, sev, code,
+        text bytes) for text a pb2 string can't hold, ("raw", num, payload) for unknown kinds,
+        ("bad",) for a record the gateway must drop as malformed"""
         chip = b.chip_id.hex()
         if self.last_seq is not None and b.seq > self.last_seq:
             self.lost += b.seq - self.last_seq - 1
@@ -177,17 +194,27 @@ class Sector:
         suspect = False  # no expected_chip on the test sector; the RX pin is the sector
 
         devs = []
-        for r in b.records:
+        for r in list(b.records) + list(extra):
+            if isinstance(r, tuple):
+                if r[0] == "event":
+                    _, cat, sev, code, text = r
+                    self.event(True, cat, sev, CODES[code], 0, 0, 0, clean_text(text, 64))
+                elif r[0] == "raw" and r[1] <= 63:
+                    self.pub(f"raw/{r[1]}", r[2].hex())
+                else:
+                    self.bad_records += 1
+                continue
             k = r.WhichOneof("kind")
             if k == "event":
                 e = r.event
                 self.event(True, e.category, e.severity, CODES[e.code], e.value, e.value2,
-                           e.cmd_seq, e.text)
+                           e.cmd_seq, clean_text(e.text.encode(), 64))
             elif k == "status":
                 s = r.status
                 st = {"t": None, "chip": chip, "seq": b.seq, "pin_sector": self.pin,
                       "suspect": suspect, "lost": self.lost, "bad": self.bad,
-                      "rx_overflow": 0, "version": s.version}
+                      "bad_records": self.bad_records, "rx_overflow": 0,
+                      "version": clean_text(s.version.encode(), 24)}
                 for f in ("ext_antenna", "listening", "active_scan", "payloads", "flash_mode",
                           "client", "test_image", "adverts", "dropped", "devices", "load_reasons",
                           "line_peak_pct", "budget_pct"):
@@ -204,11 +231,17 @@ class Sector:
                 self.pub("counters", dumps(c))
             elif k == "rssi":
                 x = r.rssi
+                if len(x.addr) != 6:
+                    self.bad_records += 1
+                    continue
                 devs.append([addr(x.addr), x.random, x.adv_type, mean1(x.rssi_sum_dbm, x.count),
                              x.rssi_max_dbm, x.count,
                              x.tx_1m_dbm if x.HasField("tx_1m_dbm") else None])
             elif k in ("advert", "scan_rsp"):
                 x = getattr(r, k)
+                if len(x.addr) != 6 or len(x.data) > 31:
+                    self.bad_records += 1
+                    continue
                 a = {"id": addr(x.addr), "mast": MAST, "sector": self.pin, "chip": chip, "t": None,
                      "suspect": suspect, "kind": "adv" if k == "advert" else "scan_rsp",
                      "rssi": x.rssi_dbm, "random": x.random, "adv_type": x.adv_type,
@@ -229,7 +262,10 @@ class Sector:
                                                "omitted": omitted}))
         # Records this pb2 doesn't know: the generator appends them last, so they come last
         for num, payload in unknown_records:
-            self.pub(f"raw/{num}", payload.hex())
+            if num <= 63:
+                self.pub(f"raw/{num}", payload.hex())
+            else:
+                self.bad_records += 1
         if devs or self.rssi_interval == 1:
             rs = {"t": None, "seq": b.seq, "t_ms": b.t_ms, "tick_ms": b.tick_ms, "chan": b.chan,
                   "load": b.load, "chip": chip, "suspect": suspect,
@@ -327,6 +363,32 @@ def bucket_d():
     return b, b.SerializeToString(), []
 
 
+def bucket_e():
+    """Malformed input the gateway must clean or drop, then a status showing bad_records"""
+    b = pb.Bucket(chip_id=CHIP, seq=105, t_ms=21000, tick_ms=200, chan=0, load=0)
+    bad_text = b"bad \xff\x1b[31m red"
+    event = key(1, 0) + ref_varint(0) + key(2, 0) + ref_varint(1) + ld(7, bad_text)
+    long_ad = bytes([39, 0xFF]) + bytes(38)
+    st = status()
+    st.status.version = "0.9\x1b[2J"
+    wire = [
+        (ld(5, event), ("event", 0, 1, 0, bad_text)),
+        (pb.Record(rssi=pb.Rssi(addr=bytes(5), count=1)).SerializeToString(), ("bad",)),
+        (pb.Record(advert=pb.Payload(addr=bytes(6), data=long_ad)).SerializeToString(), ("bad",)),
+        (ld(100, bytes([0x08, 0x01])), ("bad",)),               # unknown kind past 63
+        (key(2, 0) + ref_varint(5), ("bad",)),                  # known kind, not a sub-message
+        (ld(10, bytes([0x08, 0x2A])), ("raw", 10, bytes([0x08, 0x2A]))),
+        (st.SerializeToString(), st),
+    ]
+    body = b.SerializeToString() + b"".join(ld(15, w) for w, _ in wire)
+    return b, body, [], [m for _, m in wire]
+
+
+def bad_chip():
+    """A bucket whose chip ID isn't 8 bytes: dropped whole, counted as a bad frame"""
+    return ref.frame(pb.Bucket(chip_id=CHIP[:7], seq=106).SerializeToString())
+
+
 def corrupt(body):
     raw = body + struct.pack("<H", ref.crc16_ccitt_false(body) ^ 0x0101)
     return ref.cobs_encode(raw) + b"\x00"
@@ -350,7 +412,16 @@ def main():
 
     sec = Sector(PIN)
     frames = []
-    for make in (bucket_a, bucket_b, None, bucket_d):
+    for make in (bucket_a, bucket_b, None, bucket_d, bad_chip, bucket_e):
+        if make is bad_chip:
+            frames.append(bad_chip())
+            sec.bad_frame()
+            continue
+        if make is bucket_e:
+            b, body, unknown, extra = make()
+            frames.append(ref.frame(body))
+            sec.bucket(b, unknown, extra)
+            continue
         if make is None:
             frames.append(corrupt(bucket_d()[1]))
             try:
@@ -372,7 +443,7 @@ def main():
         f.write("static const CmdVector CMD_VECTORS[] = {\n")
         for text, chip, hexstr in CMD_VECTORS:
             f.write(f"    {{{c_str(text)}, {c_str(chip)}, {c_str(hexstr)}}},\n")
-        f.write("};\n\n// Framed buckets (hex, each ending in 00); the third has a bad CRC\n")
+        f.write("};\n\n// Framed buckets (hex, each ending in 00); the third has a bad CRC, the fifth a 7-byte chip ID\n")
         f.write("static const char *const FRAMES[] = {\n")
         for fr in frames:
             f.write(f"    {c_str(fr.hex())},\n")

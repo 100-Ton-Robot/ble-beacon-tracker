@@ -26,6 +26,12 @@ static const size_t QUEUE_MAX = 16;               /* the scanner itself queues o
 static const uint32_t BUDGET_FLOOR = 30;          /* the gateway never pushes budget_pct below this */
 static const uint32_t BUDGET_STEP = 10;
 static const time_t CLOCK_VALID_AFTER = 1700000000;  /* before this SNTP hasn't set the clock */
+static const size_t AD_MAX = 31;                  /* legacy advert / scan response bytes */
+static const size_t EVENT_TEXT_MAX = 64;          /* Event.text, as the scanner's nanopb options */
+static const size_t VERSION_MAX = 24;             /* Status.version, likewise */
+static const uint32_t RECORD_KNOWN_MAX = 8;       /* Record kinds this gateway handles: 1-8 */
+static const uint32_t RAW_RECORD_MAX = 63;        /* unknown kinds above this aren't published */
+static const size_t CMD_TEXT_MAX = 128;           /* longest MQTT command text accepted */
 
 /* Retained per-sector state topics, in Sector::state_ order */
 enum StateTopic : uint8_t {
@@ -161,6 +167,20 @@ static bool utf8_valid(const uint8_t *p, size_t n) {
     i += len;
   }
   return true;
+}
+
+/* Text from a scanner, safe for JSON and the log: at most max bytes; control characters and DEL
+ * become '?', and so does every non-ASCII byte unless the whole text is valid UTF-8 */
+static std::string clean_text(const uint8_t *p, size_t len, size_t max) {
+  len = std::min(len, max);
+  bool utf8 = utf8_valid(p, len);
+  std::string s((const char *) p, len);
+  for (auto &c : s) {
+    uint8_t b = (uint8_t) c;
+    if (b < 0x20 || b == 0x7f || (b >= 0x80 && !utf8))
+      c = '?';
+  }
+  return s;
 }
 
 /* Small JSON writer: escaping matches Python's json.dumps(ensure_ascii=False) */
@@ -406,6 +426,18 @@ static bool parse_rule(const std::string &s, uint8_t *addr, uint8_t *mask) {
 }
 
 bool parse_command(const std::string &text, Command &c, std::string &err) {
+  /* Checked before anything is logged: the error messages never repeat what was rejected here */
+  if (text.size() > CMD_TEXT_MAX) {
+    err = "command longer than " + std::to_string(CMD_TEXT_MAX) + " characters dropped";
+    return false;
+  }
+  for (char ch : text) {
+    uint8_t b = (uint8_t) ch;
+    if ((b < 0x20 && !isspace(b)) || b >= 0x7f) {
+      err = "command with control or non-ASCII characters dropped";
+      return false;
+    }
+  }
   std::vector<std::string> w;
   std::string cur;
   for (char ch : trim_lower(text)) {
@@ -535,7 +567,7 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     }
     return true;
   }
-  err = "unknown command '" + text + "'";
+  err = "unknown command '" + c.text + "'";
   return false;
 }
 
@@ -716,13 +748,16 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
 
   /* Pass 1: the bucket header, and check every record parses */
   uint8_t chip[CHIP_ID_LEN] = {};
+  size_t chip_len = 0;
   uint32_t seq = 0, t_ms = 0, tick_ms = 0, chan = 0, load = 0;
   {
     pb::Reader r(this->raw_, body);
     pb::Field f;
     while (r.next(f)) {
       if (f.num == 1 && f.wt == pb::LEN) {
-        memcpy(chip, f.p, std::min(f.len, CHIP_ID_LEN));
+        chip_len = f.len;
+        if (chip_len == CHIP_ID_LEN)
+          memcpy(chip, f.p, CHIP_ID_LEN);
       } else if (f.num >= 3 && f.num <= 7 && f.wt == pb::VARINT) {
         /* 2 was the sector claim (scanners before 0.5.0): skipped, the RX pin is the sector */
         uint32_t *dst[] = {&seq, &t_ms, &tick_ms, &chan, &load};
@@ -734,6 +769,10 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
     }
     if (!r.ok()) {
       this->bad_frame_("protobuf", len);
+      return;
+    }
+    if (chip_len != CHIP_ID_LEN) {
+      this->bad_frame_("chip ID not 8 bytes", len);
       return;
     }
   }
@@ -810,6 +849,13 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
       if (f.num == 15 && f.wt == pb::LEN)
         this->handle_record_(f.p, f.len, t);
   }
+  if (this->bad_records_ != this->bad_records_logged_ &&
+      (this->bad_records_ms_ == 0 || now - this->bad_records_ms_ >= REPORT_MS)) {
+    if (!capturing)
+      ESP_LOGW(TAG, "Sector %u: %" PRIu32 " malformed record(s) dropped since boot", this->pin_, this->bad_records_);
+    this->bad_records_logged_ = this->bad_records_;
+    this->bad_records_ms_ = now ? now : 1;
+  }
 
   uint32_t rssi_interval = this->have_status_ ? this->reported_.intervals.v[0] : 1;
   if (this->any_rssi_ || rssi_interval == 1) {
@@ -858,23 +904,33 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f)) {
-    if (f.wt != pb::LEN || f.num > 8) {
-      /* A record kind this gateway doesn't know (forward compatibility) */
+    if (f.num > RECORD_KNOWN_MAX) {
+      /* A record kind this gateway doesn't know (forward compatibility), within a bounded range so
+       * a bad scanner can't make up topics without limit */
+      if (f.num > RAW_RECORD_MAX) {
+        this->bad_records_++;
+        continue;
+      }
       std::string sub = "raw/" + std::to_string(f.num);
       this->hub_->publish(this->topic_(sub.c_str()), f.wt == pb::VARINT ? std::to_string(f.v) : to_hex(f.p, f.len),
                           false);
       continue;
     }
+    if (f.wt != pb::LEN) {
+      this->bad_records_++; /* a known kind is always a sub-message */
+      continue;
+    }
+    bool ok = true;
     switch (f.num) {
       case 1:
         this->handle_status_(f.p, f.len, t);
         break;
       case 2:
-        this->add_rssi_(f.p, f.len);
+        ok = this->add_rssi_(f.p, f.len);
         break;
       case 3:
       case 4:
-        this->publish_payload_(f.p, f.len, f.num == 4, t);
+        ok = this->publish_payload_(f.p, f.len, f.num == 4, t);
         break;
       case 5:
         this->handle_event_(f.p, f.len, t);
@@ -889,10 +945,13 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
         this->handle_tx_drops_(f.p, f.len, t);
         break;
     }
+    if (!ok)
+      this->bad_records_++;
   }
 }
 
-void Sector::add_rssi_(const uint8_t *p, size_t len) {
+/* false (nothing added) if the address isn't 6 bytes */
+bool Sector::add_rssi_(const uint8_t *p, size_t len) {
   const uint8_t *addr = nullptr;
   size_t addr_len = 0;
   bool random = false, has_tx = false;
@@ -926,6 +985,8 @@ void Sector::add_rssi_(const uint8_t *p, size_t len) {
         break;
     }
   }
+  if (addr_len != ADDR_LEN)
+    return false;
   J j;
   j.arr().str(addr_str(addr, addr_len, ':')).b(random).i(adv_type).raw(mean1(sum, count)).i(max).i(count);
   if (has_tx)
@@ -937,10 +998,12 @@ void Sector::add_rssi_(const uint8_t *p, size_t len) {
     this->rssi_ += ',';
   this->rssi_ += j.s;
   this->any_rssi_ = true;
+  return true;
 }
 
 /* Theengs-style: the AD fields split out of the raw bytes, no device-specific decoding */
-void Sector::publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t) {
+/* false (nothing published) if the address isn't 6 bytes or the data is over 31 */
+bool Sector::publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t) {
   const uint8_t *addr = nullptr, *data = nullptr;
   size_t addr_len = 0, data_len = 0;
   bool random = false, refresh = false;
@@ -975,6 +1038,9 @@ void Sector::publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const
         break;
     }
   }
+
+  if (addr_len != ADDR_LEN || data_len > AD_MAX)
+    return false;
 
   /* AD structures: [len][type][value...]; stop at padding (len 0) or a truncated one */
   const uint8_t *name = nullptr, *manu = nullptr, *svc = nullptr;
@@ -1050,6 +1116,7 @@ void Sector::publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const
   j.end_obj();
   std::string sub = "adv/" + addr_str(addr, addr_len, 0);
   this->hub_->publish(this->topic_(sub.c_str()), j.s, false);
+  return true;
 }
 
 void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
@@ -1062,7 +1129,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   pb::Field f;
   while (r.next(f)) {
     if (f.num == 1 && f.wt == pb::LEN) {
-      version.assign((const char *) f.p, f.len);
+      version = clean_text(f.p, f.len, VERSION_MAX);
     } else if (f.num >= 2 && f.num <= 8 && f.wt == pb::VARINT) {
       flags[f.num - 2] = f.b();
     } else if (f.num >= 9 && f.num <= 14 && f.wt == pb::VARINT) {
@@ -1086,7 +1153,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
                                            "budget_pct"};
   J j;
   j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_).k("pin_sector").i(this->pin_);
-  j.k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_);
+  j.k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_).k("bad_records").i(this->bad_records_);
   j.k("rx_overflow").i(this->rx_high_).k("version").str(version);
   for (int i = 0; i < 7; i++)
     j.k(FLAG_NAMES[i]).b(flags[i]);
@@ -1284,7 +1351,7 @@ void Sector::handle_event_(const uint8_t *p, size_t len, const char *t) {
         break;
       case 7:
         if (f.wt == pb::LEN)
-          text.assign((const char *) f.p, f.len);
+          text = clean_text(f.p, f.len, EVENT_TEXT_MAX);
         break;
     }
   }

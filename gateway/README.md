@@ -148,7 +148,7 @@ scanner's sector. `t` is the gateway's clock when it handled the bucket, epoch *
 | `security` | no | SECURITY-category events only | same JSON; this stream is the security record |
 | `<sector>/ignore` | yes | each `IgnoreList` record (scanner 0.7.0+: at its boot, on a change, on request) | `{"t","chip","seq","paused","count","rules":[{"rule":"C1:7D:2B:00:00:00/24","saved":true,"hits":12}]}` |
 | `<sector>/debug/tx_1m` | no | each `TxDrops` record (scanner 0.8.0+, `debug tx1m on`): after a second with dropped 1 m powers | `{"t","chip","seq","drops":[{"id":"AA:BB:CC:DD:EE:FF","random":true,"format":"ibeacon","raw_dbm":127,"tx_1m_dbm":127,"count":3}],"omitted":0}`; `format` `ibeacon`, `eddystone_uid` or `eddystone_url`; `raw_dbm` as advertised (Eddystone: at 0 m) |
-| `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`) | the record's bytes as hex |
+| `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`, 9-63; higher ones are dropped and counted in `bad_records`) | the record's bytes as hex |
 | `<sector>/online` | yes | first bucket / none for 3 s | `online` / `offline` |
 | `<sector>/chip`, `load` | yes | on change | chip ID / load level. (`claim` and the v2 `scanner_sector` are no longer published; their retained values are cleared at connect) |
 | `<sector>/flash`, `listening`, `client`, `test_image`, `active`, `payloads` | yes | on change | `on` / `off` |
@@ -191,15 +191,19 @@ device-specific decoding here):
 Status (each Status record, plus the gateway's view of the link):
 
 ```json
-{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"rx_overflow":0,
+{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"bad_records":0,"rx_overflow":0,
  "version":"0.4.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
  "client":false,"test_image":false,"adverts":123,"dropped":0,"devices":3,"load_reasons":0,"line_peak_pct":61,
  "budget_pct":70,"intervals":{"rssi":1,"payload":1,"refresh":50,"status":5,"counters":50},"baud":115200}
 ```
 
-`lost`: buckets missed (seq gaps) since the gateway booted; `bad`: frames dropped (COBS, CRC or
-protobuf); `rx_overflow`: times the RX buffer was over three quarters full. The scanner
-fields are as in `bletracker.proto`.
+`lost`: buckets missed (seq gaps) since the gateway booted; `bad`: frames dropped (COBS, CRC,
+protobuf, or a chip ID that isn't 8 bytes); `bad_records`: records dropped from good frames as
+malformed (an address that isn't 6 bytes, advert data over 31 bytes, a known record kind that
+isn't a sub-message, an unknown kind above 63), also logged at most once a minute; `rx_overflow`: times the RX buffer was over three quarters full. The scanner
+fields are as in `bletracker.proto`. Text from a scanner (`version`, event `text`) is passed on
+cleaned: control characters become `?`, and so does every non-ASCII byte unless the text is
+valid UTF-8 (advert names: only the UTF-8 rule, control characters are JSON-escaped).
 
 Counters: `{"t","chip","seq"}` plus every `Counters` field by its proto name.
 
@@ -259,7 +263,8 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `debug tx1m on` / `debug tx1m off` / `debug off` | scanner 0.8.0+, on `<sector>/cmd` or `all/cmd`: per-second summary of adverts whose 1 m power the scanner dropped, on `<sector>/debug/tx_1m`. Off at every scanner boot, and the gateway doesn't turn it back on |
 | `ignore list` | scanner 0.7.0+, on `<sector>/cmd` or `all/cmd`: the scanner sends its rules, published on `<sector>/ignore`. The gateway asks by itself when it hasn't seen a scanner's list (e.g. after the gateway restarts) |
 
-Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
+Commands are ASCII: one with control or non-ASCII characters, or longer than 128 characters, is
+dropped with a warning that doesn't repeat it. Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
 event (on `events`). One command is on the wire at a time; the next goes after the ack, or
 after 2 s with a `CMD_NO_ACK` warning. The DEBUG log shows each command's bytes in hex,
 which match `decode_frames.py --cmd ... --seq N`.

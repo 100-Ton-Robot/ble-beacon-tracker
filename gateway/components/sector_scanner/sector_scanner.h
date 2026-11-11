@@ -138,8 +138,8 @@ class Sector : public uart::UARTDevice {
   void handle_tx_drops_(const uint8_t *p, size_t len, const char *t);
   void handle_counters_(const uint8_t *p, size_t len, const char *t);
   void handle_event_(const uint8_t *p, size_t len, const char *t);
-  void add_rssi_(const uint8_t *p, size_t len);
-  void publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t);
+  bool add_rssi_(const uint8_t *p, size_t len);
+  bool publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t);
   void set_state_(uint8_t i, const std::string &v);
   void publish_online_(bool online);
   void reconcile_();
@@ -173,6 +173,9 @@ class Sector : public uart::UARTDevice {
   uint32_t lost_{0};
   uint32_t bad_{0};
   uint32_t bad_window_{0};
+  uint32_t bad_records_{0};          // records dropped as malformed, since boot
+  uint32_t bad_records_logged_{0};
+  uint32_t bad_records_ms_{0};
   uint32_t rx_high_{0};
   uint32_t rx_high_window_{0};
   uint32_t last_bucket_ms_{0};

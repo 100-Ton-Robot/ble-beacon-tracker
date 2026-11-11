@@ -420,6 +420,12 @@ static void event_post(bletracker_Event_Category cat, bletracker_Event_Severity 
 	va_start(ap, fmt);
 	vsnprintk(ev.text, sizeof(ev.text), fmt, ap);
 	va_end(ap);
+	/* Printable ASCII only: the text can carry bytes from flash (the last version booted) */
+	for (char *p = ev.text; *p; p++) {
+		if ((unsigned char)*p < 0x20 || (unsigned char)*p > 0x7e) {
+			*p = '?';
+		}
+	}
 
 	printk("[%s%s] %s\n", cat == bletracker_Event_Category_SECURITY ? "SECURITY " : "",
 	       sev_names[MIN(sev, 2)], ev.text);
@@ -2516,12 +2522,25 @@ static int cmd_data(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* Console number: the whole argument is a base-10 integer within min..max ("50x" is not) */
+static bool arg_long(const char *s, long min, long max, long *out)
+{
+	char *e;
+	long v = strtol(s, &e, 10);
+
+	if (e == s || *e != '\0' || v < min || v > max) {
+		return false;
+	}
+	*out = v;
+	return true;
+}
+
 static int cmd_budget(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		long v = strtol(argv[1], NULL, 10);
+		long v;
 
-		if (v < 10 || v > 90) {
+		if (!arg_long(argv[1], 10, 90, &v)) {
 			shell_error(sh, "usage: budget [10-90]");
 			return -EINVAL;
 		}
@@ -2538,17 +2557,17 @@ static int cmd_chan(const struct shell *sh, size_t argc, char **argv)
 	const char *usage = "chan [auto|37|38|39|rot [1-31]]";
 
 	if (argc > 1) {
-		long v = strtol(argv[1], NULL, 10);
+		long v;
 
 		if (strcmp(argv[1], "auto") == 0 && argc == 2) {
 			chan_mode = CHAN_AUTO;
-		} else if (v >= 37 && v <= 39 && argc == 2) {
+		} else if (argc == 2 && arg_long(argv[1], 37, 39, &v)) {
 			chan_fixed = (uint8_t)v;
 			chan_mode = CHAN_FIXED;
 		} else if (strcmp(argv[1], "rot") == 0) {
-			long s = argc > 2 ? strtol(argv[2], NULL, 10) : 1;
+			long s = 1;
 
-			if (s < 1 || s > 31) {
+			if (argc > 2 && !arg_long(argv[2], 1, 31, &s)) {
 				shell_error(sh, "usage: %s", usage);
 				return -EINVAL;
 			}
@@ -2658,9 +2677,9 @@ static int cmd_list(const struct shell *sh, size_t argc, char **argv)
 static int cmd_minrssi(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc > 1) {
-		long v = strtol(argv[1], NULL, 10);
+		long v;
 
-		if (v < -127 || v > 20) {
+		if (!arg_long(argv[1], -127, 20, &v)) {
 			shell_error(sh, "usage: minrssi <-127..20>");
 			return -EINVAL;
 		}
