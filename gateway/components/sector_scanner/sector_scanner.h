@@ -14,7 +14,7 @@ namespace esphome {
 namespace sector_scanner {
 
 /*
- * Protocol 3 (scanner fw 0.4.0+): scanner_fw/PROTOCOL.md, schema scanner_fw/proto/bletracker.proto.
+ * Protocol 3 (scanner fw 0.5.0+, no sector claim): scanner_fw/PROTOCOL.md, schema scanner_fw/proto/bletracker.proto.
  * Both directions: protobuf bytes + CRC-16/CCITT-FALSE of them (LE), COBS-encoded, then 0x00.
  * Scanner -> gateway: one Bucket per 200 ms tick on each sector's own RX pin.
  * Gateway -> scanners: one Command per frame on the shared TX, addressed by chip ID (or all).
@@ -23,7 +23,6 @@ namespace sector_scanner {
 static const size_t CHIP_ID_LEN = 8;
 static const size_t BUCKET_RAW_MAX = 3072;  /* largest bucket ~2.3 KB (PROTOCOL.md "Sizes") */
 static const size_t BUCKET_ENC_MAX = BUCKET_RAW_MAX + BUCKET_RAW_MAX / 254 + 1;
-static const uint32_t SECTOR_UNSET = 255;
 static const uint32_t REBOOT_ARG = 0xA5;
 
 /* Event.Category / Event.Severity numbers, shared by scanner and gateway events */
@@ -35,7 +34,6 @@ enum Action : uint8_t {
   ACT_LISTEN = 3,
   ACT_FLASH = 4,
   ACT_EXT_ANTENNA = 5,
-  ACT_SECTOR = 6,
   ACT_REBOOT = 7,
   ACT_PAYLOADS = 8,
   ACT_ACTIVE_SCAN = 9,
@@ -74,6 +72,14 @@ struct Command {
   std::string text;
 };
 
+/* A local ignore rule (YAML ignore:): adverts with (address & mask) == addr are dropped by the gateway */
+struct IgnoreRule {
+  uint8_t addr[ADDR_LEN]{};  // already masked
+  uint8_t mask[ADDR_LEN]{};
+};
+/* "<addr>[/bits|/mask]" with "*" bytes, as the scanner's console takes it; false if malformed */
+bool parse_ignore_rule(const std::string &text, IgnoreRule &rule);
+
 /* Text command -> Command (no target). Same words as scanner_fw/tools/decode_frames.py --cmd */
 bool parse_command(const std::string &text, Command &c, std::string &err);
 /* Command -> framed bytes (protobuf + CRC + COBS + 0x00) */
@@ -91,8 +97,11 @@ class Sector : public uart::UARTDevice {
   void set_lost_sensor(sensor::Sensor *s) { this->lost_sensor_ = s; }
   void set_bad_sensor(sensor::Sensor *s) { this->bad_sensor_ = s; }
   void set_devices_sensor(sensor::Sensor *s) { this->devices_sensor_ = s; }
-  void set_mismatch_sensor(binary_sensor::BinarySensor *s) { this->mismatch_sensor_ = s; }
+  void set_wrong_chip_sensor(binary_sensor::BinarySensor *s) { this->wrong_chip_sensor_ = s; }
   void set_chip_sensor(text_sensor::TextSensor *s) { this->chip_sensor_ = s; }
+  void set_firmware_sensor(text_sensor::TextSensor *s) { this->firmware_sensor_ = s; }
+  void set_firmware_outdated_sensor(binary_sensor::BinarySensor *s) { this->firmware_outdated_sensor_ = s; }
+  void set_ignored_sensor(sensor::Sensor *s) { this->ignored_sensor_ = s; }
 
   /* Text command ("flash on") to the chip last seen on this pin; for buttons and lambdas */
   bool command(const std::string &text);
@@ -128,8 +137,9 @@ class Sector : public uart::UARTDevice {
  protected:
   bool decode_(const uint8_t *enc, size_t len, size_t &body);
   void bad_frame_(const char *why, size_t len);
-  void validate_(uint32_t claim);
+  void validate_();
   void report_condition_();
+  void check_firmware_(const std::string &version, const char *t);
   void handle_record_(const uint8_t *p, size_t len, const char *t);
   void handle_status_(const uint8_t *p, size_t len, const char *t);
   void handle_ignore_list_(const uint8_t *p, size_t len, const char *t);
@@ -151,8 +161,11 @@ class Sector : public uart::UARTDevice {
   sensor::Sensor *lost_sensor_{nullptr};
   sensor::Sensor *bad_sensor_{nullptr};
   sensor::Sensor *devices_sensor_{nullptr};
-  binary_sensor::BinarySensor *mismatch_sensor_{nullptr};
+  binary_sensor::BinarySensor *wrong_chip_sensor_{nullptr};
   text_sensor::TextSensor *chip_sensor_{nullptr};
+  text_sensor::TextSensor *firmware_sensor_{nullptr};
+  binary_sensor::BinarySensor *firmware_outdated_sensor_{nullptr};
+  sensor::Sensor *ignored_sensor_{nullptr};
 
   uint8_t enc_[BUCKET_ENC_MAX];
   size_t enc_len_{0};
@@ -160,7 +173,6 @@ class Sector : public uart::UARTDevice {
   uint8_t raw_[BUCKET_RAW_MAX];
 
   /* Current bucket header (valid while its records are handled) */
-  uint32_t claim_{SECTOR_UNSET};
   uint32_t seq_{0};
   uint32_t tick_ms_{0};
   bool suspect_{false};
@@ -176,12 +188,17 @@ class Sector : public uart::UARTDevice {
   uint32_t last_bucket_ms_{0};
   int32_t load_{-1};
 
-  /* Chip and sector claim checks */
+  /* Expected chip check */
   bool have_chip_{false};
   uint8_t chip_[CHIP_ID_LEN]{};
   uint8_t cond_{0};  // COND_* bits
-  uint32_t cond_claim_{0};
   uint32_t cond_ms_{0};
+
+  /* Firmware check against the hub's scanner_firmware */
+  std::string version_;
+  bool fw_known_{false};
+  int fw_cmp_{0};  // -1 older than scanner_firmware, 0 same, 1 newer
+  uint32_t fw_report_ms_{0};
 
   /* Settings the scanner reported in its last status, and what it should have */
   Settings desired_;
@@ -211,6 +228,8 @@ class SectorScanner : public Component {
   void set_settings(bool payloads, bool active, uint32_t rssi, uint32_t payload, uint32_t refresh, uint32_t status,
                     uint32_t counters, uint32_t budget);
   void set_self_test(bool on) { this->self_test_ = on; }
+  void set_scanner_firmware(const std::string &v) { this->scanner_firmware_ = v; }
+  void add_ignore_rule(const std::string &text);
   void set_gateway_load_sensor(sensor::Sensor *s) { this->gateway_load_sensor_ = s; }
   void set_self_test_sensor(text_sensor::TextSensor *s) { this->self_test_sensor_ = s; }
   void add_sector(Sector *s) { this->sectors_.push_back(s); }
@@ -239,6 +258,9 @@ class SectorScanner : public Component {
   uint32_t rssi_interval() const { return this->rssi_interval_; }
   void set_rssi_interval(uint32_t n) { this->rssi_interval_ = n; }
   void note_publish_failure() { this->pub_fail_window_++; }
+  const std::string &scanner_firmware() const { return this->scanner_firmware_; }
+  /* True if the YAML ignore list matches this address (6 bytes, printed order): drop its records */
+  bool ignored(const uint8_t *addr, size_t len, uint32_t adverts);
   /* Epoch ms of now as a JSON number, or null before SNTP has set the clock (and in the self-test) */
   void now_json(char *out, size_t size) const;
 
@@ -247,6 +269,7 @@ class SectorScanner : public Component {
   void throttle_tick_();
   void on_all_command_(const std::string &payload);
   void run_self_test_();
+  void ignore_log_tick_();
 
   std::string mast_;
   std::string prefix_;
@@ -255,6 +278,18 @@ class SectorScanner : public Component {
   Settings defaults_;
   uint32_t rssi_interval_{1};
   bool self_test_{false};
+  std::string scanner_firmware_;
+  std::vector<IgnoreRule> ignore_;
+
+  /* Debug log of local drops: per address, records and adverts since the last 10 s report */
+  struct IgnoreHit {
+    uint8_t addr[ADDR_LEN];
+    uint32_t records;
+    uint32_t adverts;
+  };
+  std::vector<IgnoreHit> ignore_hits_;
+  uint32_t ignore_hits_overflow_{0};
+  uint32_t ignore_log_ms_{0};
   sensor::Sensor *gateway_load_sensor_{nullptr};
   text_sensor::TextSensor *self_test_sensor_{nullptr};
 

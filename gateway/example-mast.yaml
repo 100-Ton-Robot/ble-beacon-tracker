@@ -23,3 +23,10 @@ packages:
 #     static_ip: 192.0.2.20
 #     gateway: 192.0.2.1
 #     subnet: 255.255.255.0
+
+# Optional: this mast's default ignore list, one for all sectors (merged into the package's).
+# The gateway drops these addresses itself; * = any byte, /bits = prefix, /mask = explicit mask.
+# sector_scanner:
+#   ignore:
+#     - c1:7d:2b:*:*:*
+#     - aa:bb:cc:dd:ee:00/40

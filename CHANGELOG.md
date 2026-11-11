@@ -8,7 +8,28 @@ when the image was built, where known.
 
 ### Gateway
 
-Needs scanner firmware **0.4.0 or later** (protocol 3): v2 and v1 frames are dropped as bad.
+Needs scanner firmware **0.5.0 or later** (protocol 3 without the sector claim; 0.6.0 for the
+scanners' own ignore lists, 0.7.0 to read them back): v2 and v1 frames are dropped as bad.
+
+- Removed (2026-11-11): the sector claim check (scanner 0.5.0 has no sector): `claim` in
+  `rssi` and `status`, the retained `claim` topic (deleted at connect), `SECTOR_MISMATCH`,
+  `SECTOR_NOT_CONFIGURED`, `SECTOR_OK` and the `sector` command. The RX pin is the sector.
+- Changed (2026-11-11): the per-sector `mismatch` binary sensor is now `wrong_chip` (the
+  `expected_chip` check, the only one left); back to the expected chip raises `CHIP_OK`.
+- Added (2026-11-11): scanner firmware check. `scanner_firmware` (default `0.7.0`) is the
+  latest version; an older scanner raises `FIRMWARE_OUTDATED` (WARN, repeated every 10 min)
+  and "Sector N firmware outdated", a newer one `FIRMWARE_NEWER`, a return to the latest
+  `FIRMWARE_OK`. "Sector N firmware" text sensor and retained `<sector>/version` topic.
+- Added (2026-11-11): `ignore`, the mast's default ignore list (one for all sectors, checked at
+  compile time): the gateway drops RSSI and advert records from those addresses itself,
+  silently; at DEBUG it logs each ignored address once per 10 s with the drop counts.
+- Added (2026-11-11): scanner 0.6.0 fields published: `ignore_rules`, `ignore_saved`, `ignored`
+  in `status`, `ignored` in `counters`; "Sector N ignored" sensor (adverts per second).
+- Changed (2026-11-11): `ignore` / `unignore` / `ignore clear` are accepted only on `all/cmd`
+  (one list for the whole mast). Self-test regenerated: firmware check, ignore list and the
+  new command vectors and an ignore list record (24 commands, 17 messages).
+- Changed (2026-11-11): the gateway asks a scanner for its ignore list (`ignore list`) only once
+  its status shows 0.7.0 or later; a 0.6.0 scanner would reject the request every minute.
 
 - Changed (2026-11-02): reads protocol 3 (protobuf `Bucket` every 200 ms, CRC + COBS) with a
   small hand-written wire-format reader (`pb_wire.h`); unknown fields are skipped and unknown
@@ -98,8 +119,8 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   `ignore_saved` / `ignored` and `Counters.ignored`.
 - Changed: Zephyr's shell wildcard is off (`CONFIG_SHELL_WILDCARD=n`). It swallowed arguments
   containing `*`, so `ignore C1:7D:2B:*:*:*` never reached the command.
-- Gateway: parses and sends the new command words. It does not publish the new status or
-  counters fields yet (that waits for its 0.5.0 update, which regenerates the self-test).
+- Gateway: parses and sends the new command words, and (2026-11-11) publishes the new status
+  and counters fields (see Gateway above).
 - Flashed by USB (app only) on all three XIAOs and bench-tested on each: rules and masks,
   saved rules across reboot, gateway commands via `inject` (accepted to all, rejected to one
   chip). On the bench an unconnected D7 picks up noise that can corrupt an injected frame;
@@ -114,7 +135,7 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   schema). The saved value from 0.4.x is deleted at boot. `list csv` loses its first column.
 - Changed: flash mode advertises as `bletracker-<last 6 hex digits of the chip ID>` instead
   of `bletracker-s<sector>`.
-- The gateway's sector-claim check has to go with it (gateway not changed yet).
+- The gateway's sector-claim check went with it (2026-11-11, see Gateway above).
 
 ### 0.4.0 (2026-11-02)
 

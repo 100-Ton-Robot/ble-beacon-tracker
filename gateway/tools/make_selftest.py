@@ -6,7 +6,8 @@ its C++ code:
     scanner_fw/tools/decode_frames.py, must encode byte for byte the same;
   - sample buckets built and framed with the reference protobuf code (bletracker_pb2), fed to a
     test sector on pin 0, must produce exactly the MQTT messages this script expects (MQTT
-    layout v3, written here from the spec, not from the C++).
+    layout v3, written here from the spec, not from the C++), with the self-test's own
+    scanner_firmware (firmware check) and local ignore list (dropped records).
 
     python make_selftest.py [output .h]   (default: ../components/sector_scanner/selftest_data.h)
 
@@ -26,7 +27,9 @@ PREFIX = "selftest"
 MAST = "selftest"
 PIN = 0
 
-# From the contract atom (2026-11-02): text, chip ID ("" = all), framed hex incl. trailing 00, seq 1
+# Text, chip ID ("" = all), framed hex incl. trailing 00, seq 1. The first 13 are from the contract
+# atom (2026-11-02); the sector vectors went with scanner 0.5.0, the ignore and addressed ones
+# (2026-11-11) come from decode_frames.py --cmd (scanner 0.6.0).
 CMD_VECTORS = [
     ("payloads on", "", "0710014001bab500"),
     ("payloads off", "", "04100140039ba500"),
@@ -41,23 +44,51 @@ CMD_VECTORS = [
     ("reboot", "", "08100138a5014cfd00"),
     ("intervals rssi=1", "", "091001520208017ed100"),
     ("budget 50", "", "0710015832503900"),
-    ("sector 0", "2d31708df8982200", "0a0a082d31708df8982204100130030c1600"),
-    ("sector 1", "2d31708df8982200", "0a0a082d31708df8982207100130012d0600"),
-    ("sector 2", "2d31708df8982200", "0a0a082d31708df8982207100130024e3600"),
-    ("sector 0", "cc1f4cbee227cbae", "0e0a08cc1f4cbee227cbae10013003d89400"),
-    ("sector 1", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae10013001f98400"),
-    ("sector 2", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae100130029ab400"),
-    ("sector 0", "38cd69b0ed39e516", "0e0a0838cd69b0ed39e516100130036f4200"),
-    ("sector 1", "38cd69b0ed39e516", "110a0838cd69b0ed39e516100130014e5200"),
-    ("sector 2", "38cd69b0ed39e516", "110a0838cd69b0ed39e516100130022d6200"),
+    ("ignore c1:7d:2b:*:*:*", "", "0a100162100a06c17d2b0101061206ffffff0101035a2f00"),
+    ("ignore aa:bb:cc:dd:ee:ff save", "", "111001620a0a06aabbccddeeff18012d2d00"),
+    ("ignore aa:bb:cc:dd:ee:00/40", "", "0c100162100a06aabbccddee081206ffffffffff037a6700"),
+    ("unignore 11:22:33:44:55:66/ff:ff:ff:00:00:00", "", "0a10016a100a061122330101061206ffffff010103cdc500"),
+    ("ignore clear boot", "", "07100170012fb000"),
+    ("ignore clear saved", "", "07100170024c8000"),
+    ("ignore clear all", "", "07100170036d9000"),
+    ("flash on", "2d31708df8982200", "0a0a082d31708df8982207100120015e0500"),
+    ("flash on", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae100120018a8700"),
+    ("reboot", "38cd69b0ed39e516", "120a0838cd69b0ed39e516100138a5018d5c00"),
+    ("ignore list", "", "0710017801863900"),
 ]
 
 CHIP = bytes.fromhex("38cd69b0ed39e516")
+SCANNER_FIRMWARE = "0.7.0"
+# Local ignore list: the first drops aabbccddeeff, the second c0ffee000002/03 (not ...01)
+IGNORE_RULES = ["aa:bb:cc:*:*:*", "c0:ff:ee:00:00:02/47"]
 CATEGORY = ["GENERAL", "SECURITY", "LOAD", "COMMAND"]
 SEVERITY = ["INFO", "WARN", "ERROR"]
 CODES = ["UNKNOWN", "BOOT", "VERSION_CHANGED", "TEST_IMAGE", "IMAGE_CONFIRMED", "FLASH_MODE_ON",
          "FLASH_MODE_OFF", "CLIENT_CONNECTED", "CLIENT_DISCONNECTED", "SETTING_CHANGED", "CMD_OK",
-         "CMD_REJECTED", "BAD_COMMANDS", "LOAD_LEVEL", "SECTOR_NOT_SET", "EVENTS_LOST"]
+         "CMD_REJECTED", "BAD_COMMANDS", "LOAD_LEVEL", "14", "EVENTS_LOST"]
+
+
+def rule_parse(text):
+    """addr[/bits|/mask] with * bytes -> (value, mask), both 6 ints, value masked."""
+    a, _, m = text.partition("/")
+    val = [0 if x == "*" else int(x, 16) for x in a.split(":")]
+    mask = [0 if x == "*" else 0xFF for x in a.split(":")]
+    if m:
+        m2 = ([int(x, 16) for x in m.split(":")] if ":" in m else
+              [(0xFF00 >> max(0, min(8, int(m) - 8 * b))) & 0xFF for b in range(6)])
+        mask = [x & y for x, y in zip(mask, m2)]
+    return [x & y for x, y in zip(val, mask)], mask
+
+
+RULES = [rule_parse(r) for r in IGNORE_RULES]
+
+
+def ignored(a):
+    return any(all((x & m) == v for x, v, m in zip(a, val, mask)) for val, mask in RULES)
+
+
+def vtuple(v):
+    return tuple(int(x) for x in v.split("."))
 
 
 # ------------------------------------------------------------------ JSON as the gateway writes it
@@ -157,7 +188,8 @@ class Sector:
 
     def __init__(self, pin):
         self.pin, self.lost, self.bad, self.last_seq = pin, 0, 0, None
-        self.cond, self.cond_claim, self.rssi_interval = 0, 0, 1
+        self.rssi_interval = 1
+        self.version, self.fw_cmp = None, None
         self.out = []
 
     def pub(self, sub, payload):
@@ -171,6 +203,21 @@ class Sector:
         if cat == 1:
             self.out.append((f"{PREFIX}/security", dumps(e)))
 
+    def firmware(self, v):
+        """FIRMWARE_OUTDATED / NEWER / OK as the version changes (10-min repeats not reached here)."""
+        if v == self.version:
+            return
+        self.version = v
+        cmp = (vtuple(v) > vtuple(SCANNER_FIRMWARE)) - (vtuple(v) < vtuple(SCANNER_FIRMWARE))
+        was_outdated = self.fw_cmp is not None and self.fw_cmp < 0
+        self.fw_cmp = cmp
+        if cmp < 0:
+            self.event(False, 0, 1, "FIRMWARE_OUTDATED", 0, 0, 0, f"firmware {v}, latest {SCANNER_FIRMWARE}")
+        elif cmp > 0:
+            self.event(False, 0, 0, "FIRMWARE_NEWER", 0, 0, 0, f"firmware {v}, newer than {SCANNER_FIRMWARE}")
+        elif was_outdated:
+            self.event(False, 0, 0, "FIRMWARE_OK", 0, 0, 0, f"firmware {v} is the latest")
+
     def bad_frame(self):
         self.bad += 1
 
@@ -179,19 +226,7 @@ class Sector:
         if self.last_seq is not None and b.seq > self.last_seq:
             self.lost += b.seq - self.last_seq - 1
         self.last_seq = b.seq
-        claim = b.sector
-        cond = 4 if claim == 255 else 1 if claim != self.pin else 0
-        suspect = bool(cond & 1)
-        if cond != self.cond or (cond and claim != self.cond_claim):
-            was, self.cond, self.cond_claim = self.cond, cond, claim
-            if cond & 1:
-                self.event(False, 1, 2, "SECTOR_MISMATCH", claim, self.pin, 0,
-                           f"claims sector {claim} on sector {self.pin}'s pin")
-            if cond & 4:
-                self.event(False, 0, 1, "SECTOR_NOT_CONFIGURED", 255, self.pin, 0,
-                           "scanner sector not configured")
-            if not cond and was:
-                self.event(False, 1, 0, "SECTOR_OK", claim, self.pin, 0, "sector checks pass")
+        suspect = False  # only an expected_chip mismatch, not configured in the self-test
 
         devs = []
         for r in b.records:
@@ -203,7 +238,7 @@ class Sector:
             elif k == "status":
                 s = r.status
                 st = {"t": None, "chip": chip, "seq": b.seq, "pin_sector": self.pin,
-                      "claim": claim, "suspect": suspect, "lost": self.lost, "bad": self.bad,
+                      "suspect": suspect, "lost": self.lost, "bad": self.bad,
                       "rx_overflow": 0, "version": s.version}
                 for f in ("ext_antenna", "listening", "active_scan", "payloads", "flash_mode",
                           "client", "test_image", "adverts", "dropped", "devices", "load_reasons",
@@ -212,8 +247,11 @@ class Sector:
                 st["intervals"] = {f: getattr(s.intervals, f)
                                    for f in ("rssi", "payload", "refresh", "status", "counters")}
                 st["baud"] = s.baud
+                for f in ("ignore_rules", "ignore_saved", "ignored"):
+                    st[f] = getattr(s, f)
                 self.rssi_interval = s.intervals.rssi
                 self.pub("status", dumps(st))
+                self.firmware(s.version)
             elif k == "counters":
                 c = {"t": None, "chip": chip, "seq": b.seq}
                 for f in pb.Counters.DESCRIPTOR.fields:
@@ -221,11 +259,15 @@ class Sector:
                 self.pub("counters", dumps(c))
             elif k == "rssi":
                 x = r.rssi
+                if ignored(x.addr):
+                    continue
                 devs.append([addr(x.addr), x.random, x.adv_type, mean1(x.rssi_sum_dbm, x.count),
                              x.rssi_max_dbm, x.count,
                              x.tx_1m_dbm if x.HasField("tx_1m_dbm") else None])
             elif k in ("advert", "scan_rsp"):
                 x = getattr(r, k)
+                if ignored(x.addr):
+                    continue
                 a = {"id": addr(x.addr), "mast": MAST, "sector": self.pin, "chip": chip, "t": None,
                      "suspect": suspect, "kind": "adv" if k == "advert" else "scan_rsp",
                      "rssi": x.rssi_dbm, "random": x.random, "adv_type": x.adv_type,
@@ -237,7 +279,7 @@ class Sector:
             self.pub(f"raw/{num}", payload.hex())
         if devs or self.rssi_interval == 1:
             rs = {"t": None, "seq": b.seq, "t_ms": b.t_ms, "tick_ms": b.tick_ms, "chan": b.chan,
-                  "load": b.load, "chip": chip, "claim": claim, "suspect": suspect,
+                  "load": b.load, "chip": chip, "suspect": suspect,
                   "devs": [Raw(dumps(d)) for d in devs]}
             self.pub("rssi", dumps(rs))
 
@@ -262,7 +304,7 @@ def ld(num, payload):
 
 
 def status(**kw):
-    s = pb.Status(version="0.4.0", listening=True, budget_pct=70, baud=115200,
+    s = pb.Status(version="0.7.0", listening=True, budget_pct=70, baud=115200,
                   intervals=pb.Intervals(rssi=1, payload=1, refresh=50, status=5, counters=50))
     for k, v in kw.items():
         setattr(s, k, v)
@@ -270,7 +312,7 @@ def status(**kw):
 
 
 def bucket_a():
-    b = pb.Bucket(chip_id=CHIP, sector=0, seq=100, t_ms=20000, tick_ms=200, chan=0, load=1)
+    b = pb.Bucket(chip_id=CHIP, seq=100, t_ms=20000, tick_ms=200, chan=0, load=1)
     E = pb.Event
     b.records.add(event=E(category=E.SECURITY, severity=E.INFO, code=E.BOOT, value=1, value2=7,
                           text="power-on"))
@@ -278,7 +320,8 @@ def bucket_a():
     b.records.add(event=E(category=E.LOAD, severity=E.WARN, code=E.LOAD_LEVEL, value=1, value2=1,
                           text="line"))
     b.records.append(status(active_scan=True, payloads=True, test_image=True, adverts=123,
-                            devices=3, load_reasons=1, line_peak_pct=88))
+                            devices=3, load_reasons=1, line_peak_pct=88, ignore_rules=3,
+                            ignore_saved=2, ignored=17))
     b.records.add(counters=pb.Counters(**{f.name: i + 1 for i, f in
                                           enumerate(pb.Counters.DESCRIPTOR.fields)}))
     R = pb.Rssi
@@ -288,6 +331,8 @@ def bucket_a():
                          count=2, rssi_max_dbm=-66))
     b.records.add(rssi=R(addr=bytes.fromhex("aabbccddeeff"), random=True, adv_type=2,
                          rssi_sum_dbm=-5, count=4, rssi_max_dbm=-1, tx_1m_dbm=4))
+    b.records.add(rssi=R(addr=bytes.fromhex("c0ffee000003"), random=True, adv_type=0,
+                         rssi_sum_dbm=-80, count=1, rssi_max_dbm=-80))
     adv = (bytes([2, 0x01, 0x06]) + bytes([7, 0x09]) + 'T"Ä"\x01'.encode() +
            bytes([7, 0xFF, 0x4C, 0x00, 0x02, 0x15, 0xAA, 0xBB]) +
            bytes([6, 0x16, 0x1A, 0x18, 1, 2, 3]) + bytes([2, 0x0A, 0xFC]))
@@ -305,19 +350,27 @@ def bucket_a():
 
 
 def bucket_b():
-    b = pb.Bucket(chip_id=CHIP, sector=1, seq=103, t_ms=20600, tick_ms=200, chan=37, load=0)
-    b.records.append(status())
+    b = pb.Bucket(chip_id=CHIP, seq=103, t_ms=20600, tick_ms=200, chan=37, load=0)
+    b.records.append(status(version="0.5.0"))
     b.records.add(rssi=pb.Rssi(addr=bytes.fromhex("c0ffee000001"), random=True, adv_type=3,
                                rssi_sum_dbm=-70, count=1, rssi_max_dbm=-70))
     bad_ad = bytes([4, 0x09, ord("a"), 0xFF, ord("b"), 5, 0x16, 0x1A])  # bad UTF-8, truncated AD
     b.records.add(advert=pb.Payload(addr=bytes.fromhex("c0ffee000001"), random=True, adv_type=3,
                                     rssi_dbm=-70, data=bad_ad))
+    b.records.add(advert=pb.Payload(addr=bytes.fromhex("aabbccddeeff"), random=True, adv_type=2,
+                                    rssi_dbm=-1, data=bytes([2, 0x01, 0x06])))
     return b, b.SerializeToString(), []
 
 
 def bucket_d():
-    b = pb.Bucket(chip_id=CHIP, sector=0, seq=104, t_ms=20800, tick_ms=200, chan=0, load=0)
+    b = pb.Bucket(chip_id=CHIP, seq=104, t_ms=20800, tick_ms=200, chan=0, load=0)
     b.records.append(status())
+    # Ignore list readback (0.7.0): retained <sector>/ignore, so nothing in the captured messages,
+    # but it must not come out as raw/7
+    il = pb.IgnoreList(paused=False)
+    il.rules.add(addr=bytes.fromhex("c17d2b000000"), mask=bytes.fromhex("ffffff000000"), saved=True,
+                 hits=12)
+    b.records.add(ignore_list=il)
     return b, b.SerializeToString(), []
 
 
@@ -373,7 +426,10 @@ def main():
         f.write("};\n\n")
         f.write(f"static const char *const PREFIX = {c_str(PREFIX)};\n")
         f.write(f"static const char *const MAST = {c_str(MAST)};\n")
-        f.write(f"static const unsigned PIN = {PIN};\n\n")
+        f.write(f"static const unsigned PIN = {PIN};\n")
+        f.write(f"static const char *const SCANNER_FIRMWARE = {c_str(SCANNER_FIRMWARE)};\n")
+        f.write("static const char *const IGNORE_RULES[] = {"
+                + ", ".join(c_str(r) for r in IGNORE_RULES) + "};\n\n")
         f.write("struct Message {\n  const char *topic;\n  const char *payload;\n};\n")
         f.write("static const Message MESSAGES[] = {\n")
         for topic, payload in sec.out:

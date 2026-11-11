@@ -2,7 +2,8 @@
  * Boot self-test (self_test: true): the gateway's own encoder and decoder against data generated
  * independently by gateway/tools/make_selftest.py from the reference protobuf code:
  *   - the contract atom's command test vectors must encode byte for byte the same;
- *   - sample buckets fed to a scratch sector must publish exactly the expected MQTT messages.
+ *   - sample buckets fed to a scratch sector must publish exactly the expected MQTT messages, with the
+ *     self-test's own scanner_firmware and ignore list in place of the YAML's.
  * Nothing goes to MQTT or the scanners while it runs. Result: log + "Self test" text sensor.
  */
 #include "sector_scanner.h"
@@ -69,9 +70,14 @@ void SectorScanner::run_self_test_() {
 
   /* Sample buckets through a scratch sector (heap: its buffers are too big for the loop stack) */
   std::vector<std::pair<std::string, std::string>> got;
-  std::string prefix = this->prefix_, mast = this->mast_;
+  std::string prefix = this->prefix_, mast = this->mast_, firmware = this->scanner_firmware_;
+  std::vector<IgnoreRule> ignore;
+  ignore.swap(this->ignore_);
   this->prefix_ = PREFIX;
   this->mast_ = MAST;
+  this->scanner_firmware_ = SCANNER_FIRMWARE;
+  for (const char *rule : IGNORE_RULES)
+    this->add_ignore_rule(rule);
   this->capture_ = &got;
   {
     std::unique_ptr<Sector> s(new Sector(this));
@@ -92,6 +98,8 @@ void SectorScanner::run_self_test_() {
   this->capture_ = nullptr;
   this->prefix_ = prefix;
   this->mast_ = mast;
+  this->scanner_firmware_ = firmware;
+  this->ignore_.swap(ignore);
 
   size_t msg_n = sizeof(MESSAGES) / sizeof(MESSAGES[0]), msg_ok = 0;
   for (size_t i = 0; i < msg_n || i < got.size(); i++) {

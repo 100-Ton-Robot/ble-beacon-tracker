@@ -1,5 +1,5 @@
 # BLE tracker mast gateway, shared by every mast: ESP32-S3 + W5500 Ethernet, 3 sector
-# scanners on UART -> MQTT. Needs scanner firmware 0.4.0 or later (protocol 3, protobuf
+# scanners on UART -> MQTT. Needs scanner firmware 0.5.0 or later (protocol 3, protobuf
 # buckets every 200 ms: ../../scanner_fw/PROTOCOL.md). MQTT layout v3 under
 # bletracker/<mast>/ (topics and payloads: ../README.md "MQTT output"). Home Assistant gets
 # the gateway's own entities over the ESPHome API; MQTT carries only the beacon data, events
@@ -152,9 +152,16 @@ uart:
     baud_rate: 115200
     rx_buffer_size: 4096
 
-# The RX pin is the sector. Each scanner's own sector claim (set at assembly) is checked on
-# every bucket: a mismatch is a SECURITY error, marks that sector's data suspect and turns on
-# "Sector N mismatch". expected_chip (16 hex digits) per sector adds a board check.
+# The RX pin is the sector (scanners have no sector of their own since firmware 0.5.0).
+# expected_chip (16 hex digits) per sector adds a board check: another chip on that pin is a
+# SECURITY error, marks its data suspect and turns on "Sector N wrong chip".
+# scanner_firmware: the latest scanner firmware (defaults to the one the component was written
+# for); a scanner reporting an older one raises FIRMWARE_OUTDATED and "Sector N firmware outdated".
+# ignore: the mast's default ignore list, one for all sectors. The gateway drops RSSI and advert
+# records from these addresses itself, silently (logger at DEBUG: one line per address every
+# 10 s with the drop count). Forms: aa:bb:cc:dd:ee:ff, c1:7d:2b:*:*:* (* = any byte),
+# aa:bb:cc:dd:ee:00/40 (prefix bits), aa:bb:cc:dd:ee:ff/ff:ff:ff:00:00:00 (mask). Changes on
+# the radios themselves go over MQTT (all/cmd: ignore / unignore / ignore clear).
 # payloads / active_scan / budget / intervals: what the gateway keeps applied on every scanner
 # (they forget these at boot); MQTT commands change them until the gateway reboots.
 sector_scanner:
@@ -166,6 +173,8 @@ sector_scanner:
   active_scan: false
   budget: 70
   self_test: true
+  scanner_firmware: "0.7.0"
+  ignore: []
   gateway_load:
     name: Gateway load
   self_test_result:
@@ -188,10 +197,19 @@ sector_scanner:
         name: Sector 0 devices
         filters:
           - throttle: 10s
-      mismatch:
-        name: Sector 0 mismatch
+      ignored:
+        name: Sector 0 ignored
+        unit_of_measurement: adverts/s
+        filters:
+          - throttle: 10s
+      wrong_chip:
+        name: Sector 0 wrong chip
       chip:
         name: Sector 0 chip
+      firmware:
+        name: Sector 0 firmware
+      firmware_outdated:
+        name: Sector 0 firmware outdated
     - id: scanner_s1
       uart_id: uart_s1
       sector: 1
@@ -209,10 +227,19 @@ sector_scanner:
         name: Sector 1 devices
         filters:
           - throttle: 10s
-      mismatch:
-        name: Sector 1 mismatch
+      ignored:
+        name: Sector 1 ignored
+        unit_of_measurement: adverts/s
+        filters:
+          - throttle: 10s
+      wrong_chip:
+        name: Sector 1 wrong chip
       chip:
         name: Sector 1 chip
+      firmware:
+        name: Sector 1 firmware
+      firmware_outdated:
+        name: Sector 1 firmware outdated
     - id: scanner_s2
       uart_id: uart_s2
       sector: 2
@@ -230,10 +257,19 @@ sector_scanner:
         name: Sector 2 devices
         filters:
           - throttle: 10s
-      mismatch:
-        name: Sector 2 mismatch
+      ignored:
+        name: Sector 2 ignored
+        unit_of_measurement: adverts/s
+        filters:
+          - throttle: 10s
+      wrong_chip:
+        name: Sector 2 wrong chip
       chip:
         name: Sector 2 chip
+      firmware:
+        name: Sector 2 firmware
+      firmware_outdated:
+        name: Sector 2 firmware outdated
 
 # Addressed to the chip last seen on that sector's RX pin
 button:

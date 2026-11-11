@@ -18,7 +18,11 @@ namespace sector_scanner {
 static const char *const TAG = "sector_scanner";
 
 static const uint32_t STALE_MS = 3000;            /* buckets come every 200 ms */
-static const uint32_t REPORT_MS = 60000;          /* repeat a sector/chip problem this often */
+static const uint32_t REPORT_MS = 60000;          /* repeat a wrong-chip problem this often */
+static const uint32_t FIRMWARE_REPORT_MS = 600000;  /* repeat an outdated-firmware warning this often */
+static const uint32_t IGNORE_LOG_MS = 10000;      /* debug log of locally ignored addresses */
+static const size_t IGNORE_HITS_MAX = 32;         /* addresses tracked per report; the rest summed */
+static const char *const IGNORE_LIST_MIN_FW = "0.7.0";  /* first scanner with ignore list readback */
 static const uint32_t RECONCILE_MS = 60000;       /* re-check the scanner's settings this often */
 static const uint32_t ACK_TIMEOUT_MS = 2000;      /* warn when a command isn't acked within this */
 static const uint32_t WINDOW_MS = 10000;          /* throttle measurement window */
@@ -28,14 +32,12 @@ static const uint32_t BUDGET_STEP = 10;
 static const time_t CLOCK_VALID_AFTER = 1700000000;  /* before this SNTP hasn't set the clock */
 
 /* Sector condition bits */
-static const uint8_t COND_SECTOR = 1;  /* claim is another sector */
-static const uint8_t COND_CHIP = 2;    /* chip isn't the expected one */
-static const uint8_t COND_UNSET = 4;   /* claim 255 */
+static const uint8_t COND_CHIP = 2;  /* chip isn't the expected one */
 
 /* Retained per-sector state topics, in Sector::state_ order */
 enum StateTopic : uint8_t {
   ST_CHIP,
-  ST_CLAIM,
+  ST_VERSION,
   ST_LOAD,
   ST_FLASH,
   ST_ANT,
@@ -46,17 +48,17 @@ enum StateTopic : uint8_t {
   ST_PAYLOADS,
   ST_COUNT,
 };
-static const char *const STATE_NAMES[ST_COUNT] = {"chip",   "claim",      "load",   "flash",   "ant",
-                                                  "listening", "client", "test_image", "active", "payloads"};
-/* Layout v2 retained topic that v3 renamed (to claim); cleared at connect so it doesn't linger */
-static const char *const LEGACY_STATE = "scanner_sector";
+static const char *const STATE_NAMES[ST_COUNT] = {"chip",      "version", "load",       "flash",  "ant",
+                                                  "listening", "client",  "test_image", "active", "payloads"};
+/* Retained topics of earlier layouts (sector claims, gone with scanner 0.5.0); cleared at connect */
+static const char *const LEGACY_STATES[] = {"scanner_sector", "claim"};
 
 static const char *const CATEGORY_NAMES[] = {"GENERAL", "SECURITY", "LOAD", "COMMAND"};
 static const char *const SEVERITY_NAMES[] = {"INFO", "WARN", "ERROR"};
 static const char *const CODE_NAMES[] = {
     "UNKNOWN",         "BOOT",          "VERSION_CHANGED", "TEST_IMAGE",          "IMAGE_CONFIRMED", "FLASH_MODE_ON",
     "FLASH_MODE_OFF",  "CLIENT_CONNECTED", "CLIENT_DISCONNECTED", "SETTING_CHANGED", "CMD_OK",     "CMD_REJECTED",
-    "BAD_COMMANDS",    "LOAD_LEVEL",    "SECTOR_NOT_SET",  "EVENTS_LOST",
+    "BAD_COMMANDS",    "LOAD_LEVEL",    "14",              "EVENTS_LOST",
 };
 static const uint32_t CODE_BOOT = 1;
 static const uint32_t CODE_CMD_OK = 10;
@@ -409,6 +411,10 @@ static bool parse_rule(const std::string &s, uint8_t *addr, uint8_t *mask) {
   return any;
 }
 
+bool parse_ignore_rule(const std::string &text, IgnoreRule &rule) {
+  return parse_rule(trim_lower(text), rule.addr, rule.mask);
+}
+
 bool parse_command(const std::string &text, Command &c, std::string &err) {
   std::vector<std::string> w;
   std::string cur;
@@ -463,14 +469,13 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     c.arg = REBOOT_ARG;
     return true;
   }
-  if (name == "sector" || name == "budget") {
+  if (name == "budget") {
     uint32_t v;
-    bool sector = name == "sector";
-    if (w.size() != 2 || !parse_uint(arg, v) || (sector ? v > 254 : (v < 10 || v > 90))) {
-      err = sector ? "sector needs 0-254" : "budget needs 10-90";
+    if (w.size() != 2 || !parse_uint(arg, v) || v < 10 || v > 90) {
+      err = "budget needs 10-90";
       return false;
     }
-    c.action = sector ? ACT_SECTOR : ACT_BUDGET;
+    c.action = ACT_BUDGET;
     c.arg = v;
     return true;
   }
@@ -607,8 +612,11 @@ void Sector::log_config() {
   LOG_SENSOR("    ", "Lost buckets", this->lost_sensor_);
   LOG_SENSOR("    ", "Bad frames", this->bad_sensor_);
   LOG_SENSOR("    ", "Devices", this->devices_sensor_);
-  LOG_BINARY_SENSOR("    ", "Mismatch", this->mismatch_sensor_);
+  LOG_SENSOR("    ", "Ignored", this->ignored_sensor_);
+  LOG_BINARY_SENSOR("    ", "Wrong chip", this->wrong_chip_sensor_);
+  LOG_BINARY_SENSOR("    ", "Firmware outdated", this->firmware_outdated_sensor_);
   LOG_TEXT_SENSOR("    ", "Chip", this->chip_sensor_);
+  LOG_TEXT_SENSOR("    ", "Firmware", this->firmware_sensor_);
 }
 
 void Sector::poll() {
@@ -706,16 +714,17 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
 
   /* Pass 1: the bucket header, and check every record parses */
   uint8_t chip[CHIP_ID_LEN] = {};
-  uint32_t claim = 0, seq = 0, t_ms = 0, tick_ms = 0, chan = 0, load = 0;
+  uint32_t seq = 0, t_ms = 0, tick_ms = 0, chan = 0, load = 0;
   {
     pb::Reader r(this->raw_, body);
     pb::Field f;
     while (r.next(f)) {
       if (f.num == 1 && f.wt == pb::LEN) {
         memcpy(chip, f.p, std::min(f.len, CHIP_ID_LEN));
-      } else if (f.num >= 2 && f.num <= 7 && f.wt == pb::VARINT) {
-        uint32_t *dst[] = {&claim, &seq, &t_ms, &tick_ms, &chan, &load};
-        *dst[f.num - 2] = f.u32();
+      } else if (f.num >= 3 && f.num <= 7 && f.wt == pb::VARINT) {
+        /* field 2 was the sector claim (scanner 0.4.x), reserved since 0.5.0 */
+        uint32_t *dst[] = {&seq, &t_ms, &tick_ms, &chan, &load};
+        *dst[f.num - 3] = f.u32();
       } else if (f.num == 15 && f.wt == pb::LEN && !record_well_formed(f)) {
         this->bad_frame_("protobuf", len);
         return;
@@ -768,11 +777,10 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
     this->publish_online_(true);
   }
   this->last_bucket_ms_ = now ? now : 1;
-  this->claim_ = claim;
   this->seq_ = seq;
   this->tick_ms_ = tick_ms;
 
-  this->validate_(claim);
+  this->validate_();
 
   if ((int32_t) load != this->load_) {
     if (!capturing && !(this->load_ < 0 && load == 0)) {
@@ -788,7 +796,6 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
       this->load_sensor_->publish_state(load);
   }
   this->set_state_(ST_CHIP, this->chip_hex_());
-  this->set_state_(ST_CLAIM, std::to_string(claim));
   this->set_state_(ST_LOAD, std::to_string(load));
 
   /* Pass 2: records in order; RSSI is batched into one message at the end */
@@ -806,64 +813,108 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
   if (this->any_rssi_ || rssi_interval == 1) {
     J j;
     j.obj().k("t").raw(t).k("seq").i(seq).k("t_ms").i(t_ms).k("tick_ms").i(tick_ms).k("chan").i(chan);
-    j.k("load").i(load).k("chip").str(this->chip_hex_()).k("claim").i(claim).k("suspect").b(this->suspect_);
+    j.k("load").i(load).k("chip").str(this->chip_hex_()).k("suspect").b(this->suspect_);
     j.k("devs").raw("[" + this->rssi_ + "]").end_obj();
     this->hub_->publish(this->topic_("rssi"), j.s, false);
   }
 }
 
-/* Sector claim and expected chip, on every bucket */
-void Sector::validate_(uint32_t claim) {
+/* Expected chip, on every bucket. The sector is the RX pin: scanners have no claim since 0.5.0 */
+void Sector::validate_() {
   uint8_t cond = 0;
-  if (claim == SECTOR_UNSET)
-    cond |= COND_UNSET;
-  else if (claim != this->pin_)
-    cond |= COND_SECTOR;
   if (this->have_expected_ && memcmp(this->chip_, this->expected_, CHIP_ID_LEN) != 0)
     cond |= COND_CHIP;
-  bool suspect = cond & (COND_SECTOR | COND_CHIP);
+  bool suspect = cond & COND_CHIP;
 
   uint32_t now = millis();
-  bool changed = cond != this->cond_ || (cond && claim != this->cond_claim_);
   this->suspect_ = suspect;
-  if (changed) {
+  if (cond != this->cond_) {
     bool was = this->cond_ != 0;
     this->cond_ = cond;
-    this->cond_claim_ = claim;
     this->cond_ms_ = now;
     if (cond) {
       this->report_condition_();
     } else if (was) {
       char t[24];
       this->hub_->now_json(t, sizeof(t));
-      this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_INFO, "SECTOR_OK", (int32_t) claim, this->pin_,
-                        0, "sector checks pass", t);
+      this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_INFO, "CHIP_OK", 0, this->pin_, 0,
+                        "expected chip back", t);
     }
-    if (this->mismatch_sensor_ != nullptr)
-      this->mismatch_sensor_->publish_state(suspect);
+    if (this->wrong_chip_sensor_ != nullptr)
+      this->wrong_chip_sensor_->publish_state(suspect);
   } else if (cond && now - this->cond_ms_ >= REPORT_MS) {
     this->cond_ms_ = now;
     this->report_condition_();
   }
-  if (this->mismatch_sensor_ != nullptr && !this->mismatch_sensor_->has_state())
-    this->mismatch_sensor_->publish_state(suspect);
+  if (this->wrong_chip_sensor_ != nullptr && !this->wrong_chip_sensor_->has_state())
+    this->wrong_chip_sensor_->publish_state(suspect);
 }
 
 void Sector::report_condition_() {
   char t[24];
   this->hub_->now_json(t, sizeof(t));
-  char text[64];
-  if (this->cond_ & COND_SECTOR) {
-    snprintf(text, sizeof(text), "claims sector %" PRIu32 " on sector %u's pin", this->cond_claim_, this->pin_);
-    this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_ERROR, "SECTOR_MISMATCH",
-                      (int32_t) this->cond_claim_, this->pin_, 0, text, t);
-  }
   if (this->cond_ & COND_CHIP)
     this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_ERROR, "CHIP_MISMATCH", 0, this->pin_, 0,
                       "expected chip " + to_hex(this->expected_, CHIP_ID_LEN), t);
-  if (this->cond_ & COND_UNSET)
-    this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_WARN, "SECTOR_NOT_CONFIGURED", 255, this->pin_,
-                      0, "scanner sector not configured", t);
+}
+
+/* "0.6.0" style versions, numerically; missing parts are 0, anything after the numbers ignored */
+static int compare_versions(const std::string &a, const std::string &b) {
+  size_t i = 0, j = 0;
+  for (int part = 0; part < 3; part++) {
+    uint32_t x = 0, y = 0;
+    while (i < a.size() && isdigit((unsigned char) a[i]))
+      x = x * 10 + (a[i++] - '0');
+    while (j < b.size() && isdigit((unsigned char) b[j]))
+      y = y * 10 + (b[j++] - '0');
+    if (x != y)
+      return x < y ? -1 : 1;
+    if (i < a.size() && a[i] == '.')
+      i++;
+    if (j < b.size() && b[j] == '.')
+      j++;
+  }
+  return 0;
+}
+
+/* Scanner firmware against scanner_firmware (the latest this gateway knows), on every status:
+ * older = FIRMWARE_OUTDATED warning, repeated every 10 min; newer = one FIRMWARE_NEWER info;
+ * back to the latest after being older = FIRMWARE_OK */
+void Sector::check_firmware_(const std::string &version, const char *t) {
+  bool changed = version != this->version_;
+  if (changed) {
+    this->version_ = version;
+    if (this->firmware_sensor_ != nullptr)
+      this->firmware_sensor_->publish_state(version);
+  }
+  const std::string &latest = this->hub_->scanner_firmware();
+  if (latest.empty() || version.empty())
+    return;
+  int cmp = compare_versions(version, latest);
+  uint32_t now = millis();
+  if (this->fw_known_ && !changed) {
+    if (cmp < 0 && now - this->fw_report_ms_ >= FIRMWARE_REPORT_MS) {
+      this->fw_report_ms_ = now;
+      this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_WARN, "FIRMWARE_OUTDATED", 0, 0, 0,
+                        "firmware " + version + ", latest " + latest, t);
+    }
+    return;
+  }
+  bool was_outdated = this->fw_known_ && this->fw_cmp_ < 0;
+  this->fw_known_ = true;
+  this->fw_cmp_ = cmp;
+  this->fw_report_ms_ = now;
+  if (this->firmware_outdated_sensor_ != nullptr)
+    this->firmware_outdated_sensor_->publish_state(cmp < 0);
+  if (cmp < 0)
+    this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_WARN, "FIRMWARE_OUTDATED", 0, 0, 0,
+                      "firmware " + version + ", latest " + latest, t);
+  else if (cmp > 0)
+    this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_INFO, "FIRMWARE_NEWER", 0, 0, 0,
+                      "firmware " + version + ", newer than " + latest, t);
+  else if (was_outdated)
+    this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_INFO, "FIRMWARE_OK", 0, 0, 0,
+                      "firmware " + version + " is the latest", t);
 }
 
 void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
@@ -935,6 +986,8 @@ void Sector::add_rssi_(const uint8_t *p, size_t len) {
         break;
     }
   }
+  if (this->hub_->ignored(addr, addr_len, count))
+    return;
   J j;
   j.arr().str(addr_str(addr, addr_len, ':')).b(random).i(adv_type).raw(mean1(sum, count)).i(max).i(count);
   if (has_tx)
@@ -984,6 +1037,8 @@ void Sector::publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const
         break;
     }
   }
+  if (this->hub_->ignored(addr, addr_len, 0))
+    return;
 
   /* AD structures: [len][type][value...]; stop at padding (len 0) or a truncated one */
   const uint8_t *name = nullptr, *manu = nullptr, *svc = nullptr;
@@ -1067,6 +1122,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   uint32_t nums[6] = {};  // adverts, dropped, devices, load_reasons, line_peak_pct, budget_pct (9-14)
   Intervals iv;
   uint32_t baud = 0;
+  uint32_t ign[3] = {};  // ignore_rules, ignore_saved, ignored (17-19, scanner 0.6.0+)
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f)) {
@@ -1084,6 +1140,8 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
           iv.v[g.num - 1] = g.u32();
     } else if (f.num == 16 && f.wt == pb::VARINT) {
       baud = f.u32();
+    } else if (f.num >= 17 && f.num <= 19 && f.wt == pb::VARINT) {
+      ign[f.num - 17] = f.u32();
     }
   }
 
@@ -1093,7 +1151,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
                                            "budget_pct"};
   J j;
   j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_).k("pin_sector").i(this->pin_);
-  j.k("claim").i(this->claim_).k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_);
+  j.k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_);
   j.k("rx_overflow").i(this->rx_high_).k("version").str(version);
   for (int i = 0; i < 7; i++)
     j.k(FLAG_NAMES[i]).b(flags[i]);
@@ -1102,8 +1160,12 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   j.k("intervals").obj();
   for (int i = 0; i < 5; i++)
     j.k(INTERVAL_NAMES[i]).i(iv.v[i]);
-  j.end_obj().k("baud").i(baud).end_obj();
+  j.end_obj().k("baud").i(baud);
+  j.k("ignore_rules").i(ign[0]).k("ignore_saved").i(ign[1]).k("ignored").i(ign[2]).end_obj();
   this->hub_->publish(this->topic_("status"), j.s, false);
+
+  this->check_firmware_(version, t);
+  this->set_state_(ST_VERSION, version);
 
   this->set_state_(ST_FLASH, flags[4] ? "on" : "off");
   this->set_state_(ST_ANT, flags[0] ? "ext" : "int");
@@ -1114,6 +1176,8 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   this->set_state_(ST_PAYLOADS, flags[3] ? "on" : "off");
   if (this->devices_sensor_ != nullptr)
     this->devices_sensor_->publish_state(nums[2]);
+  if (this->ignored_sensor_ != nullptr)
+    this->ignored_sensor_->publish_state(ign[2]);
 
   this->reported_.payloads = flags[3];
   this->reported_.active_scan = flags[2];
@@ -1124,19 +1188,20 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
 }
 
 void Sector::handle_counters_(const uint8_t *p, size_t len, const char *t) {
-  static const char *const NAMES[14] = {"uptime_s",     "buckets_sent",  "buckets_skipped", "cmds_ok",
-                                        "cmds_bad",     "cmds_other",    "rx_errors",       "payloads_sent",
-                                        "payloads_held", "rssi_trimmed", "seen_evicted",    "events_lost",
-                                        "boots",        "flash_opens"};
-  uint32_t v[14] = {};
+  static const int N = 15;
+  static const char *const NAMES[N] = {"uptime_s",     "buckets_sent",  "buckets_skipped", "cmds_ok",
+                                       "cmds_bad",     "cmds_other",    "rx_errors",       "payloads_sent",
+                                       "payloads_held", "rssi_trimmed", "seen_evicted",    "events_lost",
+                                       "boots",        "flash_opens",   "ignored"};
+  uint32_t v[N] = {};
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f))
-    if (f.num >= 1 && f.num <= 14 && f.wt == pb::VARINT)
+    if (f.num >= 1 && f.num <= N && f.wt == pb::VARINT)
       v[f.num - 1] = f.u32();
   J j;
   j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_);
-  for (int i = 0; i < 14; i++)
+  for (int i = 0; i < N; i++)
     j.k(NAMES[i]).i(v[i]);
   j.end_obj();
   this->hub_->publish(this->topic_("counters"), j.s, false);
@@ -1268,7 +1333,8 @@ void Sector::clear_retained() {
     this->hub_->publish(this->topic_(STATE_NAMES[i]), "", true);
     this->state_[i].clear();
   }
-  this->hub_->publish(this->topic_(LEGACY_STATE), "", true);
+  for (const char *legacy : LEGACY_STATES)
+    this->hub_->publish(this->topic_(legacy), "", true);
   this->hub_->publish(this->topic_("ignore"), this->ignore_json_, true);
   this->publish_online_(this->online());
   ESP_LOGI(TAG, "Sector %u: retained topics cleared", this->pin_);
@@ -1325,8 +1391,9 @@ void Sector::reconcile_() {
     c.action = ACT_BUDGET, c.arg = budget, c.text = "budget " + std::to_string(budget);
     send(c);
   }
-  /* Ignore list: scanners send it at boot and on change; after a gateway restart, ask for it */
-  if (!this->have_ignore_) {
+  /* Ignore list: scanners send it at boot and on change; after a gateway restart, ask for it.
+   * Only 0.7.0+ knows the request (an older scanner would reject it every minute). */
+  if (!this->have_ignore_ && compare_versions(this->version_, IGNORE_LIST_MIN_FW) >= 0) {
     Command c;
     c.action = ACT_IGNORE_LIST, c.arg = 1, c.text = "ignore list";
     send(c);
@@ -1364,16 +1431,14 @@ bool Sector::command(const std::string &text) {
     return false;
   }
   if (c.action == ACT_IGNORE || c.action == ACT_UNIGNORE || c.action == ACT_IGNORE_CLEAR) {
-    ESP_LOGW(TAG, "Sector %u: the ignore list is mast-wide, send it on all/cmd", this->pin_);
+    ESP_LOGW(TAG, "Sector %u: the ignore list is one for the whole mast, send '%s' on all/cmd", this->pin_,
+             c.text.c_str());
     return false;
   }
   if (!this->have_chip_) {
     ESP_LOGW(TAG, "Sector %u: no scanner chip seen yet, '%s' dropped", this->pin_, c.text.c_str());
     return false;
   }
-  if (c.action == ACT_SECTOR)
-    ESP_LOGW(TAG, "Sector %u: manual sector command: scanner %s will claim sector %" PRIu32, this->pin_,
-             this->chip_hex_().c_str(), c.arg);
   /* Settings sent by hand become what the gateway keeps applied (until it reboots) */
   if (c.action == ACT_PAYLOADS)
     this->desired_.payloads = c.arg;
@@ -1402,6 +1467,70 @@ void SectorScanner::set_settings(bool payloads, bool active, uint32_t rssi, uint
   this->rssi_interval_ = rssi;
 }
 
+void SectorScanner::add_ignore_rule(const std::string &text) {
+  IgnoreRule r;
+  if (parse_ignore_rule(text, r))
+    this->ignore_.push_back(r);
+  else
+    ESP_LOGE(TAG, "Bad ignore rule '%s' (checked at compile time, so this shouldn't happen)", text.c_str());
+}
+
+/* YAML ignore list: records from matching addresses are dropped here, silently. At DEBUG level
+ * each address with drops is logged once per 10 s with its counts (ignore_log_tick_). */
+bool SectorScanner::ignored(const uint8_t *addr, size_t len, uint32_t adverts) {
+  if (this->ignore_.empty() || addr == nullptr || len != ADDR_LEN)
+    return false;
+  const IgnoreRule *hit = nullptr;
+  for (const auto &r : this->ignore_) {
+    bool match = true;
+    for (size_t b = 0; b < ADDR_LEN && match; b++)
+      match = (addr[b] & r.mask[b]) == r.addr[b];
+    if (match) {
+      hit = &r;
+      break;
+    }
+  }
+  if (hit == nullptr)
+    return false;
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+  if (this->capture_ == nullptr) {
+    for (auto &h : this->ignore_hits_) {
+      if (memcmp(h.addr, addr, ADDR_LEN) == 0) {
+        h.records++;
+        h.adverts += adverts;
+        return true;
+      }
+    }
+    if (this->ignore_hits_.size() < IGNORE_HITS_MAX) {
+      IgnoreHit h;
+      memcpy(h.addr, addr, ADDR_LEN);
+      h.records = 1;
+      h.adverts = adverts;
+      this->ignore_hits_.push_back(h);
+    } else {
+      this->ignore_hits_overflow_++;
+    }
+  }
+#endif
+  return true;
+}
+
+void SectorScanner::ignore_log_tick_() {
+#if ESPHOME_LOG_LEVEL >= ESPHOME_LOG_LEVEL_DEBUG
+  uint32_t now = millis();
+  if (now - this->ignore_log_ms_ < IGNORE_LOG_MS)
+    return;
+  this->ignore_log_ms_ = now;
+  for (const auto &h : this->ignore_hits_)
+    ESP_LOGD(TAG, "Ignored %s: %" PRIu32 " record(s) dropped (%" PRIu32 " adverts) in the last %" PRIu32 " s",
+             addr_str(h.addr, ADDR_LEN, ':').c_str(), h.records, h.adverts, IGNORE_LOG_MS / 1000);
+  if (this->ignore_hits_overflow_)
+    ESP_LOGD(TAG, "Ignored: %" PRIu32 " more record(s) dropped from other addresses", this->ignore_hits_overflow_);
+  this->ignore_hits_.clear();
+  this->ignore_hits_overflow_ = 0;
+#endif
+}
+
 void SectorScanner::setup() {
   for (auto *s : this->sectors_)
     s->desired() = this->defaults_;
@@ -1425,6 +1554,11 @@ void SectorScanner::dump_config() {
                 " refresh=%" PRIu32 " status=%" PRIu32 " counters=%" PRIu32,
                 d.payloads ? "on" : "off", d.active_scan ? "on" : "off", d.budget_pct, d.intervals.v[0],
                 d.intervals.v[1], d.intervals.v[2], d.intervals.v[3], d.intervals.v[4]);
+  ESP_LOGCONFIG(TAG, "  Scanner firmware (latest): %s",
+                this->scanner_firmware_.empty() ? "not checked" : this->scanner_firmware_.c_str());
+  ESP_LOGCONFIG(TAG, "  Ignore list: %u rule(s)", (unsigned) this->ignore_.size());
+  for (const auto &r : this->ignore_)
+    ESP_LOGCONFIG(TAG, "    %s/%s", addr_str(r.addr, ADDR_LEN, ':').c_str(), addr_str(r.mask, ADDR_LEN, ':').c_str());
   LOG_SENSOR("  ", "Gateway load", this->gateway_load_sensor_);
   LOG_TEXT_SENSOR("  ", "Self test", this->self_test_sensor_);
   for (auto *s : this->sectors_)
@@ -1445,6 +1579,7 @@ void SectorScanner::loop() {
     s->poll();
   this->pump_commands_();
   this->throttle_tick_();
+  this->ignore_log_tick_();
 }
 
 void SectorScanner::clear_retained() {
@@ -1624,10 +1759,6 @@ void SectorScanner::on_all_command_(const std::string &payload) {
   std::string err;
   if (!parse_command(command_text(payload), c, err)) {
     ESP_LOGW(TAG, "all/cmd: %s", err.c_str());
-    return;
-  }
-  if (c.action == ACT_SECTOR) {
-    ESP_LOGW(TAG, "all/cmd: sector goes to one scanner only, send it on <sector>/cmd");
     return;
   }
   for (auto *s : this->sectors_) {
