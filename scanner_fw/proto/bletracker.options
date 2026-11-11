@@ -13,3 +13,5 @@ bletracker.IgnoreRule.mask    max_size:6
 bletracker.IgnoreList.rules   max_count:32
 bletracker.IgnoreEntry.addr   max_size:6 fixed_length:true
 bletracker.IgnoreEntry.mask   max_size:6 fixed_length:true
+bletracker.TxDrops.drops      max_count:16
+bletracker.TxDrop.addr        max_size:6 fixed_length:true

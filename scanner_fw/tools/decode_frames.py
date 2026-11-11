@@ -25,6 +25,7 @@ Commands: listen on|off, flash on|off, ant int|ext, reboot,
           ignore <addr>[/bits|/mask] [save], unignore <addr>[/bits|/mask],
           ignore clear boot|saved|all       (addr bytes may be *: C1:7D:2B:*:*:*),
           ignore list                       (the scanner sends its rules in the next bucket)
+          debug tx1m on|off, debug off      (0.8.0+: per-second TxDrops summary, off at boot)
 --seq sets the command's seq (echoed in the scanner's CMD_OK / CMD_REJECTED event).
 """
 
@@ -155,6 +156,10 @@ def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
         for a in args:
             key, val = a.split("=")
             setattr(c.intervals, key, int(val))
+    elif name == "debug" and args in (["off"], ["tx1m", "off"]):
+        c.debug = 0
+    elif name == "debug" and args == ["tx1m", "on"]:
+        c.debug = pb.DEBUG_TX_1M
     elif name == "ignore" and args == ["list"]:
         c.ignore_list = True
     elif name == "ignore" and args and args[0] == "clear":
@@ -223,7 +228,7 @@ def show(b: pb.Bucket) -> None:
                   f"flash={s.flash_mode} test_image={s.test_image} adverts={s.adverts} "
                   f"devices={s.devices} dropped={s.dropped} budget={s.budget_pct}% "
                   f"peak={s.line_peak_pct}% reasons={s.load_reasons} baud={s.baud} "
-                  f"ignore={s.ignore_rules}({s.ignore_saved} saved) ignored={s.ignored} "
+                  f"ignore={s.ignore_rules}({s.ignore_saved} saved) ignored={s.ignored} debug={s.debug} "
                   f"intervals=({MessageToDict(s.intervals)})")
         elif k == "ignore_list":
             lst = r.ignore_list
@@ -233,6 +238,13 @@ def show(b: pb.Bucket) -> None:
                       f"{e.hits} hits")
         elif k == "counters":
             print(f"  counters {MessageToDict(r.counters)}")
+        elif k == "tx_drops":
+            t = r.tx_drops
+            print(f"  txdrops {len(t.drops)} addresses, {t.omitted} omitted")
+            for x in t.drops:
+                fmt = pb.TxFormat.Name(x.format).replace("TX_FORMAT_", "").lower()
+                print(f"          {addr(x.addr)} {'random' if x.random else 'public':6} {fmt:14} "
+                      f"raw {x.raw_dbm:4} -> 1 m {x.tx_1m_dbm:4} x{x.count}")
         else:
             print(f"  unknown record {r}")
 

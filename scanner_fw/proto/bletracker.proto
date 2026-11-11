@@ -32,6 +32,7 @@ message Record {
     Event event = 5;
     Counters counters = 6;
     IgnoreList ignore_list = 7;
+    TxDrops tx_drops = 8;        // debug (DEBUG_TX_1M), 0.8.0+
   }
 }
 
@@ -81,6 +82,7 @@ message Status {
   uint32 ignore_rules = 17;      // ignore list entries (saved + until reboot)
   uint32 ignore_saved = 18;      // of which kept in flash
   uint32 ignored = 19;           // adverts dropped by the ignore list, last second
+  uint32 debug = 20;             // DebugFlag bits on (0.8.0+); all off after boot
 }
 
 // Service intervals in ticks. In a Command, a field left at 0 is unchanged.
@@ -163,7 +165,7 @@ message Counters {
   uint32 boots = 13;             // saved in flash
   uint32 flash_opens = 14;       // saved in flash
   uint32 ignored = 15;           // adverts dropped by the ignore list
-  uint32 tx_1m_dropped = 16;     // adverts whose 1 m power was outside -100..+20 dBm (0.7.1+)
+  uint32 tx_1m_dropped = 16;     // adverts whose 1 m power was outside -100..+20 dBm (0.8.0+)
 }
 
 enum AdvType {
@@ -210,6 +212,8 @@ message Command {
     IgnoreRule unignore = 13;    // remove the rule with this addr and mask (save unused)
     IgnoreClear ignore_clear = 14;
     bool ignore_list = 15;       // true: send the IgnoreList record (to one scanner or all)
+    uint32 debug = 16;           // DebugFlag bits to have on (replaces the set; 0 = all off),
+                                 //   to one scanner or all; not saved (0.8.0+)
   }
 }
 
@@ -242,4 +246,35 @@ enum IgnoreClear {
   IGNORE_CLEAR_TEMP = 1;         // rules kept until reboot
   IGNORE_CLEAR_SAVED = 2;        // rules kept in flash
   IGNORE_CLEAR_ALL = 3;
+}
+
+// Debug output a Command.debug can turn on; bits, all off after boot
+enum DebugFlag {
+  DEBUG_NONE = 0;
+  DEBUG_TX_1M = 1;               // TxDrops records: adverts whose 1 m power was dropped
+}
+
+// Debug (DEBUG_TX_1M on): adverts whose advertised 1 m power was outside -100..+20 dBm and
+// was dropped, per address, over the last second. Only sent for a second that had any; within
+// the byte budget, after RSSI and payloads (addresses that don't fit go into omitted).
+message TxDrops {
+  repeated TxDrop drops = 1;     // up to 16 addresses, in the order first heard
+  uint32 omitted = 2;            // addresses left out (table full or budget)
+}
+
+message TxDrop {
+  bytes addr = 1;                // 6 bytes, most significant first, as printed
+  bool random = 2;
+  TxFormat format = 3;
+  sint32 raw_dbm = 4;            // the byte as advertised, last one heard (iBeacon: at 1 m,
+                                 //   Eddystone: at 0 m)
+  sint32 tx_1m_dbm = 5;          // what it works out to at 1 m (raw, or raw - 41)
+  uint32 count = 6;              // adverts dropped this second
+}
+
+enum TxFormat {
+  TX_FORMAT_NONE = 0;
+  TX_FORMAT_IBEACON = 1;
+  TX_FORMAT_EDDYSTONE_UID = 2;
+  TX_FORMAT_EDDYSTONE_URL = 3;
 }

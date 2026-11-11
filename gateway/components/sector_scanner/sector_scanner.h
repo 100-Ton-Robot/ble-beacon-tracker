@@ -45,7 +45,10 @@ enum Action : uint8_t {
   ACT_UNIGNORE = 13,      // IgnoreRule
   ACT_IGNORE_CLEAR = 14,  // arg = IgnoreClear: 1 until-reboot rules, 2 saved, 3 all
   ACT_IGNORE_LIST = 15,   // ask for the IgnoreList record (one scanner or all)
+  ACT_DEBUG = 16,         // arg = DebugFlag bits to have on (0 = all off); not kept applied
 };
+/* DebugFlag bits (bletracker.proto) */
+static const uint32_t DEBUG_TX_1M = 1;
 static const size_t ADDR_LEN = 6;
 
 /* Intervals in ticks, field order of bletracker.Intervals; 0 = unchanged in a command */
@@ -133,6 +136,7 @@ class Sector : public uart::UARTDevice {
   void handle_record_(const uint8_t *p, size_t len, const char *t);
   void handle_status_(const uint8_t *p, size_t len, const char *t);
   void handle_ignore_list_(const uint8_t *p, size_t len, const char *t);
+  void handle_tx_drops_(const uint8_t *p, size_t len, const char *t);
   void handle_counters_(const uint8_t *p, size_t len, const char *t);
   void handle_event_(const uint8_t *p, size_t len, const char *t);
   void add_rssi_(const uint8_t *p, size_t len);

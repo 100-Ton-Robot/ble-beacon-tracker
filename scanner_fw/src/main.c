@@ -21,6 +21,8 @@
  *  10. ignore list: address/mask rules whose adverts are dropped as they are heard,
  *      each saved in flash or kept until reboot (console or gateway command), sent to
  *      the gateway whole at boot, after each change and on request
+ *  11. debug output the gateway can turn on (off at boot): DEBUG_TX_1M sends a per-second
+ *      summary of adverts whose 1 m power was out of range (TxDrops record)
  *
  * Shell commands:
  *   status                 version, chip ID, antenna, listening, flash mode, stream
@@ -98,8 +100,17 @@ struct adv_evt {
 	int8_t rssi;
 	uint8_t type;
 	int8_t tx_1m;
+	uint8_t tx_bad_fmt;	/* TxFormat of a dropped 1 m power, 0 = none dropped */
+	int8_t tx_bad_raw;	/* its byte as advertised */
 	uint8_t len;
 	uint8_t data[AD_MAX];
+};
+
+/* What ad_tx_cb found in one advert */
+struct tx_parse {
+	int8_t tx_1m;		/* TX_UNKNOWN if none, or dropped */
+	uint8_t bad_fmt;	/* TxFormat when dropped, else 0 */
+	int8_t bad_raw;
 };
 
 /* One second of adverts from one address for the console, main thread only */
@@ -343,6 +354,30 @@ static char __aligned(4) adv_q_buf[ADV_Q_LEN * sizeof(struct adv_evt)];
 static struct k_msgq adv_q;
 static atomic_t dropped;
 static atomic_t tx_1m_dropped;	/* adverts whose 1 m power was out of range */
+
+/*
+ * Debug output, set by the gateway (Command.debug), all off at boot. DEBUG_TX_1M: the adverts
+ * whose 1 m power was dropped, per address, gathered over each second in the main thread and
+ * sent as a TxDrops record in the next bucket.
+ */
+#define DEBUG_KNOWN bletracker_DebugFlag_DEBUG_TX_1M
+#define TXD_MAX 16
+
+struct txd_dev {
+	bt_addr_le_t addr;
+	uint8_t fmt;
+	int8_t raw;
+	uint32_t count;
+};
+
+static atomic_t debug_flags;
+static struct txd_dev txd[TXD_MAX];		/* this second */
+static uint8_t n_txd;
+static uint32_t txd_omitted;
+static struct txd_dev txd_due[TXD_MAX];	/* last second, for the next bucket */
+static uint8_t n_txd_due;
+static uint32_t txd_due_omitted;
+static bool txd_report;
 
 enum list_mode { LIST_OFF, LIST_TABLE, LIST_CSV };
 
@@ -854,27 +889,36 @@ static int antenna_init(void)
  */
 static bool ad_tx_cb(struct bt_data *data, void *user_data)
 {
-	int8_t *tx_1m = user_data;
+	struct tx_parse *tp = user_data;
+	uint8_t fmt;
+	int8_t raw;
 	int v;
 
 	if (data->type == BT_DATA_MANUFACTURER_DATA && data->data_len == 25 &&
 	    data->data[0] == 0x4c && data->data[1] == 0x00 &&
 	    data->data[2] == 0x02 && data->data[3] == 0x15) {
 		/* iBeacon: 4C 00 02 15, UUID(16), major(2), minor(2), measured power at 1 m */
-		v = (int8_t)data->data[24];
+		fmt = bletracker_TxFormat_TX_FORMAT_IBEACON;
+		raw = (int8_t)data->data[24];
+		v = raw;
 	} else if (data->type == BT_DATA_SVC_DATA16 && data->data_len >= 4 &&
 		   data->data[0] == 0xaa && data->data[1] == 0xfe &&
 		   (data->data[2] == 0x00 || data->data[2] == 0x10)) {
 		/* Eddystone UID (0x00) or URL (0x10): power is at 0 m, ~41 dB above 1 m */
-		v = (int)(int8_t)data->data[3] - 41;
+		fmt = data->data[2] == 0x00 ? bletracker_TxFormat_TX_FORMAT_EDDYSTONE_UID :
+					      bletracker_TxFormat_TX_FORMAT_EDDYSTONE_URL;
+		raw = (int8_t)data->data[3];
+		v = (int)raw - 41;
 	} else {
 		return true;
 	}
 
 	if (v < TX_1M_MIN || v > TX_1M_MAX) {
 		atomic_inc(&tx_1m_dropped);
+		tp->bad_fmt = fmt;
+		tp->bad_raw = raw;
 	} else {
-		*tx_1m = (int8_t)v;
+		tp->tx_1m = (int8_t)v;
 	}
 	return false;
 }
@@ -882,7 +926,8 @@ static bool ad_tx_cb(struct bt_data *data, void *user_data)
 static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 		    struct net_buf_simple *ad)
 {
-	struct adv_evt evt = { .rssi = rssi, .type = adv_type, .tx_1m = TX_UNKNOWN };
+	struct adv_evt evt = { .rssi = rssi, .type = adv_type };
+	struct tx_parse tp = { .tx_1m = TX_UNKNOWN };
 
 	if (filter_on && !bt_addr_eq(&addr->a, &filter_addr)) {
 		return;
@@ -893,7 +938,10 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	bt_addr_le_copy(&evt.addr, addr);
 	evt.len = MIN(ad->len, AD_MAX);
 	memcpy(evt.data, ad->data, evt.len);
-	bt_data_parse(ad, ad_tx_cb, &evt.tx_1m);
+	bt_data_parse(ad, ad_tx_cb, &tp);
+	evt.tx_1m = tp.tx_1m;
+	evt.tx_bad_fmt = tp.bad_fmt;
+	evt.tx_bad_raw = tp.bad_raw;
 	if (k_msgq_put(&adv_q, &evt, K_NO_WAIT) != 0) {
 		atomic_inc(&dropped);
 	}
@@ -1088,6 +1136,34 @@ BT_CONN_CB_DEFINE(conn_cbs) = {
 	.disconnected = disconnected,
 	.recycled = recycled,
 };
+
+/* Debug DEBUG_TX_1M: one advert whose 1 m power was dropped, per address this second */
+static void txd_add(const struct adv_evt *evt)
+{
+	struct txd_dev *d = NULL;
+
+	if (!(atomic_get(&debug_flags) & bletracker_DebugFlag_DEBUG_TX_1M)) {
+		return;
+	}
+	for (uint8_t i = 0; i < n_txd; i++) {
+		if (bt_addr_le_eq(&txd[i].addr, &evt->addr)) {
+			d = &txd[i];
+			break;
+		}
+	}
+	if (d == NULL) {
+		if (n_txd == TXD_MAX) {
+			txd_omitted++;
+			return;
+		}
+		d = &txd[n_txd++];
+		bt_addr_le_copy(&d->addr, &evt->addr);
+		d->count = 0;
+	}
+	d->fmt = evt->tx_bad_fmt;
+	d->raw = evt->tx_bad_raw;
+	d->count++;
+}
 
 static void agg_add(const struct adv_evt *evt)
 {
@@ -1480,6 +1556,13 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 		}
 		budget_pct = c->action.budget_pct;
 		return "budget set";
+	case bletracker_Command_debug_tag:
+		/* Replaces the whole set; unknown bits are rejected so a typo isn't silently off */
+		if (c->action.debug & ~(uint32_t)DEBUG_KNOWN) {
+			return NULL;
+		}
+		atomic_set(&debug_flags, c->action.debug);
+		return c->action.debug ? "debug tx1m on" : "debug off";
 	default:
 		return NULL;
 	}
@@ -1618,6 +1701,7 @@ static void status_fill(bletracker_Status *st)
 	st->ignore_rules = n_ign;
 	st->ignore_saved = ignore_saved_count();
 	st->ignored = last_ignored;
+	st->debug = atomic_get(&debug_flags);
 }
 
 static void counters_fill(bletracker_Counters *c)
@@ -1741,6 +1825,33 @@ static bool payloads_put(pb_ostream_t *s, bletracker_Record *rec, size_t budget,
 	}
 }
 
+/* Debug: last second's TxDrops within `limit`; addresses that don't fit go into omitted */
+static void txd_put(pb_ostream_t *s, bletracker_Record *rec, size_t limit)
+{
+	bletracker_TxDrops *d;
+
+	*rec = (bletracker_Record)bletracker_Record_init_zero;
+	rec->which_kind = bletracker_Record_tx_drops_tag;
+	d = &rec->kind.tx_drops;
+	for (uint8_t i = 0; i < n_txd_due; i++) {
+		const struct txd_dev *t = &txd_due[i];
+		bletracker_TxDrop *e = &d->drops[i];
+
+		addr_put(e->addr, &t->addr);
+		e->random = t->addr.type & 1;
+		e->format = t->fmt;
+		e->raw_dbm = t->raw;
+		e->tx_1m_dbm = t->fmt == bletracker_TxFormat_TX_FORMAT_IBEACON ? t->raw : t->raw - 41;
+		e->count = t->count;
+	}
+	d->drops_count = n_txd_due;
+	d->omitted = txd_due_omitted;
+	while (!record_put(s, rec, limit) && d->drops_count > 0) {
+		d->drops_count--;
+		d->omitted++;
+	}
+}
+
 /* Build and send this tick's bucket; the throttle follows how full it was */
 static void tick_send(int64_t now, int64_t t_start)
 {
@@ -1847,6 +1958,14 @@ static void tick_send(int64_t now, int64_t t_start)
 		calm_ticks = 0;
 	}
 
+	/* Debug summary after the throttle has measured the tick, so it never moves it; within
+	 * whatever budget RSSI and payloads left
+	 */
+	if (txd_report) {
+		txd_report = false;
+		txd_put(&s, &rec, budget);
+	}
+
 	/* Ignore list (up to ~830 bytes) last, after the throttle has measured the tick, so it never
 	 * trims RSSI; it may pass the budget but not 90% of the line, else it waits a tick
 	 */
@@ -1940,6 +2059,10 @@ static void handle_adv(const struct adv_evt *evt)
 		bin2hex(evt->data, evt->len, hex, sizeof(hex));
 		printk("%s rssi=%d type=%u ad=%s\n", addr_str, evt->rssi, evt->type,
 		       evt->len ? hex : "-");
+	}
+
+	if (evt->tx_bad_fmt) {
+		txd_add(evt);
 	}
 
 	/* Scan responses only feed payloads, so RSSI means the same in both scan modes */
@@ -2078,6 +2201,17 @@ static void report_second(void)
 	}
 	chan_gap_us = 0;
 	chan_tick();
+
+	/* Debug: hand this second's dropped 1 m powers to the next bucket (none = no record) */
+	if ((atomic_get(&debug_flags) & bletracker_DebugFlag_DEBUG_TX_1M) &&
+	    (n_txd || txd_omitted)) {
+		memcpy(txd_due, txd, n_txd * sizeof(txd[0]));
+		n_txd_due = n_txd;
+		txd_due_omitted = txd_omitted;
+		txd_report = true;
+	}
+	n_txd = 0;
+	txd_omitted = 0;
 
 	n_devs = 0;
 	devs_full = 0;

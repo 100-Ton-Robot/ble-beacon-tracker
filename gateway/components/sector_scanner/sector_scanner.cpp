@@ -44,10 +44,12 @@ enum StateTopic : uint8_t {
   ST_TEST_IMAGE,
   ST_ACTIVE,
   ST_PAYLOADS,
+  ST_DEBUG,
   ST_COUNT,
 };
 static const char *const STATE_NAMES[ST_COUNT] = {"chip",   "claim",      "load",   "flash",   "ant",
-                                                  "listening", "client", "test_image", "active", "payloads"};
+                                                  "listening", "client", "test_image", "active", "payloads",
+                                                  "debug"};
 /* Layout v2 retained topic that v3 renamed (to claim); cleared at connect so it doesn't linger */
 static const char *const LEGACY_STATE = "scanner_sector";
 
@@ -474,6 +476,21 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     c.arg = v;
     return true;
   }
+  if (name == "debug") {
+    /* debug tx1m on|off, debug off: the scanner's debug output (off at its boot) */
+    if (w.size() == 2 && arg == "off") {
+      c.action = ACT_DEBUG;
+      c.arg = 0;
+      return true;
+    }
+    if (w.size() == 3 && arg == "tx1m" && (w[2] == "on" || w[2] == "off")) {
+      c.action = ACT_DEBUG;
+      c.arg = w[2] == "on" ? DEBUG_TX_1M : 0;
+      return true;
+    }
+    err = "debug takes tx1m on|off, or off";
+    return false;
+  }
   if (name == "ignore" && w.size() == 2 && arg == "list") {
     c.action = ACT_IGNORE_LIST;
     c.arg = 1;
@@ -692,7 +709,7 @@ static bool record_well_formed(const pb::Field &rec) {
   pb::Reader r(rec);
   pb::Field f;
   while (r.next(f))
-    if (f.num >= 1 && f.num <= 6 && f.wt == pb::LEN && !pb::well_formed(f.p, f.len))
+    if (f.num >= 1 && f.num <= 8 && f.wt == pb::LEN && !pb::well_formed(f.p, f.len))
       return false;
   return r.ok();
 }
@@ -870,7 +887,7 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f)) {
-    if (f.wt != pb::LEN || f.num > 7) {
+    if (f.wt != pb::LEN || f.num > 8) {
       /* A record kind this gateway doesn't know (forward compatibility) */
       std::string sub = "raw/" + std::to_string(f.num);
       this->hub_->publish(this->topic_(sub.c_str()), f.wt == pb::VARINT ? std::to_string(f.v) : to_hex(f.p, f.len),
@@ -896,6 +913,9 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
         break;
       case 7:
         this->handle_ignore_list_(f.p, f.len, t);
+        break;
+      case 8:
+        this->handle_tx_drops_(f.p, f.len, t);
         break;
     }
   }
@@ -1066,7 +1086,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   bool flags[8] = {};  // ext_antenna, listening, active_scan, payloads, flash_mode, client, test_image (2-8)
   uint32_t nums[6] = {};  // adverts, dropped, devices, load_reasons, line_peak_pct, budget_pct (9-14)
   Intervals iv;
-  uint32_t baud = 0;
+  uint32_t baud = 0, debug = 0;
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f)) {
@@ -1084,6 +1104,8 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
           iv.v[g.num - 1] = g.u32();
     } else if (f.num == 16 && f.wt == pb::VARINT) {
       baud = f.u32();
+    } else if (f.num == 20 && f.wt == pb::VARINT) {
+      debug = f.u32();
     }
   }
 
@@ -1112,6 +1134,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
   this->set_state_(ST_TEST_IMAGE, flags[6] ? "on" : "off");
   this->set_state_(ST_ACTIVE, flags[2] ? "on" : "off");
   this->set_state_(ST_PAYLOADS, flags[3] ? "on" : "off");
+  this->set_state_(ST_DEBUG, debug == 0 ? "off" : debug == DEBUG_TX_1M ? "tx1m" : std::to_string(debug));
   if (this->devices_sensor_ != nullptr)
     this->devices_sensor_->publish_state(nums[2]);
 
@@ -1213,6 +1236,53 @@ void Sector::handle_ignore_list_(const uint8_t *p, size_t len, const char *t) {
   this->have_ignore_ = true;
   this->hub_->publish(this->topic_("ignore"), j.s, true);
   this->hub_->check_ignore_lists(t);
+}
+
+/* TxDrops (debug tx1m): adverts whose 1 m power the scanner dropped, per address, last second */
+void Sector::handle_tx_drops_(const uint8_t *p, size_t len, const char *t) {
+  static const char *const FORMATS[] = {"none", "ibeacon", "eddystone_uid", "eddystone_url"};
+  uint32_t omitted = 0;
+  J j;
+  j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_).k("drops").arr();
+  pb::Reader r(p, len);
+  pb::Field f;
+  while (r.next(f)) {
+    if (f.num == 2 && f.wt == pb::VARINT) {
+      omitted += f.u32();
+    } else if (f.num == 1 && f.wt == pb::LEN) {
+      const uint8_t *addr = nullptr;
+      bool random = false;
+      uint32_t format = 0, count = 0;
+      int32_t raw = 0, tx = 0;
+      pb::Reader ri(f);
+      pb::Field g;
+      while (ri.next(g)) {
+        if (g.num == 1 && g.wt == pb::LEN && g.len == ADDR_LEN)
+          addr = g.p;
+        else if (g.wt != pb::VARINT)
+          continue;
+        else if (g.num == 2)
+          random = g.b();
+        else if (g.num == 3)
+          format = g.u32();
+        else if (g.num == 4)
+          raw = g.s32();
+        else if (g.num == 5)
+          tx = g.s32();
+        else if (g.num == 6)
+          count = g.u32();
+      }
+      if (addr == nullptr) {
+        omitted++; /* not a 6-byte address: not published */
+        continue;
+      }
+      j.obj().k("id").str(addr_str(addr, ADDR_LEN, ':')).k("random").b(random);
+      j.k("format").str(enum_name(FORMATS, format)).k("raw_dbm").i(raw).k("tx_1m_dbm").i(tx);
+      j.k("count").i(count).end_obj();
+    }
+  }
+  j.end_arr().k("omitted").i(omitted).end_obj();
+  this->hub_->publish(this->topic_("debug/tx_1m"), j.s, false);
 }
 
 void Sector::handle_event_(const uint8_t *p, size_t len, const char *t) {

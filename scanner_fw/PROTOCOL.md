@@ -57,14 +57,15 @@ it sees a scanner (for example after a `BOOT` event).
 ## Records
 
 A bucket's records come in this order: events, status, counters, RSSI (strongest mean first),
-payloads (changed first, then refreshes), ignore list (when due, 0.7.0+).
+payloads (changed first, then refreshes), debug `TxDrops` (when on and due, 0.8.0+), ignore list
+(when due, 0.7.0+).
 
 - **`Rssi`**: one address over the RSSI interval. Mean = `rssi_sum_dbm / count`; `rssi_max_dbm`
   is the strongest advert. Scan responses are not counted, so RSSI means the same in passive
   and active mode. `tx_1m_dbm` is the advertised power at 1 m when the advert carries it
-  (iBeacon, or Eddystone UID/URL minus 41 dB) and it is within -100..+20 dBm. Since 0.7.1 a
+  (iBeacon, or Eddystone UID/URL minus 41 dB) and it is within -100..+20 dBm. Since 0.8.0 a
   value outside that range is left out (the advert itself still counts) and counted in
-  `Counters.tx_1m_dropped`; before 0.7.1 Eddystone values below -87 dBm wrapped to positive.
+  `Counters.tx_1m_dropped`; before 0.8.0 Eddystone values below -87 dBm wrapped to positive.
 - **`Payload`** (`advert` or `scan_rsp`): the raw AD bytes as received (legacy PDUs, up to
   31 bytes), with the RSSI of the last advert that carried them. An address's advert and scan
   response are tracked separately. One goes out when its bytes change (at most once per payload
@@ -76,11 +77,21 @@ payloads (changed first, then refreshes), ignore list (when due, 0.7.0+).
 - **`Status`**: firmware version, antenna, listening, active scanning, payloads on, flash mode,
   update client connected, test image, adverts / addresses / queue drops in the last second,
   the throttle reasons and peak use since the last status, budget, intervals and baud rate;
-  since 0.6.0 the ignore list's size (and how many saved) and adverts ignored in the last second.
+  since 0.6.0 the ignore list's size (and how many saved) and adverts ignored in the last second;
+  since 0.8.0 the `DebugFlag` bits on (`debug`).
 - **`Counters`**: totals since boot (buckets sent and skipped, commands ok / bad / for other
   scanners, D7 UART errors, payloads sent and held, RSSI records trimmed, payload table
-  evictions, events lost, adverts ignored, adverts whose 1 m power was out of range (0.7.1+))
+  evictions, events lost, adverts ignored, adverts whose 1 m power was out of range (0.8.0+))
   plus `boots` and `flash_opens`, which are saved in flash.
+- **`TxDrops`** (debug, 0.8.0+, only while `DEBUG_TX_1M` is on): the adverts whose 1 m power
+  was dropped, per address, over the last second: address, random, `format` (iBeacon,
+  Eddystone UID or URL), `raw_dbm` (the byte as advertised, last one heard: at 1 m for iBeacon,
+  0 m for Eddystone), `tx_1m_dbm` (what it works out to at 1 m) and `count`. Up to 16
+  addresses in the order first heard; `omitted` counts the rest. Sent in the bucket after each
+  second that had any (none = no record). It goes after RSSI and payloads within what is left
+  of the budget, so it never trims RSSI or moves the throttle; addresses that don't fit go into
+  `omitted`, and when not even an empty record fits, that second's is skipped (the total is
+  still in `Counters.tx_1m_dropped`).
 - **`Event`**: `category` (GENERAL, SECURITY, LOAD, COMMAND), `severity` (INFO, WARN, ERROR),
   `code`, `value`/`value2` (meaning per code, below), `cmd_seq` for command acks, and a short
   `text`. The scanner prints each one on its USB console too (`[SECURITY WARN] ...`).
@@ -152,6 +163,7 @@ value at boot. The chip ID in every bucket still lets the gateway notice a board
 | `unignore` | `IgnoreRule` | only to all scanners: remove the rule with exactly this `addr` and `mask`; rejected if there is none |
 | `ignore_clear` | `IgnoreClear` 1-3 | only to all scanners: remove the rules kept until reboot (1), the saved ones (2) or all (3) |
 | `ignore_list` | true | 0.7.0+, one scanner or all: send the `IgnoreList` record in the next bucket |
+| `debug` | `DebugFlag` bits | 0.8.0+, one scanner or all: the debug output to have on (replaces the set, 0 = all off; unknown bits are rejected). Not saved: off at every boot. Text: `debug tx1m on\|off`, `debug off` |
 
 ### Ignore list (0.6.0+)
 

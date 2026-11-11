@@ -151,11 +151,13 @@ scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **
 | `events` | no | every scanner and gateway event | event JSON, below |
 | `security` | no | SECURITY-category events only | same JSON; this stream is the security record |
 | `<sector>/ignore` | yes | each `IgnoreList` record (scanner 0.7.0+: at its boot, on a change, on request) | `{"t","chip","seq","paused","count","rules":[{"rule":"C1:7D:2B:00:00:00/24","saved":true,"hits":12}]}` |
+| `<sector>/debug/tx_1m` | no | each `TxDrops` record (scanner 0.8.0+, `debug tx1m on`): after a second with dropped 1 m powers | `{"t","chip","seq","drops":[{"id":"AA:BB:CC:DD:EE:FF","random":true,"format":"ibeacon","raw_dbm":127,"tx_1m_dbm":127,"count":3}],"omitted":0}`; `format` `ibeacon`, `eddystone_uid` or `eddystone_url`; `raw_dbm` as advertised (Eddystone: at 0 m) |
 | `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`) | the record's bytes as hex |
 | `<sector>/online` | yes | first bucket / none for 3 s | `online` / `offline` |
 | `<sector>/chip`, `claim`, `load` | yes | on change | chip ID / claimed sector (255 = unset) / load level |
 | `<sector>/flash`, `listening`, `client`, `test_image`, `active`, `payloads` | yes | on change | `on` / `off` |
 | `<sector>/ant` | yes | on change | `int` / `ext` |
+| `<sector>/debug` | yes | on change | `off` / `tx1m` (scanner debug output; older scanners: `off`) |
 
 `<ADDR>` in topics is 12 upper-case hex digits, no colons; in payloads `AA:BB:CC:DD:EE:FF`.
 
@@ -261,6 +263,7 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `ignore <addr>[/bits\|/mask] [save]` | only on `all/cmd` (the ignore list is mast-wide), scanner 0.6.0+: drop that address (or range; `*` bytes allowed, e.g. `c1:7d:2b:*:*:*`) until the scanners reboot, or with `save` for good |
 | `unignore <addr>[/bits\|/mask]` | only on `all/cmd`: remove that rule (same address and mask) |
 | `ignore clear boot` / `saved` / `all` | only on `all/cmd`: remove the rules kept until reboot / the saved ones / all of them |
+| `debug tx1m on` / `debug tx1m off` / `debug off` | scanner 0.8.0+, on `<sector>/cmd` or `all/cmd`: per-second summary of adverts whose 1 m power the scanner dropped, on `<sector>/debug/tx_1m`. Off at every scanner boot, and the gateway doesn't turn it back on |
 | `ignore list` | scanner 0.7.0+, on `<sector>/cmd` or `all/cmd`: the scanner sends its rules, published on `<sector>/ignore`. The gateway asks by itself when it hasn't seen a scanner's list (e.g. after the gateway restarts) |
 
 Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`

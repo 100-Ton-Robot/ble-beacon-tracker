@@ -66,15 +66,25 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
-### 0.7.1 (unreleased)
+### 0.8.0 (unreleased)
 
 - Fixed: the advertised 1 m power was not range-checked. Eddystone UID/URL 0 m power below
   -87 dBm wrapped when 41 was subtracted (-100 came out as +115 dBm), and any iBeacon byte was
   passed on as is (0x7F read as "none"). Values outside -100..+20 dBm at 1 m are now dropped
   (`tx_1m_dbm` left out, the advert still counted) and counted in the new
   `Counters.tx_1m_dropped` (field 16).
+- Added: debug output the gateway turns on, off at every boot. `Command.debug` (field 16,
+  `DebugFlag` bits, one scanner or all; text `debug tx1m on|off`, `debug off`) and
+  `Status.debug` (field 20). `DEBUG_TX_1M`: a `TxDrops` record (`Record` field 8) in the
+  bucket after each second with dropped 1 m powers: per address (up to 16, the rest counted
+  in `omitted`) the format, the byte as advertised, what it works out to at 1 m and how many
+  adverts. It uses what RSSI and payloads left of the budget, so it never trims RSSI.
 - Gateway: `<sector>/counters` now includes `ignored` (field 15, missing since 0.6.0) and
-  `tx_1m_dropped`; self-test data regenerated.
+  `tx_1m_dropped`. `debug` commands on `<sector>/cmd` and `all/cmd`; `TxDrops` published on
+  `<sector>/debug/tx_1m`, retained state `<sector>/debug`. `make_selftest.py` no longer runs
+  (it still builds the retired `sector` command), so the expected counters message in
+  `selftest_data.h` was extended by hand; the self-test passes on a host build.
+- `decode_frames.py` builds the `debug` commands and shows `TxDrops` and `Status.debug`.
 - Not built or flashed yet: no image in `scanner_fw/release/`.
 
 ### 0.7.0 (2026-11-11)
