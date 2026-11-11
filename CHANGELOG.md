@@ -72,7 +72,8 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   or `*` bytes). Adverts that match are dropped in the scan callback, so they never reach
   RSSI, payloads, the console or the load. Each rule is saved in flash or kept until reboot.
   Console: `ignore`, `ignore <addr>[/bits|/mask] [save]`, `ignore clear boot|saved|all`,
-  `ignore off|on`, `unignore`. Gateway commands `ignore` / `unignore` / `ignore_clear`
+  `ignore off|on`, `unignore`. Gateway commands `ignore` / `unignore` / `ignore_clear`,
+  accepted only when sent to all scanners (the list is mast-wide)
   (Command fields 12-14, `IgnoreRule`, `IgnoreClear`). Each change is a `SETTING_CHANGED`
   security event (Setting 3 `IGNORE_LIST`). New fields: `Status.ignore_rules` /
   `ignore_saved` / `ignored` and `Counters.ignored`.

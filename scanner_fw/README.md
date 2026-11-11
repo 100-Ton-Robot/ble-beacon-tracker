@@ -220,7 +220,8 @@ What you see and type:
   `unignore <rule as listed>` removes one, `ignore clear boot|saved|all` several, and
   `ignore off` / `ignore on` pause and resume them (until reboot). Up to 32 rules; each change is
   a security event, and the `[1s]` line shows `ignored=N` while there are rules. The gateway
-  sends the same words (`<sector>/cmd` or `all/cmd`), see [PROTOCOL.md](PROTOCOL.md).
+  sends the same words, only on `all/cmd`: the list is mast-wide, every scanner ignores the
+  same addresses (see [PROTOCOL.md](PROTOCOL.md)). The console works on its own board, for the bench.
 - `ant` / `ant int` / `ant ext`: show or switch antenna. The choice is saved in flash; a new
   board boots on `int` (onboard).
 - `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts,

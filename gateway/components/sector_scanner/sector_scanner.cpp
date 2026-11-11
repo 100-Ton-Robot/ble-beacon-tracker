@@ -1274,6 +1274,10 @@ bool Sector::command(const std::string &text) {
     ESP_LOGW(TAG, "Sector %u: the rssi interval is mast-wide, send it on all/cmd", this->pin_);
     return false;
   }
+  if (c.action == ACT_IGNORE || c.action == ACT_UNIGNORE || c.action == ACT_IGNORE_CLEAR) {
+    ESP_LOGW(TAG, "Sector %u: the ignore list is mast-wide, send it on all/cmd", this->pin_);
+    return false;
+  }
   if (!this->have_chip_) {
     ESP_LOGW(TAG, "Sector %u: no scanner chip seen yet, '%s' dropped", this->pin_, c.text.c_str());
     return false;

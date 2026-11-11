@@ -203,6 +203,7 @@ message Command {
     bool active_scan = 9;        // off after boot
     Intervals intervals = 10;    // not saved
     uint32 budget_pct = 11;      // 10-90, not saved
+    // Ignore list: mast-wide, so 12-14 are only accepted in a command to all scanners
     IgnoreRule ignore = 12;      // add (or update) a rule
     IgnoreRule unignore = 13;    // remove the rule with this addr and mask (save unused)
     IgnoreClear ignore_clear = 14;

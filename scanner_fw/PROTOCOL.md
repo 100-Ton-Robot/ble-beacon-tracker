@@ -146,9 +146,9 @@ value at boot. The chip ID in every bucket still lets the gateway notice a board
 | `active_scan` | bool | active scanning on/off |
 | `intervals` | `Intervals` | fields left at 0 are unchanged; `rssi` only to all scanners; limits: rssi/payload/status 1-50, refresh/counters 1-3000 |
 | `budget_pct` | 10-90 | |
-| `ignore` | `IgnoreRule` | add a rule, or change whether it is saved (0.6.0+, below) |
-| `unignore` | `IgnoreRule` | remove the rule with exactly this `addr` and `mask`; rejected if there is none |
-| `ignore_clear` | `IgnoreClear` 1-3 | remove the rules kept until reboot (1), the saved ones (2) or all (3) |
+| `ignore` | `IgnoreRule` | only to all scanners: add a rule, or change whether it is saved (0.6.0+, below) |
+| `unignore` | `IgnoreRule` | only to all scanners: remove the rule with exactly this `addr` and `mask`; rejected if there is none |
+| `ignore_clear` | `IgnoreClear` 1-3 | only to all scanners: remove the rules kept until reboot (1), the saved ones (2) or all (3) |
 
 ### Ignore list (0.6.0+)
 
@@ -161,7 +161,9 @@ mask)`; public/random isn't compared. A mask of all zeros is rejected (that's `l
 - `save` true: kept in flash across reboots. False: kept until the next reboot. Sending a
   saved rule again with `save` false removes it from flash but keeps it until reboot.
 - Up to 32 rules per scanner, saved and unsaved together; a 33rd is rejected.
-- Rules are per scanner: send to all (empty target) to apply them mast-wide.
+- The list is mast-wide: every scanner ignores the same addresses, so `ignore`, `unignore` and
+  `ignore_clear` are only accepted in a command to all scanners (empty target); one addressed
+  to a single chip is rejected. The console's `ignore` works on its own board, for the bench.
 - Every change is a `SETTING_CHANGED` security event (`value` 3 = `IGNORE_LIST`, `value2` = rules
   now listed, text = the rule and `saved`/`boot`, then `gw` or `usb`): a rule can hide a device.
   Acks: `ignore added` / `changed` / `unchanged`, `unignored`, `ignore cleared`; `... NOT SAVED`

@@ -396,7 +396,8 @@ static void event_post(bletracker_Event_Category cat, bletracker_Event_Severity 
  * is an address and a mask, bytes in printed order (most significant first); it matches
  * when (address & mask) == addr, addr being stored already masked. Address type isn't
  * compared. Saved rules are kept in flash ("scanner/ign"), the others until reboot.
- * Every change is a security event: a rule can hide a device from the tracker.
+ * Every change is a security event: a rule can hide a device from the tracker. Gateway
+ * commands must go to all scanners (the list is mast-wide); the console is for the bench.
  * ign[] is read in the BT RX thread under ign_lock; changes (shell thread, system
  * workqueue) also hold ign_mutex so flash writes go out in order.
  */
@@ -1373,6 +1374,9 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 	uint8_t mask[ADDR_LEN];
 
 	switch (c->which_action) {
+	/* The ignore list is mast-wide: every scanner ignores the same addresses, so these are
+	 * only accepted in a command to all scanners (like the rssi interval)
+	 */
 	case bletracker_Command_ignore_tag: {
 		static const char *const done[] = {
 			[IGN_ADDED] = "ignore added", [IGN_CHANGED] = "ignore changed",
@@ -1380,7 +1384,7 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 		};
 		enum ignore_result res;
 
-		if (!ignore_from_pb(&c->action.ignore, addr, mask)) {
+		if (!to_all || !ignore_from_pb(&c->action.ignore, addr, mask)) {
 			return NULL;
 		}
 		res = ignore_add(addr, mask, c->action.ignore.save, gw);
@@ -1389,7 +1393,7 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 	case bletracker_Command_unignore_tag: {
 		int err;
 
-		if (!ignore_from_pb(&c->action.unignore, addr, mask)) {
+		if (!to_all || !ignore_from_pb(&c->action.unignore, addr, mask)) {
 			return NULL;
 		}
 		err = ignore_del(addr, mask, gw);
@@ -1398,7 +1402,7 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 	case bletracker_Command_ignore_clear_tag: {
 		int n;
 
-		if (c->action.ignore_clear < bletracker_IgnoreClear_IGNORE_CLEAR_TEMP ||
+		if (!to_all || c->action.ignore_clear < bletracker_IgnoreClear_IGNORE_CLEAR_TEMP ||
 		    c->action.ignore_clear > bletracker_IgnoreClear_IGNORE_CLEAR_ALL) {
 			return NULL;
 		}
