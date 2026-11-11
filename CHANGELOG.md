@@ -76,6 +76,14 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 - Gateway: publishes each scanner's list on retained `<sector>/ignore`, asks for it when it
   hasn't seen one (e.g. after a gateway restart), and raises `IGNORE_MISMATCH` (SECURITY,
   WARN) when the online scanners' lists differ, `IGNORE_MATCH` when they agree again.
+- Fixed: event text (command acks) could hold only 39 characters, so longer acks such as
+  `ignore list in next bucket (to all)` were cut short. The limit is now 63; the wire format
+  is unchanged.
+- Flashed by USB (app only) on all three XIAOs and bench-tested on each. Readback works sent
+  to one chip and to all, and the list is correct when empty, with saved and boot-only rules
+  and their hits, while paused, and after a clear. The 0.6.0 ignore checks pass again. The
+  list sent at boot is checked in code only: it goes out before the USB console is up.
+- Image: `scanner_fw/release/scanner_fw-0.7.0-dfu.zip`.
 
 ### 0.6.0 (2026-11-11)
 
