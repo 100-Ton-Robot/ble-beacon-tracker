@@ -152,9 +152,9 @@ uart:
     baud_rate: 115200
     rx_buffer_size: 4096
 
-# The RX pin is the sector. Each scanner's own sector claim (set at assembly) is checked on
-# every bucket: a mismatch is a SECURITY error, marks that sector's data suspect and turns on
-# "Sector N mismatch". expected_chip (16 hex digits) per sector adds a board check.
+# The RX pin is the sector. A different chip on a pin is a SECURITY warning (CHIP_CHANGED).
+# expected_chip (16 hex digits) per sector pins it to one board: any other chip is a SECURITY
+# error, marks that sector's data suspect and turns on "Sector N chip mismatch".
 # payloads / active_scan / budget / intervals: what the gateway keeps applied on every scanner
 # (they forget these at boot); MQTT commands change them until the gateway reboots.
 sector_scanner:
@@ -189,7 +189,7 @@ sector_scanner:
         filters:
           - throttle: 10s
       mismatch:
-        name: Sector 0 mismatch
+        name: Sector 0 chip mismatch
       chip:
         name: Sector 0 chip
     - id: scanner_s1
@@ -210,7 +210,7 @@ sector_scanner:
         filters:
           - throttle: 10s
       mismatch:
-        name: Sector 1 mismatch
+        name: Sector 1 chip mismatch
       chip:
         name: Sector 1 chip
     - id: scanner_s2
@@ -231,7 +231,7 @@ sector_scanner:
         filters:
           - throttle: 10s
       mismatch:
-        name: Sector 2 mismatch
+        name: Sector 2 chip mismatch
       chip:
         name: Sector 2 chip
 

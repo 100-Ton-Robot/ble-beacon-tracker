@@ -5,8 +5,8 @@ Reads the three sector scanners' protocol 3 stream (protobuf buckets every 200 m
 [`../scanner_fw/proto/bletracker.proto`](../scanner_fw/proto/bletracker.proto)) and publishes
 it to MQTT (layout v3, below): one RSSI message per sector per bucket, the raw advert and scan
 response bytes split into Theengs-style fields, status, counters, events and a separate
-security stream. It checks every scanner's sector claim against the RX pin it arrives on,
-keeps the settings the scanners forget at boot applied, passes commands to the scanners and
+security stream. The RX pin a scanner is wired to is its sector; the gateway watches each pin's
+chip ID for a board swap, keeps the settings the scanners forget at boot applied, passes commands to the scanners and
 lowers their byte budget when it can't keep up. Needs scanner firmware **0.4.0 or later**;
 older (v2) frames are dropped as bad.
 
@@ -84,21 +84,17 @@ used by the scanners).
 
 ## Sectors
 
-Each scanner's sector is a **claim set once at assembly** (USB console `sector <n>`, or a
-manual `sector <n>` on that sector's MQTT command topic), saved in the scanner. The gateway
-never sets it. On every bucket it compares the claim with the sector of the RX pin the bucket
-came in on:
+A scanner doesn't know its sector: the sector is the gateway RX pin its D6 is wired to, so
+wiring is the only source of truth. (Scanners before 0.5.0 also sent a saved sector claim; the
+gateway ignores it.) What the gateway checks is the scanner's chip ID, sent in every bucket:
 
-- **Claim = pin**: fine.
-- **Claim ≠ pin** (wiring or board swap): `SECTOR_MISMATCH`, logged as ERROR tagged
-  `[SECURITY ERROR]` on first detection, on any change and then once a minute while it lasts;
-  `suspect: true` on that sector's `rssi`, `adv`, and `status`; the API binary sensor
-  "Sector N mismatch" turns on. Data keeps flowing, labelled by the pin.
-- **Claim 255** (never set): `SECTOR_NOT_CONFIGURED`, WARN, same rate limit; not suspect.
-- **Back to normal**: `SECTOR_OK`, INFO (security).
-- Optional `expected_chip` per sector (16 hex digits): a different chip on that pin is a
-  `CHIP_MISMATCH` (ERROR, security, suspect). A pin whose chip changes at all raises
-  `CHIP_CHANGED` (WARN, security).
+- **Chip changed**: a different chip on a pin than the last one seen there (board swap or
+  rewiring): `CHIP_CHANGED`, WARN (security), text "chip <new> replaced <old>".
+- **Expected chip** (optional `expected_chip` per sector, 16 hex digits): any other chip on
+  that pin is a `CHIP_MISMATCH`, logged as ERROR tagged `[SECURITY ERROR]` on first detection
+  and then once a minute while it lasts; `suspect: true` on that sector's `rssi`, `adv` and
+  `status`; the API binary sensor "Sector N chip mismatch" turns on. Data keeps flowing,
+  labelled by the pin. When the expected chip is back: `CHIP_OK`, INFO (security).
 
 ## Settings the gateway keeps applied
 
@@ -136,8 +132,8 @@ sector_scanner:
 
 ## MQTT output (layout v3)
 
-All under `bletracker/<mast>/`, QoS 0. `<sector>` is the gateway's RX pin (0-2), not the
-scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **milliseconds**
+All under `bletracker/<mast>/`, QoS 0. `<sector>` is the gateway's RX pin (0-2), which is the
+scanner's sector. `t` is the gateway's clock when it handled the bucket, epoch **milliseconds**
 (null until SNTP has set the clock). `chip` is the scanner's chip ID, 16 lowercase hex.
 
 | Topic | Retained | When | Payload |
@@ -154,7 +150,7 @@ scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **
 | `<sector>/debug/tx_1m` | no | each `TxDrops` record (scanner 0.8.0+, `debug tx1m on`): after a second with dropped 1 m powers | `{"t","chip","seq","drops":[{"id":"AA:BB:CC:DD:EE:FF","random":true,"format":"ibeacon","raw_dbm":127,"tx_1m_dbm":127,"count":3}],"omitted":0}`; `format` `ibeacon`, `eddystone_uid` or `eddystone_url`; `raw_dbm` as advertised (Eddystone: at 0 m) |
 | `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`) | the record's bytes as hex |
 | `<sector>/online` | yes | first bucket / none for 3 s | `online` / `offline` |
-| `<sector>/chip`, `claim`, `load` | yes | on change | chip ID / claimed sector (255 = unset) / load level |
+| `<sector>/chip`, `load` | yes | on change | chip ID / load level. (`claim` and the v2 `scanner_sector` are no longer published; their retained values are cleared at connect) |
 | `<sector>/flash`, `listening`, `client`, `test_image`, `active`, `payloads` | yes | on change | `on` / `off` |
 | `<sector>/ant` | yes | on change | `int` / `ext` |
 | `<sector>/debug` | yes | on change | `off` / `tx1m` (scanner debug output; older scanners: `off`) |
@@ -164,7 +160,7 @@ scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **
 RSSI, one message per bucket (records in the scanner's order, strongest mean first):
 
 ```json
-{"t":1793476800123,"seq":100,"t_ms":20000,"tick_ms":200,"chan":0,"load":0,"chip":"38cd69b0ed39e516","claim":0,"suspect":false,
+{"t":1793476800123,"seq":100,"t_ms":20000,"tick_ms":200,"chan":0,"load":0,"chip":"38cd69b0ed39e516","suspect":false,
  "devs":[["C0:FF:EE:00:00:01",true,3,-67.0,-60,3,-59],["11:22:33:44:55:66",false,0,-67.5,-66,2,null]]}
 ```
 
@@ -195,7 +191,7 @@ device-specific decoding here):
 Status (each Status record, plus the gateway's view of the link):
 
 ```json
-{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"claim":0,"suspect":false,"lost":0,"bad":0,"rx_overflow":0,
+{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"rx_overflow":0,
  "version":"0.4.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
  "client":false,"test_image":false,"adverts":123,"dropped":0,"devices":3,"load_reasons":0,"line_peak_pct":61,
  "budget_pct":70,"intervals":{"rssi":1,"payload":1,"refresh":50,"status":5,"counters":50},"baud":115200}
@@ -219,10 +215,8 @@ Scanner codes are `Event.Code` names (PROTOCOL.md "Event codes"). Gateway codes 
 
 | code | category / severity | value, value2 |
 | --- | --- | --- |
-| `SECTOR_MISMATCH` | SECURITY, ERROR | claim, pin sector |
 | `CHIP_MISMATCH` | SECURITY, ERROR | -, pin sector; text names the expected chip |
-| `SECTOR_NOT_CONFIGURED` | GENERAL, WARN | 255, pin sector |
-| `SECTOR_OK` | SECURITY, INFO | claim, pin sector |
+| `CHIP_OK` | SECURITY, INFO | -, pin sector; the expected chip is back |
 | `CHIP_CHANGED` | SECURITY, WARN | text "chip <new> replaced <old>" |
 | `CMD_NO_ACK` | COMMAND, WARN | `cmd_seq` = the command's seq |
 | `IGNORE_MISMATCH` / `IGNORE_MATCH` | SECURITY, WARN / INFO | online scanners compared; the scanners' ignore lists (rules and saved flags, not hits) differ / match again; text gives each sector's rule count |
@@ -259,7 +253,6 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `active on` / `active off` | active scanning (scan responses) on / off |
 | `budget <10-90>` | the scanner's byte budget, % of the line per tick |
 | `intervals rssi=N payload=N refresh=N status=N counters=N` | any subset; `rssi` only on `all/cmd` |
-| `sector <0-254>` | only on `<sector>/cmd`, a deliberate manual fix: that scanner saves the new claim |
 | `ignore <addr>[/bits\|/mask] [save]` | only on `all/cmd` (the ignore list is mast-wide), scanner 0.6.0+: drop that address (or range; `*` bytes allowed, e.g. `c1:7d:2b:*:*:*`) until the scanners reboot, or with `save` for good |
 | `unignore <addr>[/bits\|/mask]` | only on `all/cmd`: remove that rule (same address and mask) |
 | `ignore clear boot` / `saved` / `all` | only on `all/cmd`: remove the rules kept until reboot / the saved ones / all of them |
@@ -283,10 +276,10 @@ Commands for the gateway itself go to `bletracker/<mast>/cmd`:
 With `self_test: true` (the default) the gateway checks itself once at boot, without touching
 MQTT or the scanners: the contract's command test vectors must encode byte for byte, and
 sample buckets (built and framed by the reference protobuf code in `tools/make_selftest.py`,
-covering every record kind, an unknown record kind and field, a lost bucket, a sector
-mismatch and recovery, a bad CRC, odd advert names and a truncated AD structure) must
+covering every record kind, an unknown record kind and field, the retired sector claim field,
+a lost bucket, a bad CRC, odd advert names and a truncated AD structure) must
 produce exactly the expected MQTT messages. The result goes to the log and to the "Self test"
-text sensor, e.g. `PASS: commands 22/22, messages 19/19`; a FAIL logs each differing message.
+text sensor, e.g. `PASS: commands 16/16, messages 16/16`; a FAIL logs each differing message.
 After changing the JSON layout or the test vectors, regenerate:
 
 ```bash
@@ -296,6 +289,6 @@ python tools/make_selftest.py        # writes components/sector_scanner/selftest
 ## Home Assistant entities
 
 Over the ESPHome API, per sector: load level, lost buckets, bad frames (one at boot is
-normal, as the first frame is usually partial), devices heard, "mismatch" (problem binary
-sensor), the scanner's chip ID, and buttons "flash mode" and "reboot scanner". For the
+normal, as the first frame is usually partial), devices heard, "chip mismatch" (problem
+binary sensor, `expected_chip` only), the scanner's chip ID, and buttons "flash mode" and "reboot scanner". For the
 gateway: "Gateway load", "Self test", IP and MAC address.

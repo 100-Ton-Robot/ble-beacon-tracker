@@ -41,15 +41,10 @@ CMD_VECTORS = [
     ("reboot", "", "08100138a5014cfd00"),
     ("intervals rssi=1", "", "091001520208017ed100"),
     ("budget 50", "", "0710015832503900"),
-    ("sector 0", "2d31708df8982200", "0a0a082d31708df8982204100130030c1600"),
-    ("sector 1", "2d31708df8982200", "0a0a082d31708df8982207100130012d0600"),
-    ("sector 2", "2d31708df8982200", "0a0a082d31708df8982207100130024e3600"),
-    ("sector 0", "cc1f4cbee227cbae", "0e0a08cc1f4cbee227cbae10013003d89400"),
-    ("sector 1", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae10013001f98400"),
-    ("sector 2", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae100130029ab400"),
-    ("sector 0", "38cd69b0ed39e516", "0e0a0838cd69b0ed39e516100130036f4200"),
-    ("sector 1", "38cd69b0ed39e516", "110a0838cd69b0ed39e516100130014e5200"),
-    ("sector 2", "38cd69b0ed39e516", "110a0838cd69b0ed39e516100130022d6200"),
+    # Added after the contract atom (checked against decode_frames.py like the rest)
+    ("ignore list", "", "0710017801863900"),
+    ("debug tx1m on", "", "081001800101a87b00"),
+    ("debug off", "", "051001800103896b00"),
 ]
 
 CHIP = bytes.fromhex("38cd69b0ed39e516")
@@ -157,7 +152,7 @@ class Sector:
 
     def __init__(self, pin):
         self.pin, self.lost, self.bad, self.last_seq = pin, 0, 0, None
-        self.cond, self.cond_claim, self.rssi_interval = 0, 0, 1
+        self.rssi_interval = 1
         self.out = []
 
     def pub(self, sub, payload):
@@ -179,19 +174,7 @@ class Sector:
         if self.last_seq is not None and b.seq > self.last_seq:
             self.lost += b.seq - self.last_seq - 1
         self.last_seq = b.seq
-        claim = b.sector
-        cond = 4 if claim == 255 else 1 if claim != self.pin else 0
-        suspect = bool(cond & 1)
-        if cond != self.cond or (cond and claim != self.cond_claim):
-            was, self.cond, self.cond_claim = self.cond, cond, claim
-            if cond & 1:
-                self.event(False, 1, 2, "SECTOR_MISMATCH", claim, self.pin, 0,
-                           f"claims sector {claim} on sector {self.pin}'s pin")
-            if cond & 4:
-                self.event(False, 0, 1, "SECTOR_NOT_CONFIGURED", 255, self.pin, 0,
-                           "scanner sector not configured")
-            if not cond and was:
-                self.event(False, 1, 0, "SECTOR_OK", claim, self.pin, 0, "sector checks pass")
+        suspect = False  # no expected_chip on the test sector; the RX pin is the sector
 
         devs = []
         for r in b.records:
@@ -203,7 +186,7 @@ class Sector:
             elif k == "status":
                 s = r.status
                 st = {"t": None, "chip": chip, "seq": b.seq, "pin_sector": self.pin,
-                      "claim": claim, "suspect": suspect, "lost": self.lost, "bad": self.bad,
+                      "suspect": suspect, "lost": self.lost, "bad": self.bad,
                       "rx_overflow": 0, "version": s.version}
                 for f in ("ext_antenna", "listening", "active_scan", "payloads", "flash_mode",
                           "client", "test_image", "adverts", "dropped", "devices", "load_reasons",
@@ -232,12 +215,24 @@ class Sector:
                      "refresh": x.refresh, "age_ms": x.age_ticks * b.tick_ms, "data": x.data.hex()}
                 a.update(ad_fields(x.data))
                 self.pub(f"adv/{addr(x.addr, '')}", dumps(a))
+            elif k == "tx_drops":
+                t = r.tx_drops
+                drops, omitted = [], t.omitted
+                for x in t.drops:
+                    if len(x.addr) != 6:
+                        omitted += 1  # not published
+                        continue
+                    drops.append({"id": addr(x.addr), "random": x.random,
+                                  "format": pb.TxFormat.Name(x.format)[len("TX_FORMAT_"):].lower(),
+                                  "raw_dbm": x.raw_dbm, "tx_1m_dbm": x.tx_1m_dbm, "count": x.count})
+                self.pub("debug/tx_1m", dumps({"t": None, "chip": chip, "seq": b.seq, "drops": drops,
+                                               "omitted": omitted}))
         # Records this pb2 doesn't know: the generator appends them last, so they come last
         for num, payload in unknown_records:
             self.pub(f"raw/{num}", payload.hex())
         if devs or self.rssi_interval == 1:
             rs = {"t": None, "seq": b.seq, "t_ms": b.t_ms, "tick_ms": b.tick_ms, "chan": b.chan,
-                  "load": b.load, "chip": chip, "claim": claim, "suspect": suspect,
+                  "load": b.load, "chip": chip, "suspect": suspect,
                   "devs": [Raw(dumps(d)) for d in devs]}
             self.pub("rssi", dumps(rs))
 
@@ -270,7 +265,7 @@ def status(**kw):
 
 
 def bucket_a():
-    b = pb.Bucket(chip_id=CHIP, sector=0, seq=100, t_ms=20000, tick_ms=200, chan=0, load=1)
+    b = pb.Bucket(chip_id=CHIP, seq=100, t_ms=20000, tick_ms=200, chan=0, load=1)
     E = pb.Event
     b.records.add(event=E(category=E.SECURITY, severity=E.INFO, code=E.BOOT, value=1, value2=7,
                           text="power-on"))
@@ -298,14 +293,16 @@ def bucket_a():
     b.records.add(scan_rsp=pb.Payload(addr=bytes.fromhex("112233445566"), adv_type=4,
                                       rssi_dbm=-70, data=rsp, refresh=True, age_ticks=2))
     assert len(adv) <= 31 and len(rsp) <= 31
-    # Unknown record kind (Record field 9) and unknown Bucket field 20, both to be skipped
+    # Unknown record kind (Record field 9) and unknown Bucket field 20, both to be skipped, and
+    # the retired sector claim (Bucket field 2) a scanner before 0.5.0 still sends: ignored
     unknown = bytes([0x08, 0x2A])
-    body = b.SerializeToString() + ld(15, ld(9, unknown)) + key(20, 0) + ref_varint(1)
+    body = (b.SerializeToString() + ld(15, ld(9, unknown)) + key(20, 0) + ref_varint(1) +
+            key(2, 0) + ref_varint(1))
     return b, body, [(9, unknown)]
 
 
 def bucket_b():
-    b = pb.Bucket(chip_id=CHIP, sector=1, seq=103, t_ms=20600, tick_ms=200, chan=37, load=0)
+    b = pb.Bucket(chip_id=CHIP, seq=103, t_ms=20600, tick_ms=200, chan=37, load=0)
     b.records.append(status())
     b.records.add(rssi=pb.Rssi(addr=bytes.fromhex("c0ffee000001"), random=True, adv_type=3,
                                rssi_sum_dbm=-70, count=1, rssi_max_dbm=-70))
@@ -316,8 +313,17 @@ def bucket_b():
 
 
 def bucket_d():
-    b = pb.Bucket(chip_id=CHIP, sector=0, seq=104, t_ms=20800, tick_ms=200, chan=0, load=0)
+    b = pb.Bucket(chip_id=CHIP, seq=104, t_ms=20800, tick_ms=200, chan=0, load=0)
     b.records.append(status())
+    # Debug summary (scanner 0.8.0+): the 3-byte address is left out and counted in omitted
+    td = b.records.add().tx_drops
+    td.drops.add(addr=bytes.fromhex("c0ffee000002"), random=True, format=pb.TX_FORMAT_IBEACON,
+                 raw_dbm=127, tx_1m_dbm=127, count=3)
+    td.drops.add(addr=bytes.fromhex("c0ffee000003"), format=pb.TX_FORMAT_EDDYSTONE_UID,
+                 raw_dbm=-100, tx_1m_dbm=-141, count=1)
+    td.drops.add(addr=bytes.fromhex("c0ffee"), format=pb.TX_FORMAT_EDDYSTONE_URL, raw_dbm=90,
+                 tx_1m_dbm=49, count=2)
+    td.omitted = 2
     return b, b.SerializeToString(), []
 
 

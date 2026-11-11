@@ -27,15 +27,9 @@ static const uint32_t BUDGET_FLOOR = 30;          /* the gateway never pushes bu
 static const uint32_t BUDGET_STEP = 10;
 static const time_t CLOCK_VALID_AFTER = 1700000000;  /* before this SNTP hasn't set the clock */
 
-/* Sector condition bits */
-static const uint8_t COND_SECTOR = 1;  /* claim is another sector */
-static const uint8_t COND_CHIP = 2;    /* chip isn't the expected one */
-static const uint8_t COND_UNSET = 4;   /* claim 255 */
-
 /* Retained per-sector state topics, in Sector::state_ order */
 enum StateTopic : uint8_t {
   ST_CHIP,
-  ST_CLAIM,
   ST_LOAD,
   ST_FLASH,
   ST_ANT,
@@ -47,11 +41,11 @@ enum StateTopic : uint8_t {
   ST_DEBUG,
   ST_COUNT,
 };
-static const char *const STATE_NAMES[ST_COUNT] = {"chip",   "claim",      "load",   "flash",   "ant",
-                                                  "listening", "client", "test_image", "active", "payloads",
-                                                  "debug"};
-/* Layout v2 retained topic that v3 renamed (to claim); cleared at connect so it doesn't linger */
-static const char *const LEGACY_STATE = "scanner_sector";
+static const char *const STATE_NAMES[ST_COUNT] = {"chip",      "load",   "flash",      "ant",    "listening",
+                                                  "client",    "test_image", "active", "payloads", "debug"};
+/* Retained topics no longer published, cleared at connect so they don't linger: the layout v2
+ * scanner_sector, and claim (the scanner's sector claim, retired in scanner 0.5.0) */
+static const char *const LEGACY_STATES[] = {"scanner_sector", "claim"};
 
 static const char *const CATEGORY_NAMES[] = {"GENERAL", "SECURITY", "LOAD", "COMMAND"};
 static const char *const SEVERITY_NAMES[] = {"INFO", "WARN", "ERROR"};
@@ -465,14 +459,13 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     c.arg = REBOOT_ARG;
     return true;
   }
-  if (name == "sector" || name == "budget") {
+  if (name == "budget") {
     uint32_t v;
-    bool sector = name == "sector";
-    if (w.size() != 2 || !parse_uint(arg, v) || (sector ? v > 254 : (v < 10 || v > 90))) {
-      err = sector ? "sector needs 0-254" : "budget needs 10-90";
+    if (w.size() != 2 || !parse_uint(arg, v) || v < 10 || v > 90) {
+      err = "budget needs 10-90";
       return false;
     }
-    c.action = sector ? ACT_SECTOR : ACT_BUDGET;
+    c.action = ACT_BUDGET;
     c.arg = v;
     return true;
   }
@@ -723,16 +716,17 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
 
   /* Pass 1: the bucket header, and check every record parses */
   uint8_t chip[CHIP_ID_LEN] = {};
-  uint32_t claim = 0, seq = 0, t_ms = 0, tick_ms = 0, chan = 0, load = 0;
+  uint32_t seq = 0, t_ms = 0, tick_ms = 0, chan = 0, load = 0;
   {
     pb::Reader r(this->raw_, body);
     pb::Field f;
     while (r.next(f)) {
       if (f.num == 1 && f.wt == pb::LEN) {
         memcpy(chip, f.p, std::min(f.len, CHIP_ID_LEN));
-      } else if (f.num >= 2 && f.num <= 7 && f.wt == pb::VARINT) {
-        uint32_t *dst[] = {&claim, &seq, &t_ms, &tick_ms, &chan, &load};
-        *dst[f.num - 2] = f.u32();
+      } else if (f.num >= 3 && f.num <= 7 && f.wt == pb::VARINT) {
+        /* 2 was the sector claim (scanners before 0.5.0): skipped, the RX pin is the sector */
+        uint32_t *dst[] = {&seq, &t_ms, &tick_ms, &chan, &load};
+        *dst[f.num - 3] = f.u32();
       } else if (f.num == 15 && f.wt == pb::LEN && !record_well_formed(f)) {
         this->bad_frame_("protobuf", len);
         return;
@@ -785,11 +779,10 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
     this->publish_online_(true);
   }
   this->last_bucket_ms_ = now ? now : 1;
-  this->claim_ = claim;
   this->seq_ = seq;
   this->tick_ms_ = tick_ms;
 
-  this->validate_(claim);
+  this->validate_();
 
   if ((int32_t) load != this->load_) {
     if (!capturing && !(this->load_ < 0 && load == 0)) {
@@ -805,7 +798,6 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
       this->load_sensor_->publish_state(load);
   }
   this->set_state_(ST_CHIP, this->chip_hex_());
-  this->set_state_(ST_CLAIM, std::to_string(claim));
   this->set_state_(ST_LOAD, std::to_string(load));
 
   /* Pass 2: records in order; RSSI is batched into one message at the end */
@@ -823,64 +815,43 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
   if (this->any_rssi_ || rssi_interval == 1) {
     J j;
     j.obj().k("t").raw(t).k("seq").i(seq).k("t_ms").i(t_ms).k("tick_ms").i(tick_ms).k("chan").i(chan);
-    j.k("load").i(load).k("chip").str(this->chip_hex_()).k("claim").i(claim).k("suspect").b(this->suspect_);
+    j.k("load").i(load).k("chip").str(this->chip_hex_()).k("suspect").b(this->suspect_);
     j.k("devs").raw("[" + this->rssi_ + "]").end_obj();
     this->hub_->publish(this->topic_("rssi"), j.s, false);
   }
 }
 
-/* Sector claim and expected chip, on every bucket */
-void Sector::validate_(uint32_t claim) {
-  uint8_t cond = 0;
-  if (claim == SECTOR_UNSET)
-    cond |= COND_UNSET;
-  else if (claim != this->pin_)
-    cond |= COND_SECTOR;
-  if (this->have_expected_ && memcmp(this->chip_, this->expected_, CHIP_ID_LEN) != 0)
-    cond |= COND_CHIP;
-  bool suspect = cond & (COND_SECTOR | COND_CHIP);
-
+/* Expected chip (optional, per sector), on every bucket. The sector itself is the RX pin. */
+void Sector::validate_() {
+  bool bad = this->have_expected_ && memcmp(this->chip_, this->expected_, CHIP_ID_LEN) != 0;
   uint32_t now = millis();
-  bool changed = cond != this->cond_ || (cond && claim != this->cond_claim_);
-  this->suspect_ = suspect;
-  if (changed) {
-    bool was = this->cond_ != 0;
-    this->cond_ = cond;
-    this->cond_claim_ = claim;
-    this->cond_ms_ = now;
-    if (cond) {
+  this->suspect_ = bad;
+  if (bad != this->chip_bad_) {
+    this->chip_bad_ = bad;
+    this->chip_bad_ms_ = now;
+    if (bad) {
       this->report_condition_();
-    } else if (was) {
+    } else {
       char t[24];
       this->hub_->now_json(t, sizeof(t));
-      this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_INFO, "SECTOR_OK", (int32_t) claim, this->pin_,
-                        0, "sector checks pass", t);
+      this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_INFO, "CHIP_OK", 0, this->pin_, 0,
+                        "expected chip " + this->chip_hex_() + " back", t);
     }
     if (this->mismatch_sensor_ != nullptr)
-      this->mismatch_sensor_->publish_state(suspect);
-  } else if (cond && now - this->cond_ms_ >= REPORT_MS) {
-    this->cond_ms_ = now;
+      this->mismatch_sensor_->publish_state(bad);
+  } else if (bad && now - this->chip_bad_ms_ >= REPORT_MS) {
+    this->chip_bad_ms_ = now;
     this->report_condition_();
   }
   if (this->mismatch_sensor_ != nullptr && !this->mismatch_sensor_->has_state())
-    this->mismatch_sensor_->publish_state(suspect);
+    this->mismatch_sensor_->publish_state(bad);
 }
 
 void Sector::report_condition_() {
   char t[24];
   this->hub_->now_json(t, sizeof(t));
-  char text[64];
-  if (this->cond_ & COND_SECTOR) {
-    snprintf(text, sizeof(text), "claims sector %" PRIu32 " on sector %u's pin", this->cond_claim_, this->pin_);
-    this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_ERROR, "SECTOR_MISMATCH",
-                      (int32_t) this->cond_claim_, this->pin_, 0, text, t);
-  }
-  if (this->cond_ & COND_CHIP)
-    this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_ERROR, "CHIP_MISMATCH", 0, this->pin_, 0,
-                      "expected chip " + to_hex(this->expected_, CHIP_ID_LEN), t);
-  if (this->cond_ & COND_UNSET)
-    this->hub_->event(this->pin_, this->chip_, false, CAT_GENERAL, SEV_WARN, "SECTOR_NOT_CONFIGURED", 255, this->pin_,
-                      0, "scanner sector not configured", t);
+  this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_ERROR, "CHIP_MISMATCH", 0, this->pin_, 0,
+                    "expected chip " + to_hex(this->expected_, CHIP_ID_LEN), t);
 }
 
 void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
@@ -1115,7 +1086,7 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
                                            "budget_pct"};
   J j;
   j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_).k("pin_sector").i(this->pin_);
-  j.k("claim").i(this->claim_).k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_);
+  j.k("suspect").b(this->suspect_).k("lost").i(this->lost_).k("bad").i(this->bad_);
   j.k("rx_overflow").i(this->rx_high_).k("version").str(version);
   for (int i = 0; i < 7; i++)
     j.k(FLAG_NAMES[i]).b(flags[i]);
@@ -1339,7 +1310,8 @@ void Sector::clear_retained() {
     this->hub_->publish(this->topic_(STATE_NAMES[i]), "", true);
     this->state_[i].clear();
   }
-  this->hub_->publish(this->topic_(LEGACY_STATE), "", true);
+  for (const char *legacy : LEGACY_STATES)
+    this->hub_->publish(this->topic_(legacy), "", true);
   this->hub_->publish(this->topic_("ignore"), this->ignore_json_, true);
   this->publish_online_(this->online());
   ESP_LOGI(TAG, "Sector %u: retained topics cleared", this->pin_);
@@ -1442,9 +1414,6 @@ bool Sector::command(const std::string &text) {
     ESP_LOGW(TAG, "Sector %u: no scanner chip seen yet, '%s' dropped", this->pin_, c.text.c_str());
     return false;
   }
-  if (c.action == ACT_SECTOR)
-    ESP_LOGW(TAG, "Sector %u: manual sector command: scanner %s will claim sector %" PRIu32, this->pin_,
-             this->chip_hex_().c_str(), c.arg);
   /* Settings sent by hand become what the gateway keeps applied (until it reboots) */
   if (c.action == ACT_PAYLOADS)
     this->desired_.payloads = c.arg;
@@ -1695,10 +1664,6 @@ void SectorScanner::on_all_command_(const std::string &payload) {
   std::string err;
   if (!parse_command(command_text(payload), c, err)) {
     ESP_LOGW(TAG, "all/cmd: %s", err.c_str());
-    return;
-  }
-  if (c.action == ACT_SECTOR) {
-    ESP_LOGW(TAG, "all/cmd: sector goes to one scanner only, send it on <sector>/cmd");
     return;
   }
   for (auto *s : this->sectors_) {

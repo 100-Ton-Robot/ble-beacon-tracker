@@ -10,6 +10,17 @@ when the image was built, where known.
 
 Needs scanner firmware **0.4.0 or later** (protocol 3): v2 and v1 frames are dropped as bad.
 
+- Removed (2026-11-11): the sector claim check, left over from before scanner 0.5.0 (which
+  stopped sending the claim, so an absent claim read as 0 and the sectors on pins 1 and 2 were
+  flagged `suspect` with a `SECTOR_MISMATCH` every minute). The RX pin is the sector. Gone:
+  `SECTOR_MISMATCH`, `SECTOR_NOT_CONFIGURED`, `claim` in the `rssi` and `status` JSON, the
+  retained `<sector>/claim` topic (its old value is cleared at connect) and the `sector`
+  command. A claim still sent by an older scanner is ignored.
+- Changed (2026-11-11): `SECTOR_OK` is now `CHIP_OK` (the expected chip is back), and the
+  binary sensors are "Sector N chip mismatch" (new Home Assistant entity IDs). Only
+  `expected_chip` sets them.
+- Fixed (2026-11-11): `tools/make_selftest.py` runs again; the self-test data is regenerated
+  from it and covers the retired claim field, `ignore list`, `debug` and `TxDrops`.
 - Changed (2026-11-02): reads protocol 3 (protobuf `Bucket` every 200 ms, CRC + COBS) with a
   small hand-written wire-format reader (`pb_wire.h`); unknown fields are skipped and unknown
   record kinds published as hex on `<sector>/raw/<n>`. UART RX buffers 4096 bytes.
@@ -81,9 +92,7 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   adverts. It uses what RSSI and payloads left of the budget, so it never trims RSSI.
 - Gateway: `<sector>/counters` now includes `ignored` (field 15, missing since 0.6.0) and
   `tx_1m_dropped`. `debug` commands on `<sector>/cmd` and `all/cmd`; `TxDrops` published on
-  `<sector>/debug/tx_1m`, retained state `<sector>/debug`. `make_selftest.py` no longer runs
-  (it still builds the retired `sector` command), so the expected counters message in
-  `selftest_data.h` was extended by hand; the self-test passes on a host build.
+  `<sector>/debug/tx_1m`, retained state `<sector>/debug`.
 - `decode_frames.py` builds the `debug` commands and shows `TxDrops` and `Status.debug`.
 - Not built or flashed yet: no image in `scanner_fw/release/`.
 

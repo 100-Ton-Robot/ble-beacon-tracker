@@ -23,7 +23,6 @@ namespace sector_scanner {
 static const size_t CHIP_ID_LEN = 8;
 static const size_t BUCKET_RAW_MAX = 3072;  /* largest bucket ~2.3 KB (PROTOCOL.md "Sizes") */
 static const size_t BUCKET_ENC_MAX = BUCKET_RAW_MAX + BUCKET_RAW_MAX / 254 + 1;
-static const uint32_t SECTOR_UNSET = 255;
 static const uint32_t REBOOT_ARG = 0xA5;
 
 /* Event.Category / Event.Severity numbers, shared by scanner and gateway events */
@@ -35,7 +34,7 @@ enum Action : uint8_t {
   ACT_LISTEN = 3,
   ACT_FLASH = 4,
   ACT_EXT_ANTENNA = 5,
-  ACT_SECTOR = 6,
+  /* 6 was sector (the scanner's sector claim), retired in scanner 0.5.0 */
   ACT_REBOOT = 7,
   ACT_PAYLOADS = 8,
   ACT_ACTIVE_SCAN = 9,
@@ -131,7 +130,7 @@ class Sector : public uart::UARTDevice {
  protected:
   bool decode_(const uint8_t *enc, size_t len, size_t &body);
   void bad_frame_(const char *why, size_t len);
-  void validate_(uint32_t claim);
+  void validate_();
   void report_condition_();
   void handle_record_(const uint8_t *p, size_t len, const char *t);
   void handle_status_(const uint8_t *p, size_t len, const char *t);
@@ -164,7 +163,6 @@ class Sector : public uart::UARTDevice {
   uint8_t raw_[BUCKET_RAW_MAX];
 
   /* Current bucket header (valid while its records are handled) */
-  uint32_t claim_{SECTOR_UNSET};
   uint32_t seq_{0};
   uint32_t tick_ms_{0};
   bool suspect_{false};
@@ -180,12 +178,11 @@ class Sector : public uart::UARTDevice {
   uint32_t last_bucket_ms_{0};
   int32_t load_{-1};
 
-  /* Chip and sector claim checks */
+  /* Chip checks: the RX pin is the sector, the chip shows a board swap */
   bool have_chip_{false};
   uint8_t chip_[CHIP_ID_LEN]{};
-  uint8_t cond_{0};  // COND_* bits
-  uint32_t cond_claim_{0};
-  uint32_t cond_ms_{0};
+  bool chip_bad_{false};  // not the expected chip
+  uint32_t chip_bad_ms_{0};
 
   /* Settings the scanner reported in its last status, and what it should have */
   Settings desired_;
