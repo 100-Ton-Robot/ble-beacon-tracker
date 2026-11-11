@@ -5,7 +5,8 @@ the RF switch and every 200 ms sends the gateway a protobuf bucket on the header
 address, and optionally each address's raw advert and scan response bytes, plus status, events
 (security ones included) and counters. A byte budget and a throttle keep it inside the line,
 shedding payloads before RSSI. The gateway sends commands back on the same UART: listen, flash
-mode, antenna, payloads, active scanning, intervals and budget. The stream is specified
+mode, antenna, payloads, active scanning, intervals, budget and the ignore list (addresses
+or address ranges whose adverts are dropped, saved in flash or until reboot). The stream is specified
 in [PROTOCOL.md](PROTOCOL.md) and [proto/bletracker.proto](proto/bletracker.proto). Each scanner's TX (D6) has its own gateway RX pin, which is how the gateway
 knows the sector (the scanner itself doesn't); the gateway's one TX drives all three scanners' RX (D7) through the bus board,
 so commands are addressed by chip ID. In flash mode the scanner takes signed firmware updates
@@ -211,6 +212,15 @@ What you see and type:
   the bench forces the throttle (load levels in the `[1s]` line and as events).
 - `filter C1:7D:2B:AC:03:BC`: track one device; prints `n`, mean, min and max RSSI each second.
   `filter off` to go back.
+- `ignore C1:7D:2B:AC:03:BC`: drop that address's adverts as they are heard (no RSSI, payloads
+  or console lines) until reboot; add `save` to keep the rule in flash. A range takes a prefix
+  or a mask, or `*` bytes: `ignore C1:7D:2B:*:*:*`, `ignore C1:7D:2B:00:00:00/24` and
+  `ignore C1:7D:2B:00:00:00/FF:FF:FF:00:00:00` are the same rule. Re-adding a rule with or
+  without `save` moves it into or out of flash. `ignore` lists the rules with their hits;
+  `unignore <rule as listed>` removes one, `ignore clear boot|saved|all` several, and
+  `ignore off` / `ignore on` pause and resume them (until reboot). Up to 32 rules; each change is
+  a security event, and the `[1s]` line shows `ignored=N` while there are rules. The gateway
+  sends the same words (`<sector>/cmd` or `all/cmd`), see [PROTOCOL.md](PROTOCOL.md).
 - `ant` / `ant int` / `ant ext`: show or switch antenna. The choice is saved in flash; a new
   board boots on `int` (onboard).
 - `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts,
@@ -248,7 +258,8 @@ it). Full spec: [PROTOCOL.md](PROTOCOL.md), schema: [proto/bletracker.proto](pro
   address (every tick: sum, count and max, so the mean is exact), and, once the gateway turns
   them on, changed advert / scan response bytes plus a refresh every 10 s.
 - Commands are protobuf too: listen, flash, antenna, reboot, payloads, active scanning,
-  intervals, budget. Each is acknowledged with an event in the next bucket.
+  intervals, budget, ignore / unignore / ignore clear. Each is acknowledged with an event in the
+  next bucket.
 
 The firmware builds its C code from the schema with nanopb (in NCS, `CONFIG_NANOPB`). For the
 Python tools, `tools/bletracker_pb2.py` is generated with the toolchain's protoc:

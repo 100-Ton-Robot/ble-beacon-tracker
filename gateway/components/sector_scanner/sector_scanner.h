@@ -41,7 +41,11 @@ enum Action : uint8_t {
   ACT_ACTIVE_SCAN = 9,
   ACT_INTERVALS = 10,
   ACT_BUDGET = 11,
+  ACT_IGNORE = 12,        // IgnoreRule; arg = save
+  ACT_UNIGNORE = 13,      // IgnoreRule
+  ACT_IGNORE_CLEAR = 14,  // arg = IgnoreClear: 1 until-reboot rules, 2 saved, 3 all
 };
+static const size_t ADDR_LEN = 6;
 
 /* Intervals in ticks, field order of bletracker.Intervals; 0 = unchanged in a command */
 struct Intervals {
@@ -62,6 +66,8 @@ struct Command {
   uint8_t action{0};
   uint32_t arg{0};
   Intervals intervals;
+  uint8_t addr[ADDR_LEN]{};  // ACT_IGNORE / ACT_UNIGNORE: masked address, printed order
+  uint8_t mask[ADDR_LEN]{};
   int8_t sector{-1};  // pin sector it came from; -1 = all/cmd or the gateway itself
   uint32_t seq{0};
   std::string text;

@@ -21,7 +21,9 @@ command; with --port it sends them on the adapter's TX:
     python decode_frames.py --cmd "ant ext" --id 1a2b3c4d5e6f7081 --port COM5
 Commands: listen on|off, flash on|off, ant int|ext, reboot,
           payloads on|off, active on|off, budget <10-90>,
-          intervals [rssi=N] [payload=N] [refresh=N] [status=N] [counters=N]   (ticks)
+          intervals [rssi=N] [payload=N] [refresh=N] [status=N] [counters=N]   (ticks),
+          ignore <addr>[/bits|/mask] [save], unignore <addr>[/bits|/mask],
+          ignore clear boot|saved|all       (addr bytes may be *: C1:7D:2B:*:*:*)
 --seq sets the command's seq (echoed in the scanner's CMD_OK / CMD_REJECTED event).
 """
 
@@ -90,6 +92,33 @@ def frame(payload: bytes) -> bytes:
     return cobs_encode(raw) + b"\x00"
 
 
+def parse_rule(text: str) -> tuple[bytes, bytes]:
+    """'C1:7D:2B:*:*:*', 'C1:7D:2B:00:00:00/24' or '<addr>/<mask>' -> (masked addr, mask),
+    the same forms as the scanner's `ignore` command."""
+    def six(s: str) -> tuple[bytes, bytes]:
+        parts = s.split(":")
+        if len(parts) != 6:
+            raise ValueError(f"bad address {s!r}")
+        return (bytes(0 if p == "*" else int(p, 16) for p in parts),
+                bytes(0 if p == "*" else 0xFF for p in parts))
+    a_txt, _, m_txt = text.partition("/")
+    addr, mask = six(a_txt)
+    if m_txt:
+        if ":" in m_txt:
+            m2, wild = six(m_txt)
+            if wild != b"\xff" * 6:
+                raise ValueError("no * in a mask")
+        else:
+            bits = int(m_txt)
+            if not 1 <= bits <= 48:
+                raise ValueError("prefix must be 1-48 bits")
+            m2 = (((1 << bits) - 1) << (48 - bits)).to_bytes(6, "big")
+        mask = bytes(x & y for x, y in zip(mask, m2))
+    if not any(mask):
+        raise ValueError("a mask of all zeros would ignore everything")
+    return bytes(x & y for x, y in zip(addr, mask)), mask
+
+
 def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
     """'flash on' -> framed Command. chip_id empty or all zeros = every scanner."""
     if chip_id and len(chip_id) != CHIP_ID_LEN:
@@ -113,6 +142,18 @@ def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
         for a in args:
             key, val = a.split("=")
             setattr(c.intervals, key, int(val))
+    elif name == "ignore" and args and args[0] == "clear":
+        c.ignore_clear = {"boot": pb.IGNORE_CLEAR_TEMP, "saved": pb.IGNORE_CLEAR_SAVED,
+                          "all": pb.IGNORE_CLEAR_ALL}[args[1]]
+    elif name in ("ignore", "unignore"):
+        if not args or len(args) > 2 or (args[1:] and (name, args[1]) != ("ignore", "save")):
+            raise ValueError(f"usage: {name} <addr>[/bits|/mask]" + (" [save]" if name == "ignore" else ""))
+        a, m = parse_rule(args[0])
+        rule = getattr(c, name)
+        rule.addr = a
+        if m != b"\xff" * 6:
+            rule.mask = m
+        rule.save = args[1:] == ["save"]
     else:
         raise ValueError(f"unknown command {text!r}")
     return frame(c.SerializeToString())
@@ -167,6 +208,7 @@ def show(b: pb.Bucket) -> None:
                   f"flash={s.flash_mode} test_image={s.test_image} adverts={s.adverts} "
                   f"devices={s.devices} dropped={s.dropped} budget={s.budget_pct}% "
                   f"peak={s.line_peak_pct}% reasons={s.load_reasons} baud={s.baud} "
+                  f"ignore={s.ignore_rules}({s.ignore_saved} saved) ignored={s.ignored} "
                   f"intervals=({MessageToDict(s.intervals)})")
         elif k == "counters":
             print(f"  counters {MessageToDict(r.counters)}")

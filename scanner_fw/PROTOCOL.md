@@ -49,7 +49,8 @@ These are what make new fields and record kinds free to add without breaking old
 | `counters` | 50 ticks (10 s) | `Counters`. |
 | events | next tick | `Event`s are queued and sent in the next bucket, never held back. |
 
-Intervals, payload records on/off, active scanning and the budget are not saved: every boot
+Intervals, payload records on/off, active scanning and the budget are not saved (ignore rules
+can be, see "Ignore list"): every boot
 starts with the defaults (payloads off, passive), and the gateway sets what it wants again when
 it sees a scanner (for example after a `BOOT` event).
 
@@ -72,10 +73,12 @@ payloads (changed first, then refreshes).
   advertisers. They often carry the device name.
 - **`Status`**: firmware version, antenna, listening, active scanning, payloads on, flash mode,
   update client connected, test image, adverts / addresses / queue drops in the last second,
-  the throttle reasons and peak use since the last status, budget, intervals and baud rate.
+  the throttle reasons and peak use since the last status, budget, intervals and baud rate;
+  since 0.6.0 the ignore list's size (and how many saved) and adverts ignored in the last second.
 - **`Counters`**: totals since boot (buckets sent and skipped, commands ok / bad / for other
   scanners, D7 UART errors, payloads sent and held, RSSI records trimmed, payload table
-  evictions, events lost) plus `boots` and `flash_opens`, which are saved in flash.
+  evictions, events lost, adverts ignored) plus `boots` and `flash_opens`, which are saved in
+  flash.
 - **`Event`**: `category` (GENERAL, SECURITY, LOAD, COMMAND), `severity` (INFO, WARN, ERROR),
   `code`, `value`/`value2` (meaning per code, below), `cmd_seq` for command acks, and a short
   `text`. The scanner prints each one on its USB console too (`[SECURITY WARN] ...`).
@@ -91,7 +94,7 @@ payloads (changed first, then refreshes).
 | `FLASH_MODE_ON` | SECURITY, WARN | Source (0 console, 1 gateway, 2 test-image window), flash-mode open count |
 | `FLASH_MODE_OFF` | SECURITY, INFO | 0 command, 1 timeout |
 | `CLIENT_CONNECTED` / `CLIENT_DISCONNECTED` | SECURITY, WARN / INFO | –, HCI reason |
-| `SETTING_CHANGED` | SECURITY, INFO | Setting (2 antenna), new value, text = new value and source |
+| `SETTING_CHANGED` | SECURITY, INFO | Setting (2 antenna, 3 ignore list), new value (ignore list: rules listed), text = what changed and source |
 | `BAD_COMMANDS` | SECURITY, WARN | 3 or more bad command frames on D7 within 10 s: count |
 | `CMD_OK` / `CMD_REJECTED` | COMMAND, INFO / WARN | Command action field number, `cmd_seq` = the command's `seq` |
 | `LOAD_LEVEL` | LOAD, INFO (back to 0), WARN (1-3), ERROR (4) | new level, reasons |
@@ -143,6 +146,33 @@ value at boot. The chip ID in every bucket still lets the gateway notice a board
 | `active_scan` | bool | active scanning on/off |
 | `intervals` | `Intervals` | fields left at 0 are unchanged; `rssi` only to all scanners; limits: rssi/payload/status 1-50, refresh/counters 1-3000 |
 | `budget_pct` | 10-90 | |
+| `ignore` | `IgnoreRule` | add a rule, or change whether it is saved (0.6.0+, below) |
+| `unignore` | `IgnoreRule` | remove the rule with exactly this `addr` and `mask`; rejected if there is none |
+| `ignore_clear` | `IgnoreClear` 1-3 | remove the rules kept until reboot (1), the saved ones (2) or all (3) |
+
+### Ignore list (0.6.0+)
+
+Adverts from ignored addresses are dropped as the scanner hears them: no RSSI or payload records,
+no console lines, and they don't count in `adverts`, `devices` or the load. An `IgnoreRule` is
+`addr` (6 bytes, most significant first, as in `Rssi.addr`) and `mask` (6 bytes, same order;
+left out = all ones, this address only). An address matches when `(address & mask) == (addr &
+mask)`; public/random isn't compared. A mask of all zeros is rejected (that's `listen off`).
+
+- `save` true: kept in flash across reboots. False: kept until the next reboot. Sending a
+  saved rule again with `save` false removes it from flash but keeps it until reboot.
+- Up to 32 rules per scanner, saved and unsaved together; a 33rd is rejected.
+- Rules are per scanner: send to all (empty target) to apply them mast-wide.
+- Every change is a `SETTING_CHANGED` security event (`value` 3 = `IGNORE_LIST`, `value2` = rules
+  now listed, text = the rule and `saved`/`boot`, then `gw` or `usb`): a rule can hide a device.
+  Acks: `ignore added` / `changed` / `unchanged`, `unignored`, `ignore cleared`; `... NOT SAVED`
+  when the flash write failed (the change still holds until reboot).
+- `Status.ignore_rules`, `ignore_saved` and `ignored` (adverts dropped in the last second) and
+  `Counters.ignored` (since boot) show it working. The rules themselves are only listed on the
+  console (`ignore`).
+
+Text forms (console, `decode_frames.py --cmd`, gateway MQTT): `ignore <addr>[/<bits>|/<mask>]
+[save]`, `unignore <addr>[/<bits>|/<mask>]`, `ignore clear boot|saved|all`. Any address byte
+may be `*`: `C1:7D:2B:*:*:*` = `C1:7D:2B:00:00:00/24`.
 
 Every accepted command is answered with a `CMD_OK` event in the scanner's next bucket, every
 rejected one (bad argument, rssi interval to one scanner) with `CMD_REJECTED`.

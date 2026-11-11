@@ -77,6 +77,9 @@ message Status {
   uint32 budget_pct = 14;        // budget, % of the line's time per tick
   Intervals intervals = 15;
   uint32 baud = 16;
+  uint32 ignore_rules = 17;      // ignore list entries (saved + until reboot)
+  uint32 ignore_saved = 18;      // of which kept in flash
+  uint32 ignored = 19;           // adverts dropped by the ignore list, last second
 }
 
 // Service intervals in ticks. In a Command, a field left at 0 is unchanged.
@@ -118,7 +121,8 @@ message Event {
     FLASH_MODE_OFF = 6;          // value = 0 command, 1 timeout
     CLIENT_CONNECTED = 7;
     CLIENT_DISCONNECTED = 8;     // value = HCI reason
-    SETTING_CHANGED = 9;         // value = Setting, value2 = new value, text = source
+    SETTING_CHANGED = 9;         // value = Setting, value2 = new value (IGNORE_LIST: rule
+                                 //   count), text = what changed and source
     CMD_OK = 10;                 // value = Command action field number
     CMD_REJECTED = 11;           // value = action field number, text = why
     BAD_COMMANDS = 12;           // value = bad command frames in the last 10 s
@@ -137,6 +141,7 @@ message Event {
     reserved 1;                  // was SECTOR (dropped in 0.5.0)
     reserved "SECTOR";
     ANTENNA = 2;
+    IGNORE_LIST = 3;
   }
 }
 
@@ -156,6 +161,7 @@ message Counters {
   uint32 events_lost = 12;
   uint32 boots = 13;             // saved in flash
   uint32 flash_opens = 14;       // saved in flash
+  uint32 ignored = 15;           // adverts dropped by the ignore list
 }
 
 enum AdvType {
@@ -197,5 +203,24 @@ message Command {
     bool active_scan = 9;        // off after boot
     Intervals intervals = 10;    // not saved
     uint32 budget_pct = 11;      // 10-90, not saved
+    IgnoreRule ignore = 12;      // add (or update) a rule
+    IgnoreRule unignore = 13;    // remove the rule with this addr and mask (save unused)
+    IgnoreClear ignore_clear = 14;
   }
+}
+
+// Adverts from an address with (address & mask) == (addr & mask) are dropped as they are
+// heard: no RSSI, payload or console output. Address type (public/random) isn't compared.
+message IgnoreRule {
+  bytes addr = 1;                // 6 bytes, most significant first, as printed
+  bytes mask = 2;                // 6 bytes, same order; empty = all ones (this address only)
+  bool save = 3;                 // kept in flash; false = until reboot (a saved rule re-added
+                                 //   with false is removed from flash but stays until reboot)
+}
+
+enum IgnoreClear {
+  IGNORE_CLEAR_NONE = 0;         // rejected
+  IGNORE_CLEAR_TEMP = 1;         // rules kept until reboot
+  IGNORE_CLEAR_SAVED = 2;        // rules kept in flash
+  IGNORE_CLEAR_ALL = 3;
 }

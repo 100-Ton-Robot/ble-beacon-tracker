@@ -66,6 +66,21 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
+### 0.6.0 (2026-11-11, bench-tested on one board by USB)
+
+- Added: ignore list. Up to 32 rules, each an address plus a mask (prefix `/24`, a full mask,
+  or `*` bytes). Adverts that match are dropped in the scan callback, so they never reach
+  RSSI, payloads, the console or the load. Each rule is saved in flash or kept until reboot.
+  Console: `ignore`, `ignore <addr>[/bits|/mask] [save]`, `ignore clear boot|saved|all`,
+  `ignore off|on`, `unignore`. Gateway commands `ignore` / `unignore` / `ignore_clear`
+  (Command fields 12-14, `IgnoreRule`, `IgnoreClear`). Each change is a `SETTING_CHANGED`
+  security event (Setting 3 `IGNORE_LIST`). New fields: `Status.ignore_rules` /
+  `ignore_saved` / `ignored` and `Counters.ignored`.
+- Changed: Zephyr's shell wildcard is off (`CONFIG_SHELL_WILDCARD=n`). It swallowed arguments
+  containing `*`, so `ignore C1:7D:2B:*:*:*` never reached the command.
+- Gateway: parses and sends the new command words. It does not publish the new status or
+  counters fields yet (that waits for its 0.5.0 update, which regenerates the self-test).
+
 ### 0.5.0 (2026-11-10)
 
 - Removed: the sector claim. The scanner doesn't know its sector; the gateway RX pin its D6

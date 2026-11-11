@@ -18,6 +18,8 @@
  *   8. antenna choice kept in flash
  *   9. security events (flash mode, updates, resets, settings, bad commands) with
  *      boot and flash-mode counts kept in flash
+ *  10. ignore list: address/mask rules whose adverts are dropped as they are heard,
+ *      each saved in flash or kept until reboot (console or gateway command)
  *
  * Shell commands:
  *   status                 version, chip ID, antenna, listening, flash mode, stream
@@ -36,6 +38,10 @@
  *   minrssi <dBm>          hide devices whose median is below this in the list
  *   stream [dump]          bucket stats; dump = hex of the next bucket frame
  *   chan [auto|37|38|39|rot [s]]  primary channels scanned (bench test, not saved)
+ *   ignore [list]          ignore rules and their hits
+ *   ignore <addr>[/bits|/mask] [save]  ignore until reboot, or saved ("*" = any byte)
+ *   ignore clear boot|saved|all, ignore off|on (pause, until reboot)
+ *   unignore <addr>[/bits|/mask]|all   remove a rule
  */
 
 #include <stdarg.h>
@@ -384,12 +390,68 @@ static void event_post(bletracker_Event_Category cat, bletracker_Event_Severity 
 	event_post(bletracker_Event_Category_SECURITY, bletracker_Event_Severity_##sev, \
 		   bletracker_Event_Code_##code, v, v2, 0, __VA_ARGS__)
 
-/* Settings under "scanner/": ant (1 byte), boots, fopens (u32), ver (string).
- * A "sector" key left by 0.4.x is ignored and deleted at boot. */
+/*
+ * Ignore list: adverts from matching addresses are dropped in the scan callback, before
+ * they take queue space or main-thread time (no RSSI, payloads or console lines). A rule
+ * is an address and a mask, bytes in printed order (most significant first); it matches
+ * when (address & mask) == addr, addr being stored already masked. Address type isn't
+ * compared. Saved rules are kept in flash ("scanner/ign"), the others until reboot.
+ * Every change is a security event: a rule can hide a device from the tracker.
+ * ign[] is read in the BT RX thread under ign_lock; changes (shell thread, system
+ * workqueue) also hold ign_mutex so flash writes go out in order.
+ */
+#define IGNORE_MAX 32
+#define ADDR_LEN 6
+
+struct ignore_rule {
+	uint8_t addr[ADDR_LEN];
+	uint8_t mask[ADDR_LEN];
+	bool saved;
+	uint32_t hits;
+};
+
+/* What "scanner/ign" holds: the saved rules, one after another */
+struct ignore_flash {
+	uint8_t addr[ADDR_LEN];
+	uint8_t mask[ADDR_LEN];
+};
+
+static struct ignore_rule ign[IGNORE_MAX];
+static uint8_t n_ign;
+static bool ign_paused;		/* console `ignore off`: rules kept, not applied */
+static struct k_spinlock ign_lock;
+K_MUTEX_DEFINE(ign_mutex);
+static atomic_t ign_total;	/* adverts ignored since boot */
+static atomic_t ign_sec;	/* this second */
+static uint32_t last_ignored;	/* last whole second */
+
+/* Settings under "scanner/": ant (1 byte), boots, fopens (u32), ver (string), ign (saved
+ * ignore rules). A "sector" key left by 0.4.x is ignored and deleted at boot. */
 static int settings_set_cb(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
 {
 	uint8_t v;
 
+	if (strcmp(key, "ign") == 0) {
+		struct ignore_flash f[IGNORE_MAX];
+		size_t n = len / sizeof(f[0]);
+
+		if (len % sizeof(f[0]) != 0 || n > IGNORE_MAX || read_cb(cb_arg, f, len) != len) {
+			return -EINVAL;
+		}
+		/* Loaded once at boot, before scanning starts */
+		n_ign = 0;
+		for (size_t i = 0; i < n; i++) {
+			struct ignore_rule *r = &ign[n_ign++];
+
+			memset(r, 0, sizeof(*r));
+			memcpy(r->mask, f[i].mask, ADDR_LEN);
+			for (int b = 0; b < ADDR_LEN; b++) {
+				r->addr[b] = f[i].addr[b] & f[i].mask[b];
+			}
+			r->saved = true;
+		}
+		return 0;
+	}
 	if (strcmp(key, "boots") == 0 || strcmp(key, "fopens") == 0) {
 		uint32_t n;
 
@@ -416,6 +478,316 @@ static int settings_set_cb(const char *key, size_t len, settings_read_cb read_cb
 }
 
 SETTINGS_STATIC_HANDLER_DEFINE(scanner, "scanner", NULL, settings_set_cb, NULL, NULL);
+
+/* Scan callback (BT RX thread): true = drop this advert */
+static bool ignore_match(const bt_addr_t *a)
+{
+	k_spinlock_key_t key;
+	bool hit = false;
+
+	if (n_ign == 0 || ign_paused) {
+		return false;
+	}
+	key = k_spin_lock(&ign_lock);
+	for (uint8_t i = 0; i < n_ign && !hit; i++) {
+		struct ignore_rule *r = &ign[i];
+
+		hit = true;
+		for (int b = 0; b < ADDR_LEN; b++) {
+			if ((a->val[ADDR_LEN - 1 - b] & r->mask[b]) != r->addr[b]) {
+				hit = false;
+				break;
+			}
+		}
+		if (hit) {
+			r->hits++;
+		}
+	}
+	k_spin_unlock(&ign_lock, key);
+	if (hit) {
+		atomic_inc(&ign_total);
+		atomic_inc(&ign_sec);
+	}
+	return hit;
+}
+
+/* Prefix length if the mask is one (ones then zeros), else -1 */
+static int mask_prefix(const uint8_t mask[ADDR_LEN])
+{
+	int bits = 0;
+
+	for (int b = 0; b < ADDR_LEN; b++) {
+		for (int k = 7; k >= 0; k--) {
+			if (!(mask[b] & BIT(k))) {
+				goto zeros;
+			}
+			bits++;
+		}
+	}
+	return bits;
+zeros:
+	for (int i = bits; i < 8 * ADDR_LEN; i++) {
+		if (mask[i / 8] & BIT(7 - i % 8)) {
+			return -1;
+		}
+	}
+	return bits;
+}
+
+/* "C1:7D:2B:AC:03:BC", "C1:7D:2B:00:00:00/24" or "C1:7D:00:AC:00:00/FF:FF:00:FF:00:00" */
+static void ignore_fmt(char *buf, size_t size, const uint8_t addr[ADDR_LEN],
+		       const uint8_t mask[ADDR_LEN])
+{
+	int bits = mask_prefix(mask);
+	int n = snprintk(buf, size, "%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1], addr[2],
+			 addr[3], addr[4], addr[5]);
+
+	if (bits == 8 * ADDR_LEN) {
+		return;
+	}
+	if (bits >= 0) {
+		snprintk(buf + n, size - n, "/%d", bits);
+	} else {
+		snprintk(buf + n, size - n, "/%02X:%02X:%02X:%02X:%02X:%02X", mask[0], mask[1],
+			 mask[2], mask[3], mask[4], mask[5]);
+	}
+}
+
+/* 6 bytes "AA:BB:...", any byte may be "*" (mask byte 0); end of the parsed text or NULL */
+static const char *addr6_parse(const char *s, uint8_t v[ADDR_LEN], uint8_t m[ADDR_LEN])
+{
+	for (int b = 0; b < ADDR_LEN; b++) {
+		if (*s == '*') {
+			v[b] = 0;
+			m[b] = 0;
+			s++;
+		} else if (hex2bin(s, 2, &v[b], 1) == 1) {
+			m[b] = 0xff;
+			s += 2;
+		} else {
+			return NULL;
+		}
+		if (b < ADDR_LEN - 1 && *s++ != ':') {
+			return NULL;
+		}
+	}
+	return s;
+}
+
+/* Console rule: <addr>[/<bits 1-48>|/<mask>], "*" bytes allowed; false if malformed or the
+ * mask is all zeros (that would ignore everything: use `scan off`) */
+static bool ignore_parse(const char *s, uint8_t addr[ADDR_LEN], uint8_t mask[ADDR_LEN])
+{
+	const char *end = addr6_parse(s, addr, mask);
+	bool any = false;
+
+	if (end == NULL || (*end != '\0' && *end != '/')) {
+		return false;
+	}
+	if (*end == '/') {
+		const char *m = end + 1;
+		uint8_t m2[ADDR_LEN];
+		uint8_t wild[ADDR_LEN];
+
+		if (strchr(m, ':') != NULL) {
+			end = addr6_parse(m, m2, wild);
+			if (end == NULL || *end != '\0' || memchr(wild, 0, ADDR_LEN) != NULL) {
+				return false;
+			}
+		} else {
+			char *e;
+			long bits = strtol(m, &e, 10);
+
+			if (e == m || *e != '\0' || bits < 1 || bits > 8 * ADDR_LEN) {
+				return false;
+			}
+			for (int b = 0; b < ADDR_LEN; b++) {
+				long n = CLAMP(bits - 8 * b, 0, 8);
+
+				m2[b] = (uint8_t)(0xff00 >> n);
+			}
+		}
+		for (int b = 0; b < ADDR_LEN; b++) {
+			mask[b] &= m2[b];
+		}
+	}
+	for (int b = 0; b < ADDR_LEN; b++) {
+		addr[b] &= mask[b];
+		any |= mask[b] != 0;
+	}
+	return any;
+}
+
+static int ignore_find(const uint8_t addr[ADDR_LEN], const uint8_t mask[ADDR_LEN])
+{
+	for (uint8_t i = 0; i < n_ign; i++) {
+		if (memcmp(ign[i].addr, addr, ADDR_LEN) == 0 &&
+		    memcmp(ign[i].mask, mask, ADDR_LEN) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* Saved rules to flash; call with ign_mutex held (it guards f, kept off the work queue's
+ * stack) */
+static int ignore_store(void)
+{
+	static struct ignore_flash f[IGNORE_MAX];
+	size_t n = 0;
+	k_spinlock_key_t key = k_spin_lock(&ign_lock);
+
+	for (uint8_t i = 0; i < n_ign; i++) {
+		if (ign[i].saved) {
+			memcpy(f[n].addr, ign[i].addr, ADDR_LEN);
+			memcpy(f[n].mask, ign[i].mask, ADDR_LEN);
+			n++;
+		}
+	}
+	k_spin_unlock(&ign_lock, key);
+	return n ? settings_save_one("scanner/ign", f, n * sizeof(f[0])) :
+		   settings_delete("scanner/ign");
+}
+
+static const char *src_short(bletracker_Event_Source src)
+{
+	/* Event text is 39 characters at most: keep it short */
+	return src == bletracker_Event_Source_GATEWAY ? "gw" : "usb";
+}
+
+enum ignore_result {
+	IGN_ADDED,	/* new rule */
+	IGN_CHANGED,	/* existing rule, now saved / no longer saved */
+	IGN_SAME,	/* already there as asked */
+	IGN_FULL,
+	IGN_FLASH_ERR,	/* in the list, but saving to flash failed (kept until reboot) */
+};
+
+/* Add a rule, or change whether an existing one is saved (save false: until reboot) */
+static enum ignore_result ignore_add(const uint8_t addr[ADDR_LEN], const uint8_t mask[ADDR_LEN],
+				     bool save, bletracker_Event_Source src)
+{
+	enum ignore_result res;
+	char str[48];
+	k_spinlock_key_t key;
+	int i;
+
+	k_mutex_lock(&ign_mutex, K_FOREVER);
+	key = k_spin_lock(&ign_lock);
+	i = ignore_find(addr, mask);
+	if (i < 0 && n_ign == IGNORE_MAX) {
+		k_spin_unlock(&ign_lock, key);
+		k_mutex_unlock(&ign_mutex);
+		return IGN_FULL;
+	}
+	if (i < 0) {
+		i = n_ign;
+		memset(&ign[i], 0, sizeof(ign[i]));
+		memcpy(ign[i].addr, addr, ADDR_LEN);
+		memcpy(ign[i].mask, mask, ADDR_LEN);
+		ign[i].saved = save;
+		n_ign++;
+		res = IGN_ADDED;
+	} else {
+		res = ign[i].saved == save ? IGN_SAME : IGN_CHANGED;
+		ign[i].saved = save;
+	}
+	k_spin_unlock(&ign_lock, key);
+
+	if ((res == IGN_ADDED && save) || res == IGN_CHANGED) {
+		if (ignore_store() != 0) {
+			ign[i].saved = false;
+			res = IGN_FLASH_ERR;
+		}
+	}
+	if (res != IGN_SAME) {
+		ignore_fmt(str, sizeof(str), addr, mask);
+		SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
+			       "ignore %s %s %s", str, ign[i].saved ? "saved" : "boot", src_short(src));
+	}
+	k_mutex_unlock(&ign_mutex);
+	return res;
+}
+
+/* Remove one rule (exact addr and mask); -ENOENT if not listed, -EIO if flash failed */
+static int ignore_del(const uint8_t addr[ADDR_LEN], const uint8_t mask[ADDR_LEN],
+		      bletracker_Event_Source src)
+{
+	char str[48];
+	k_spinlock_key_t key;
+	bool was_saved;
+	int err = 0;
+	int i;
+
+	k_mutex_lock(&ign_mutex, K_FOREVER);
+	key = k_spin_lock(&ign_lock);
+	i = ignore_find(addr, mask);
+	if (i < 0) {
+		k_spin_unlock(&ign_lock, key);
+		k_mutex_unlock(&ign_mutex);
+		return -ENOENT;
+	}
+	was_saved = ign[i].saved;
+	ign[i] = ign[--n_ign];
+	k_spin_unlock(&ign_lock, key);
+
+	if (was_saved) {
+		err = ignore_store() ? -EIO : 0;
+	}
+	ignore_fmt(str, sizeof(str), addr, mask);
+	SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
+		       "unignore %s %s", str, src_short(src));
+	k_mutex_unlock(&ign_mutex);
+	return err;
+}
+
+/* Remove the rules kept until reboot, the saved ones, or all; how many went (-EIO: flash) */
+static int ignore_clear(bletracker_IgnoreClear which, bletracker_Event_Source src)
+{
+	static const char *const names[] = { "", "boot", "saved", "all" };
+	bool drop_temp = which == bletracker_IgnoreClear_IGNORE_CLEAR_TEMP ||
+			 which == bletracker_IgnoreClear_IGNORE_CLEAR_ALL;
+	bool drop_saved = which == bletracker_IgnoreClear_IGNORE_CLEAR_SAVED ||
+			  which == bletracker_IgnoreClear_IGNORE_CLEAR_ALL;
+	k_spinlock_key_t key;
+	uint8_t kept = 0;
+	int removed;
+	bool saved_gone = false;
+
+	k_mutex_lock(&ign_mutex, K_FOREVER);
+	key = k_spin_lock(&ign_lock);
+	for (uint8_t i = 0; i < n_ign; i++) {
+		if (ign[i].saved ? drop_saved : drop_temp) {
+			saved_gone |= ign[i].saved;
+		} else {
+			ign[kept++] = ign[i];
+		}
+	}
+	removed = n_ign - kept;
+	n_ign = kept;
+	k_spin_unlock(&ign_lock, key);
+
+	if (removed != 0) {
+		SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
+			       "ignore clear %s: %d gone %s", names[which], removed,
+			       src_short(src));
+	}
+	if (saved_gone && ignore_store() != 0) {
+		removed = -EIO;
+	}
+	k_mutex_unlock(&ign_mutex);
+	return removed;
+}
+
+static uint8_t ignore_saved_count(void)
+{
+	uint8_t n = 0;
+
+	for (uint8_t i = 0; i < n_ign; i++) {
+		n += ign[i].saved;
+	}
+	return n;
+}
 
 static void antenna_select(bool external)
 {
@@ -492,6 +864,9 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	struct adv_evt evt = { .rssi = rssi, .type = adv_type, .tx_1m = TX_UNKNOWN };
 
 	if (filter_on && !bt_addr_eq(&addr->a, &filter_addr)) {
+		return;
+	}
+	if (ignore_match(&addr->a)) {
 		return;
 	}
 	bt_addr_le_copy(&evt.addr, addr);
@@ -973,12 +1348,63 @@ static int cobs_decode(const uint8_t *in, size_t len, uint8_t *out, size_t out_m
 	return o;
 }
 
+/* IgnoreRule -> masked addr and mask; false if malformed or the mask is all zeros */
+static bool ignore_from_pb(const bletracker_IgnoreRule *r, uint8_t addr[ADDR_LEN],
+			   uint8_t mask[ADDR_LEN])
+{
+	bool any = false;
+
+	if (r->addr.size != ADDR_LEN || (r->mask.size != 0 && r->mask.size != ADDR_LEN)) {
+		return false;
+	}
+	for (int b = 0; b < ADDR_LEN; b++) {
+		mask[b] = r->mask.size ? r->mask.bytes[b] : 0xff;
+		addr[b] = r->addr.bytes[b] & mask[b];
+		any |= mask[b] != 0;
+	}
+	return any;
+}
+
 /* NULL = rejected (argument out of range); else what was done, for the ack */
 static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 {
 	const bletracker_Event_Source gw = bletracker_Event_Source_GATEWAY;
+	uint8_t addr[ADDR_LEN];
+	uint8_t mask[ADDR_LEN];
 
 	switch (c->which_action) {
+	case bletracker_Command_ignore_tag: {
+		static const char *const done[] = {
+			[IGN_ADDED] = "ignore added", [IGN_CHANGED] = "ignore changed",
+			[IGN_SAME] = "ignore unchanged", [IGN_FLASH_ERR] = "ignore NOT SAVED",
+		};
+		enum ignore_result res;
+
+		if (!ignore_from_pb(&c->action.ignore, addr, mask)) {
+			return NULL;
+		}
+		res = ignore_add(addr, mask, c->action.ignore.save, gw);
+		return res == IGN_FULL ? NULL : done[res];
+	}
+	case bletracker_Command_unignore_tag: {
+		int err;
+
+		if (!ignore_from_pb(&c->action.unignore, addr, mask)) {
+			return NULL;
+		}
+		err = ignore_del(addr, mask, gw);
+		return err == -ENOENT ? NULL : err ? "unignore NOT SAVED" : "unignored";
+	}
+	case bletracker_Command_ignore_clear_tag: {
+		int n;
+
+		if (c->action.ignore_clear < bletracker_IgnoreClear_IGNORE_CLEAR_TEMP ||
+		    c->action.ignore_clear > bletracker_IgnoreClear_IGNORE_CLEAR_ALL) {
+			return NULL;
+		}
+		n = ignore_clear(c->action.ignore_clear, gw);
+		return n < 0 ? "ignore clear NOT SAVED" : "ignore cleared";
+	}
 	case bletracker_Command_listen_tag:
 		return listen_set(c->action.listen) ? "listen FAILED" :
 		       (c->action.listen ? "listen on" : "listen off");
@@ -1141,6 +1567,9 @@ static void status_fill(bletracker_Status *st)
 	st->has_intervals = true;
 	st->intervals = intervals;
 	st->baud = uart_baud;
+	st->ignore_rules = n_ign;
+	st->ignore_saved = ignore_saved_count();
+	st->ignored = last_ignored;
 }
 
 static void counters_fill(bletracker_Counters *c)
@@ -1159,6 +1588,7 @@ static void counters_fill(bletracker_Counters *c)
 	c->events_lost = atomic_get(&events_lost);
 	c->boots = boot_count;
 	c->flash_opens = flash_opens;
+	c->ignored = atomic_get(&ign_total);
 }
 
 /* RSSI records strongest mean first; true if any were left out */
@@ -1547,6 +1977,7 @@ static void report_second(void)
 	last_adverts = sec_total;
 	last_dropped = drops;
 	last_devices = n_devs;
+	last_ignored = (uint32_t)atomic_set(&ign_sec, 0);
 	if (drops) {
 		load_reasons |= bletracker_LoadReason_LOAD_QUEUE;
 		/* Payload handling costs main-thread time: shed it */
@@ -1568,6 +1999,7 @@ static void report_second(void)
 		list_print();
 	} else if (!print_raw) {
 		char ch[24];
+		char ig[24] = "";
 		int len = chan_now ? snprintk(ch, sizeof(ch), "%u", chan_now)
 				   : snprintk(ch, sizeof(ch), "all");
 
@@ -1575,9 +2007,13 @@ static void report_second(void)
 		if (chan_gap_us) {
 			snprintk(ch + len, sizeof(ch) - len, " switch=%uus", chan_gap_us);
 		}
-		printk("[1s] ant=%s ch=%s adverts=%u devices=%u dropped=%u load=%u%s%s\n", ant, ch,
-		       sec_total, n_devs, drops, load_level, scanning ? "" : " (listening off)",
-		       flash_mode ? " (flash mode)" : "");
+		if (n_ign) {
+			snprintk(ig, sizeof(ig), ign_paused ? " ignored=off" : " ignored=%u",
+				 last_ignored);
+		}
+		printk("[1s] ant=%s ch=%s adverts=%u devices=%u dropped=%u%s load=%u%s%s\n", ant,
+		       ch, sec_total, n_devs, drops, ig, load_level,
+		       scanning ? "" : " (listening off)", flash_mode ? " (flash mode)" : "");
 	}
 	chan_gap_us = 0;
 	chan_tick();
@@ -1648,7 +2084,140 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 		    (unsigned)atomic_get(&cmds_other));
 	shell_print(sh, "D7 line: %u bytes received, %u UART errors",
 		    (unsigned)atomic_get(&cmd_rx_bytes), (unsigned)atomic_get(&cmd_rx_errors));
+	shell_print(sh, "ignore list: %u rules (%u saved)%s, %u adverts ignored", n_ign,
+		    ignore_saved_count(), ign_paused ? ", PAUSED" : "",
+		    (unsigned)atomic_get(&ign_total));
 	return 0;
+}
+
+static void ignore_list(const struct shell *sh)
+{
+	shell_print(sh, "%u of %u rules (%u saved), %s, %u adverts ignored since boot", n_ign,
+		    IGNORE_MAX, ignore_saved_count(), ign_paused ? "PAUSED (ignore on)" : "on",
+		    (unsigned)atomic_get(&ign_total));
+	/* One rule at a time off the shell's stack; a change meanwhile may skip or repeat one */
+	for (uint8_t i = 0;; i++) {
+		struct ignore_rule r;
+		k_spinlock_key_t key = k_spin_lock(&ign_lock);
+		bool more = i < n_ign;
+		char str[48];
+
+		if (more) {
+			r = ign[i];
+		}
+		k_spin_unlock(&ign_lock, key);
+		if (!more) {
+			break;
+		}
+		ignore_fmt(str, sizeof(str), r.addr, r.mask);
+		shell_print(sh, "  %-36s %-12s %u hits", str, r.saved ? "saved" : "until reboot",
+			    r.hits);
+	}
+}
+
+static const char ignore_usage[] =
+	"ignore [list]                      show the rules\n"
+	"ignore <addr>[/bits|/mask] [save]  ignore until reboot, or saved in flash\n"
+	"                                   (* for any byte: C1:7D:2B:*:*:*)\n"
+	"ignore clear boot|saved|all        remove rules\n"
+	"ignore off|on                      pause / resume (until reboot)\n"
+	"unignore <addr>[/bits|/mask]|all   remove one rule (as listed) or all";
+
+static int cmd_ignore(const struct shell *sh, size_t argc, char **argv)
+{
+	const bletracker_Event_Source con = bletracker_Event_Source_CONSOLE;
+	uint8_t addr[ADDR_LEN];
+	uint8_t mask[ADDR_LEN];
+	char str[48];
+
+	if (argc == 1 || (argc == 2 && strcmp(argv[1], "list") == 0)) {
+		ignore_list(sh);
+		return 0;
+	}
+	if (argc == 2 && (strcmp(argv[1], "on") == 0 || strcmp(argv[1], "off") == 0)) {
+		ign_paused = argv[1][1] == 'f';
+		shell_print(sh, "ignore list %s", ign_paused ? "paused until `ignore on` or reboot" :
+			    "on");
+		return 0;
+	}
+	if (argc == 3 && strcmp(argv[1], "clear") == 0) {
+		static const char *const kinds[] = { "", "boot", "saved", "all" };
+		int n;
+
+		for (size_t k = 1; k < ARRAY_SIZE(kinds); k++) {
+			if (strcmp(argv[2], kinds[k]) == 0) {
+				n = ignore_clear((bletracker_IgnoreClear)k, con);
+				if (n < 0) {
+					shell_error(sh, "flash write failed");
+					return n;
+				}
+				shell_print(sh, "%d rules removed, %u left", n, n_ign);
+				return 0;
+			}
+		}
+	}
+	if ((argc == 2 || (argc == 3 && strcmp(argv[2], "save") == 0)) &&
+	    ignore_parse(argv[1], addr, mask)) {
+		bool save = argc == 3;
+
+		ignore_fmt(str, sizeof(str), addr, mask);
+		switch (ignore_add(addr, mask, save, con)) {
+		case IGN_FULL:
+			shell_error(sh, "list full (%u rules): unignore one first", IGNORE_MAX);
+			return -ENOMEM;
+		case IGN_FLASH_ERR:
+			shell_error(sh, "%s ignored, but the flash write failed: until reboot only",
+				    str);
+			return -EIO;
+		case IGN_SAME:
+			shell_print(sh, "%s already ignored %s", str,
+				    save ? "(saved)" : "until reboot");
+			return 0;
+		case IGN_CHANGED:
+			shell_print(sh, "%s now %s", str,
+				    save ? "saved" : "until reboot (removed from flash)");
+			return 0;
+		default:
+			shell_print(sh, "%s ignored %s", str, save ? "(saved)" : "until reboot");
+			return 0;
+		}
+	}
+	shell_error(sh, "usage:\n%s", ignore_usage);
+	return -EINVAL;
+}
+
+static int cmd_unignore(const struct shell *sh, size_t argc, char **argv)
+{
+	uint8_t addr[ADDR_LEN];
+	uint8_t mask[ADDR_LEN];
+	char str[48];
+	int err;
+
+	if (strcmp(argv[1], "all") == 0) {
+		err = ignore_clear(bletracker_IgnoreClear_IGNORE_CLEAR_ALL,
+				   bletracker_Event_Source_CONSOLE);
+		if (err < 0) {
+			shell_error(sh, "flash write failed");
+			return err;
+		}
+		shell_print(sh, "%d rules removed", err);
+		return 0;
+	}
+	if (!ignore_parse(argv[1], addr, mask)) {
+		shell_error(sh, "usage: unignore <addr>[/bits|/mask] | all");
+		return -EINVAL;
+	}
+	ignore_fmt(str, sizeof(str), addr, mask);
+	err = ignore_del(addr, mask, bletracker_Event_Source_CONSOLE);
+	if (err == -ENOENT) {
+		shell_error(sh, "%s is not a rule (`ignore` lists them; the mask must match too)",
+			    str);
+	} else if (err) {
+		shell_error(sh, "%s removed, but the flash write failed: back after a reboot", str);
+	} else {
+		shell_print(sh, "%s no longer ignored", str);
+	}
+	return err;
 }
 
 static int cmd_cmdlog(const struct shell *sh, size_t argc, char **argv)
@@ -1943,6 +2512,9 @@ SHELL_CMD_ARG_REGISTER(minrssi, NULL, "Hide weaker devices in the list: minrssi 
 SHELL_CMD_ARG_REGISTER(ant, NULL, "Show or set antenna: ant [int|ext]", cmd_ant, 1, 1);
 SHELL_CMD_ARG_REGISTER(filter, NULL, "Track one address: filter <addr>|off", cmd_filter, 2, 0);
 SHELL_CMD_ARG_REGISTER(print, NULL, "Raw advert lines: print on|off", cmd_print, 2, 0);
+SHELL_CMD_ARG_REGISTER(ignore, NULL, ignore_usage, cmd_ignore, 1, 2);
+SHELL_CMD_ARG_REGISTER(unignore, NULL, "Remove an ignore rule: unignore <addr>[/bits|/mask]|all",
+		       cmd_unignore, 2, 0);
 
 int main(void)
 {

@@ -357,6 +357,58 @@ static std::string command_text(const std::string &payload) {
   return e == std::string::npos ? "" : trim_lower(p.substr(q + 1, e - q - 1));
 }
 
+/* "aa:bb:cc:dd:ee:ff" with any byte "*" (mask byte 0); end of the parsed text or npos */
+static size_t parse_addr6(const std::string &s, size_t i, uint8_t *v, uint8_t *m) {
+  for (size_t b = 0; b < ADDR_LEN; b++) {
+    if (i < s.size() && s[i] == '*') {
+      v[b] = 0, m[b] = 0, i++;
+    } else if (i + 1 < s.size() && isxdigit((unsigned char) s[i]) && isxdigit((unsigned char) s[i + 1])) {
+      v[b] = (uint8_t) strtoul(s.substr(i, 2).c_str(), nullptr, 16), m[b] = 0xff, i += 2;
+    } else {
+      return std::string::npos;
+    }
+    if (b < ADDR_LEN - 1 && (i >= s.size() || s[i++] != ':'))
+      return std::string::npos;
+  }
+  return i;
+}
+
+/* Ignore rule, the same forms as the scanner's console: <addr>[/<bits 1-48>|/<mask>], "*" bytes.
+ * addr comes back masked; false if malformed or the mask is all zeros. */
+static bool parse_rule(const std::string &s, uint8_t *addr, uint8_t *mask) {
+  size_t i = parse_addr6(s, 0, addr, mask);
+  if (i == std::string::npos || (i < s.size() && s[i] != '/'))
+    return false;
+  if (i < s.size()) {
+    std::string m = s.substr(i + 1);
+    uint8_t m2[ADDR_LEN], wild[ADDR_LEN];
+    if (m.find(':') != std::string::npos) {
+      if (parse_addr6(m, 0, m2, wild) != m.size())
+        return false;
+      for (uint8_t x : wild)
+        if (x == 0)
+          return false;
+    } else {
+      uint32_t bits;
+      if (!parse_uint(m, bits) || bits < 1 || bits > 8 * ADDR_LEN)
+        return false;
+      for (size_t b = 0; b < ADDR_LEN; b++) {
+        int n = (int) bits - 8 * (int) b;
+        n = n < 0 ? 0 : n > 8 ? 8 : n;
+        m2[b] = (uint8_t) (0xff00 >> n);
+      }
+    }
+    for (size_t b = 0; b < ADDR_LEN; b++)
+      mask[b] &= m2[b];
+  }
+  bool any = false;
+  for (size_t b = 0; b < ADDR_LEN; b++) {
+    addr[b] &= mask[b];
+    any |= mask[b] != 0;
+  }
+  return any;
+}
+
 bool parse_command(const std::string &text, Command &c, std::string &err) {
   std::vector<std::string> w;
   std::string cur;
@@ -422,6 +474,29 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     c.arg = v;
     return true;
   }
+  if (name == "ignore" && w.size() == 3 && arg == "clear") {
+    static const char *const KINDS[] = {"boot", "saved", "all"};
+    for (uint32_t k = 0; k < 3; k++)
+      if (w[2] == KINDS[k]) {
+        c.action = ACT_IGNORE_CLEAR;
+        c.arg = k + 1;
+        return true;
+      }
+    err = "ignore clear needs boot, saved or all";
+    return false;
+  }
+  if (name == "ignore" || name == "unignore") {
+    bool ignore = name == "ignore";
+    if (w.size() < 2 || w.size() > (ignore ? 3u : 2u) || (w.size() == 3 && w[2] != "save") ||
+        !parse_rule(arg, c.addr, c.mask)) {
+      err = ignore ? "ignore takes <addr>[/bits|/mask] [save] (* for any byte), or clear boot|saved|all"
+                   : "unignore takes <addr>[/bits|/mask], as the scanner lists it";
+      return false;
+    }
+    c.action = ignore ? ACT_IGNORE : ACT_UNIGNORE;
+    c.arg = w.size() == 3;
+    return true;
+  }
   if (name == "intervals" && w.size() > 1) {
     c.action = ACT_INTERVALS;
     c.intervals = Intervals{};
@@ -474,6 +549,20 @@ std::string encode_command(const Command &c) {
       w.message(ACT_INTERVALS, sub);
       break;
     }
+    case ACT_IGNORE:
+    case ACT_UNIGNORE: {
+      pb::Writer sub;
+      bool exact = true;
+      for (uint8_t m : c.mask)
+        exact &= m == 0xff;
+      sub.bytes(1, c.addr, ADDR_LEN);
+      if (!exact)
+        sub.bytes(2, c.mask, ADDR_LEN); /* left out = this address only */
+      if (c.action == ACT_IGNORE && c.arg)
+        sub.boolean(3, true);
+      w.message(c.action, sub);
+      break;
+    }
     default:
       w.u32(c.action, c.arg);
   }
@@ -487,7 +576,8 @@ std::string encode_command(const Command &c) {
 
 static bool same_command(const Command &a, const Command &b) {
   return a.all == b.all && (a.all || memcmp(a.target, b.target, CHIP_ID_LEN) == 0) && a.action == b.action &&
-         a.arg == b.arg && memcmp(a.intervals.v, b.intervals.v, sizeof(a.intervals.v)) == 0;
+         a.arg == b.arg && memcmp(a.intervals.v, b.intervals.v, sizeof(a.intervals.v)) == 0 &&
+         memcmp(a.addr, b.addr, ADDR_LEN) == 0 && memcmp(a.mask, b.mask, ADDR_LEN) == 0;
 }
 
 /* ---------------------------------------------------------------- Sector */

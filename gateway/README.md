@@ -255,6 +255,9 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `budget <10-90>` | the scanner's byte budget, % of the line per tick |
 | `intervals rssi=N payload=N refresh=N status=N counters=N` | any subset; `rssi` only on `all/cmd` |
 | `sector <0-254>` | only on `<sector>/cmd`, a deliberate manual fix: that scanner saves the new claim |
+| `ignore <addr>[/bits\|/mask] [save]` | scanner 0.6.0+: drop that address (or range; `*` bytes allowed, e.g. `c1:7d:2b:*:*:*`) until the scanner reboots, or with `save` for good; use `all/cmd` for the whole mast |
+| `unignore <addr>[/bits\|/mask]` | remove that rule (same address and mask) |
+| `ignore clear boot` / `saved` / `all` | remove the rules kept until reboot / the saved ones / all of them |
 
 Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
 event (on `events`). One command is on the wire at a time; the next goes after the ack, or
