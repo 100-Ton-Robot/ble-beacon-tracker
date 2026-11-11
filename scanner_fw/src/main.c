@@ -657,7 +657,7 @@ static int ignore_store(void)
 
 static const char *src_short(bletracker_Event_Source src)
 {
-	/* Event text is 39 characters at most: keep it short */
+	/* Event text is 63 characters at most: keep it short */
 	return src == bletracker_Event_Source_GATEWAY ? "gw" : "usb";
 }
 

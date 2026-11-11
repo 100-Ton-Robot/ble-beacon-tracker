@@ -6,7 +6,7 @@ bletracker.Rssi.addr          max_size:6 fixed_length:true
 bletracker.Payload.addr       max_size:6 fixed_length:true
 bletracker.Payload.data       max_size:31
 bletracker.Status.version     max_size:24
-bletracker.Event.text         max_size:40
+bletracker.Event.text         max_size:64
 bletracker.Command.target     max_size:8
 bletracker.IgnoreRule.addr    max_size:6
 bletracker.IgnoreRule.mask    max_size:6
