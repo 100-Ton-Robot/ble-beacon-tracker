@@ -19,7 +19,7 @@ section).
 | # | Gap | Status | Date |
 | --- | --- | --- | --- |
 | 1 | MCUboot accepts older signed images (no downgrade prevention) | Accepted | 2026-11-11 |
-| 2 | Gateway -> scanner commands on D7 are not authenticated | Accepted | 2026-11-11 |
+| 2 | Gateway -> scanner commands over serial (D7) are not authenticated or encrypted | Accepted | 2026-11-11 |
 | 3 | MQTT commands are authorised by the broker login only | Accepted | 2026-11-11 |
 
 ### 1. MCUboot downgrade
@@ -46,12 +46,12 @@ the same key); or a released version has a security fix worth enforcing. The fix
 downgrade prevention (`MCUBOOT_DOWNGRADE_PREVENTION`, with version numbers in the image
 header), tested on a board before release.
 
-### 2. D7 commands not authenticated
+### 2. Serial (D7) commands not authenticated or encrypted
 
-**Gap.** Commands from the gateway to the scanners on the shared D7 serial line carry only a
-CRC-16, which catches corruption, not forgery. Anything that can drive D7 can send any
-command: `flash on`, `reboot`, `listen off`, `ignore <addr> save` (hides a device), `debug`, and
-so on.
+**Gap.** Commands from the gateway to the scanners on the shared D7 serial line are sent in
+plain text and carry only a CRC-16, which catches corruption, not forgery. Anything that can
+drive D7 can send any command: `flash on`, `reboot`, `listen off`, `ignore <addr> save` (hides a
+device), `debug`, and so on.
 
 **How it could be used.** Physical access to the mast's wiring, or control of the gateway
 (ESP32), which already has full control of the scanners by design.
