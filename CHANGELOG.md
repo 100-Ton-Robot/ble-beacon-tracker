@@ -82,6 +82,9 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Docs
 
+- Added `security_acceptance.md` (2026-11-11): the gaps from the input-validation review that
+  are accepted as they are (MCUboot downgrade, unauthenticated D7 commands, MQTT commands
+  authorised by the broker login), why, and what would reopen them.
 - READMEs match gateway v2. Notes that only applied to one PC were made general. This changelog
   was added.
 
