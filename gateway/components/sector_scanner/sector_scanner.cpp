@@ -1124,19 +1124,20 @@ void Sector::handle_status_(const uint8_t *p, size_t len, const char *t) {
 }
 
 void Sector::handle_counters_(const uint8_t *p, size_t len, const char *t) {
-  static const char *const NAMES[14] = {"uptime_s",     "buckets_sent",  "buckets_skipped", "cmds_ok",
-                                        "cmds_bad",     "cmds_other",    "rx_errors",       "payloads_sent",
-                                        "payloads_held", "rssi_trimmed", "seen_evicted",    "events_lost",
-                                        "boots",        "flash_opens"};
-  uint32_t v[14] = {};
+  static const char *const NAMES[] = {"uptime_s",     "buckets_sent",  "buckets_skipped", "cmds_ok",
+                                      "cmds_bad",     "cmds_other",    "rx_errors",       "payloads_sent",
+                                      "payloads_held", "rssi_trimmed", "seen_evicted",    "events_lost",
+                                      "boots",        "flash_opens",   "ignored",         "tx_1m_dropped"};
+  static const size_t N = sizeof(NAMES) / sizeof(NAMES[0]);
+  uint32_t v[N] = {};
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f))
-    if (f.num >= 1 && f.num <= 14 && f.wt == pb::VARINT)
+    if (f.num >= 1 && f.num <= N && f.wt == pb::VARINT)
       v[f.num - 1] = f.u32();
   J j;
   j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_);
-  for (int i = 0; i < 14; i++)
+  for (size_t i = 0; i < N; i++)
     j.k(NAMES[i]).i(v[i]);
   j.end_obj();
   this->hub_->publish(this->topic_("counters"), j.s, false);

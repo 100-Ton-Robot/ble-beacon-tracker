@@ -197,7 +197,8 @@ What you see and type:
   (most beacons), 4 scan response, 5 extended. `print off` to stop; it scrolls fast.
 - `list on`: a table each second, one row per device heard in that second, strongest first:
   `address type med max n tx1m adv` = median and max RSSI (dBm), adverts that second,
-  advertised 1 m power (iBeacon, or Eddystone UID/URL 0 m power minus 41; blank if none),
+  advertised 1 m power (iBeacon, or Eddystone UID/URL 0 m power minus 41; blank if none or
+  outside -100..+20 dBm),
   advert type. Up to 64 devices; the median uses that second's last 32 adverts.
   `minrssi -80` hides weaker devices (`minrssi -127` shows all). `list off` to stop.
 - `list csv`: the same data as CSV

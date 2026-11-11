@@ -85,8 +85,11 @@ static const struct device *const rfsw_pwr = DEVICE_DT_GET(DT_NODELABEL(rfsw_pwr
 static const struct device *const rfsw_ctl = DEVICE_DT_GET(DT_NODELABEL(rfsw_ctl));
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led0), gpios, {0});
 
-/* Advertised power at 1 m not present in the advert */
+/* Advertised power at 1 m not present in the advert (or out of range, see ad_tx_cb) */
 #define TX_UNKNOWN INT8_MAX
+/* Plausible advertised power at 1 m; anything else is dropped and counted */
+#define TX_1M_MIN (-100)
+#define TX_1M_MAX 20
 /* Legacy advert or scan response payload (extended adverts aren't scanned) */
 #define AD_MAX 31
 
@@ -339,6 +342,7 @@ static const struct bt_data flash_ad[] = {
 static char __aligned(4) adv_q_buf[ADV_Q_LEN * sizeof(struct adv_evt)];
 static struct k_msgq adv_q;
 static atomic_t dropped;
+static atomic_t tx_1m_dropped;	/* adverts whose 1 m power was out of range */
 
 enum list_mode { LIST_OFF, LIST_TABLE, LIST_CSV };
 
@@ -843,28 +847,36 @@ static int antenna_init(void)
 	return 0;
 }
 
-/* Pick the 1 m power out of iBeacon or Eddystone UID/URL adverts */
+/*
+ * Pick the 1 m power out of iBeacon or Eddystone UID/URL adverts (BT RX thread). The byte is
+ * unauthenticated: outside TX_1M_MIN..TX_1M_MAX it is dropped (left TX_UNKNOWN) and counted.
+ * Worked out in int so Eddystone's -41 can't wrap an int8_t (-100 would become +115).
+ */
 static bool ad_tx_cb(struct bt_data *data, void *user_data)
 {
 	int8_t *tx_1m = user_data;
+	int v;
 
-	/* iBeacon: 4C 00 02 15, UUID(16), major(2), minor(2), measured power */
 	if (data->type == BT_DATA_MANUFACTURER_DATA && data->data_len == 25 &&
 	    data->data[0] == 0x4c && data->data[1] == 0x00 &&
 	    data->data[2] == 0x02 && data->data[3] == 0x15) {
-		*tx_1m = (int8_t)data->data[24];
-		return false;
+		/* iBeacon: 4C 00 02 15, UUID(16), major(2), minor(2), measured power at 1 m */
+		v = (int8_t)data->data[24];
+	} else if (data->type == BT_DATA_SVC_DATA16 && data->data_len >= 4 &&
+		   data->data[0] == 0xaa && data->data[1] == 0xfe &&
+		   (data->data[2] == 0x00 || data->data[2] == 0x10)) {
+		/* Eddystone UID (0x00) or URL (0x10): power is at 0 m, ~41 dB above 1 m */
+		v = (int)(int8_t)data->data[3] - 41;
+	} else {
+		return true;
 	}
 
-	/* Eddystone UID (0x00) or URL (0x10): power is at 0 m, ~41 dB above 1 m */
-	if (data->type == BT_DATA_SVC_DATA16 && data->data_len >= 4 &&
-	    data->data[0] == 0xaa && data->data[1] == 0xfe &&
-	    (data->data[2] == 0x00 || data->data[2] == 0x10)) {
-		*tx_1m = (int8_t)data->data[3] - 41;
-		return false;
+	if (v < TX_1M_MIN || v > TX_1M_MAX) {
+		atomic_inc(&tx_1m_dropped);
+	} else {
+		*tx_1m = (int8_t)v;
 	}
-
-	return true;
+	return false;
 }
 
 static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
@@ -1625,6 +1637,7 @@ static void counters_fill(bletracker_Counters *c)
 	c->boots = boot_count;
 	c->flash_opens = flash_opens;
 	c->ignored = atomic_get(&ign_total);
+	c->tx_1m_dropped = atomic_get(&tx_1m_dropped);
 }
 
 /* RSSI records strongest mean first; true if any were left out */

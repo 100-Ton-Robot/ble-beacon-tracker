@@ -62,7 +62,9 @@ payloads (changed first, then refreshes), ignore list (when due, 0.7.0+).
 - **`Rssi`**: one address over the RSSI interval. Mean = `rssi_sum_dbm / count`; `rssi_max_dbm`
   is the strongest advert. Scan responses are not counted, so RSSI means the same in passive
   and active mode. `tx_1m_dbm` is the advertised power at 1 m when the advert carries it
-  (iBeacon, or Eddystone UID/URL minus 41 dB).
+  (iBeacon, or Eddystone UID/URL minus 41 dB) and it is within -100..+20 dBm. Since 0.7.1 a
+  value outside that range is left out (the advert itself still counts) and counted in
+  `Counters.tx_1m_dropped`; before 0.7.1 Eddystone values below -87 dBm wrapped to positive.
 - **`Payload`** (`advert` or `scan_rsp`): the raw AD bytes as received (legacy PDUs, up to
   31 bytes), with the RSSI of the last advert that carried them. An address's advert and scan
   response are tracked separately. One goes out when its bytes change (at most once per payload
@@ -77,8 +79,8 @@ payloads (changed first, then refreshes), ignore list (when due, 0.7.0+).
   since 0.6.0 the ignore list's size (and how many saved) and adverts ignored in the last second.
 - **`Counters`**: totals since boot (buckets sent and skipped, commands ok / bad / for other
   scanners, D7 UART errors, payloads sent and held, RSSI records trimmed, payload table
-  evictions, events lost, adverts ignored) plus `boots` and `flash_opens`, which are saved in
-  flash.
+  evictions, events lost, adverts ignored, adverts whose 1 m power was out of range (0.7.1+))
+  plus `boots` and `flash_opens`, which are saved in flash.
 - **`Event`**: `category` (GENERAL, SECURITY, LOAD, COMMAND), `severity` (INFO, WARN, ERROR),
   `code`, `value`/`value2` (meaning per code, below), `cmd_seq` for command acks, and a short
   `text`. The scanner prints each one on its USB console too (`[SECURITY WARN] ...`).

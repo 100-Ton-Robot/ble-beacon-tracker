@@ -66,6 +66,17 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
+### 0.7.1 (unreleased)
+
+- Fixed: the advertised 1 m power was not range-checked. Eddystone UID/URL 0 m power below
+  -87 dBm wrapped when 41 was subtracted (-100 came out as +115 dBm), and any iBeacon byte was
+  passed on as is (0x7F read as "none"). Values outside -100..+20 dBm at 1 m are now dropped
+  (`tx_1m_dbm` left out, the advert still counted) and counted in the new
+  `Counters.tx_1m_dropped` (field 16).
+- Gateway: `<sector>/counters` now includes `ignored` (field 15, missing since 0.6.0) and
+  `tx_1m_dropped`; self-test data regenerated.
+- Not built or flashed yet: no image in `scanner_fw/release/`.
+
 ### 0.7.0 (2026-11-11)
 
 - Added: ignore list readback. The scanner sends its whole list (`IgnoreList` record, `Record`

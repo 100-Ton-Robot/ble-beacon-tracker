@@ -44,7 +44,7 @@ message Rssi {
   sint32 rssi_sum_dbm = 4;
   uint32 count = 5;
   sint32 rssi_max_dbm = 6;
-  optional sint32 tx_1m_dbm = 7; // advertised power at 1 m (iBeacon, Eddystone UID/URL)
+  optional sint32 tx_1m_dbm = 7; // advertised power at 1 m (iBeacon, Eddystone UID/URL), -100..+20
 }
 
 // Raw advert or scan response bytes (AD structures as received, legacy PDUs: <= 31 bytes).
@@ -163,6 +163,7 @@ message Counters {
   uint32 boots = 13;             // saved in flash
   uint32 flash_opens = 14;       // saved in flash
   uint32 ignored = 15;           // adverts dropped by the ignore list
+  uint32 tx_1m_dropped = 16;     // adverts whose 1 m power was outside -100..+20 dBm (0.7.1+)
 }
 
 enum AdvType {

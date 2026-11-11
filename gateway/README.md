@@ -147,7 +147,7 @@ scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **
 | `<sector>/rssi` | no | every bucket (5 Hz), or every RSSI interval when it's > 1 | batched RSSI, below |
 | `<sector>/adv/<ADDR>` | no | each payload record (changed bytes, refreshes) | advert / scan response, below |
 | `<sector>/status` | no | each status record (1 s) | scanner status + gateway link health, below |
-| `<sector>/counters` | no | each counters record (10 s) | scanner totals since boot |
+| `<sector>/counters` | no | each counters record (10 s) | scanner totals since boot (`Counters` fields by name, `ignored` and `tx_1m_dropped` included) |
 | `events` | no | every scanner and gateway event | event JSON, below |
 | `security` | no | SECURITY-category events only | same JSON; this stream is the security record |
 | `<sector>/ignore` | yes | each `IgnoreList` record (scanner 0.7.0+: at its boot, on a change, on request) | `{"t","chip","seq","paused","count","rules":[{"rule":"C1:7D:2B:00:00:00/24","saved":true,"hits":12}]}` |
@@ -168,7 +168,8 @@ RSSI, one message per bucket (records in the scanner's order, strongest mean fir
 
 Each `devs` entry: address, random (vs public), advert type (0 ind, 1 direct, 2 scan,
 3 nonconn), mean RSSI (`sum / count`, one decimal, half away from zero), max RSSI, adverts
-counted, advertised power at 1 m or null. `seq`, `t_ms`, `tick_ms`, `chan` (37-39, 0 = all)
+counted, advertised power at 1 m or null (none, or outside -100..+20 dBm: the scanner drops
+it and counts it in `counters` `tx_1m_dropped`). `seq`, `t_ms`, `tick_ms`, `chan` (37-39, 0 = all)
 and `load` are the bucket's. With `devs` empty the scanner heard nothing in that interval.
 
 Advert / scan response (Theengs-style field names, so existing decoders work; no
