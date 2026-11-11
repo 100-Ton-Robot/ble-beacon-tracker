@@ -19,7 +19,8 @@
  *   9. security events (flash mode, updates, resets, settings, bad commands) with
  *      boot and flash-mode counts kept in flash
  *  10. ignore list: address/mask rules whose adverts are dropped as they are heard,
- *      each saved in flash or kept until reboot (console or gateway command)
+ *      each saved in flash or kept until reboot (console or gateway command), sent to
+ *      the gateway whole at boot, after each change and on request
  *
  * Shell commands:
  *   status                 version, chip ID, antenna, listening, flash mode, stream
@@ -130,8 +131,10 @@ static uint8_t order[MAX_DEVS]; /* devs[] indices, strongest median first */
  *   payloads   every intervals.payload ticks while payload records are on: changed
  *              advert/scan response bytes first, then refreshes, until the budget is used;
  *              the rest wait (load levels 1-3 slow, then stop them)
- * The budget is budget_pct of the bytes the line carries in one tick; events and status
- * may go over it.
+ *   ignore     the whole ignore list, after boot, a change or a request; outside the
+ *              budget but within 90% of the line, else the next tick
+ * The budget is budget_pct of the bytes the line carries in one tick; events, status and
+ * the ignore list may go over it.
  */
 #define TICK_MS 200
 #define TICKS_PER_S (1000 / TICK_MS)
@@ -425,6 +428,8 @@ K_MUTEX_DEFINE(ign_mutex);
 static atomic_t ign_total;	/* adverts ignored since boot */
 static atomic_t ign_sec;	/* this second */
 static uint32_t last_ignored;	/* last whole second */
+/* IgnoreList record due in the next bucket: at boot, after a change, on request */
+static atomic_t ign_report = ATOMIC_INIT(1);
 
 /* Settings under "scanner/": ant (1 byte), boots, fopens (u32), ver (string), ign (saved
  * ignore rules). A "sector" key left by 0.4.x is ignored and deleted at boot. */
@@ -702,6 +707,7 @@ static enum ignore_result ignore_add(const uint8_t addr[ADDR_LEN], const uint8_t
 		}
 	}
 	if (res != IGN_SAME) {
+		atomic_set(&ign_report, 1);
 		ignore_fmt(str, sizeof(str), addr, mask);
 		SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
 			       "ignore %s %s %s", str, ign[i].saved ? "saved" : "boot", src_short(src));
@@ -735,6 +741,7 @@ static int ignore_del(const uint8_t addr[ADDR_LEN], const uint8_t mask[ADDR_LEN]
 	if (was_saved) {
 		err = ignore_store() ? -EIO : 0;
 	}
+	atomic_set(&ign_report, 1);
 	ignore_fmt(str, sizeof(str), addr, mask);
 	SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
 		       "unignore %s %s", str, src_short(src));
@@ -769,6 +776,7 @@ static int ignore_clear(bletracker_IgnoreClear which, bletracker_Event_Source sr
 	k_spin_unlock(&ign_lock, key);
 
 	if (removed != 0) {
+		atomic_set(&ign_report, 1);
 		SECURITY_EVENT(INFO, SETTING_CHANGED, bletracker_Event_Setting_IGNORE_LIST, n_ign,
 			       "ignore clear %s: %d gone %s", names[which], removed,
 			       src_short(src));
@@ -1399,6 +1407,13 @@ static const char *cmd_apply(const bletracker_Command *c, bool to_all)
 		err = ignore_del(addr, mask, gw);
 		return err == -ENOENT ? NULL : err ? "unignore NOT SAVED" : "unignored";
 	}
+	case bletracker_Command_ignore_list_tag:
+		/* Reading is fine per scanner: comparing them is the point */
+		if (!c->action.ignore_list) {
+			return NULL;
+		}
+		atomic_set(&ign_report, 1);
+		return "ignore list in next bucket";
 	case bletracker_Command_ignore_clear_tag: {
 		int n;
 
@@ -1550,6 +1565,23 @@ static void level_set(uint8_t level)
 		   bletracker_Event_Severity_ERROR,
 		   bletracker_Event_Code_LOAD_LEVEL, level, load_reasons, 0, "load level %u: %s",
 		   level, names[level]);
+}
+
+static void ignore_list_fill(bletracker_IgnoreList *l)
+{
+	k_spinlock_key_t key = k_spin_lock(&ign_lock);
+
+	l->rules_count = n_ign;
+	for (uint8_t i = 0; i < n_ign; i++) {
+		bletracker_IgnoreEntry *e = &l->rules[i];
+
+		memcpy(e->addr, ign[i].addr, ADDR_LEN);
+		memcpy(e->mask, ign[i].mask, ADDR_LEN);
+		e->saved = ign[i].saved;
+		e->hits = ign[i].hits;
+	}
+	k_spin_unlock(&ign_lock, key);
+	l->paused = ign_paused;
 }
 
 static void status_fill(bletracker_Status *st)
@@ -1800,6 +1832,18 @@ static void tick_send(int64_t now, int64_t t_start)
 		}
 	} else {
 		calm_ticks = 0;
+	}
+
+	/* Ignore list (up to ~830 bytes) last, after the throttle has measured the tick, so it never
+	 * trims RSSI; it may pass the budget but not 90% of the line, else it waits a tick
+	 */
+	if (atomic_cas(&ign_report, 1, 0)) {
+		rec = (bletracker_Record)bletracker_Record_init_zero;
+		rec.which_kind = bletracker_Record_ignore_list_tag;
+		ignore_list_fill(&rec.kind.ignore_list);
+		if (!record_put(&s, &rec, (size_t)uart_baud / 10 * TICK_MS / 1000 * 9 / 10)) {
+			atomic_set(&ign_report, 1);
+		}
 	}
 
 	raw_len = s.bytes_written;
@@ -2140,6 +2184,7 @@ static int cmd_ignore(const struct shell *sh, size_t argc, char **argv)
 	}
 	if (argc == 2 && (strcmp(argv[1], "on") == 0 || strcmp(argv[1], "off") == 0)) {
 		ign_paused = argv[1][1] == 'f';
+		atomic_set(&ign_report, 1);
 		shell_print(sh, "ignore list %s", ign_paused ? "paused until `ignore on` or reboot" :
 			    "on");
 		return 0;

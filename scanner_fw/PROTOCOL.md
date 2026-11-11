@@ -57,7 +57,7 @@ it sees a scanner (for example after a `BOOT` event).
 ## Records
 
 A bucket's records come in this order: events, status, counters, RSSI (strongest mean first),
-payloads (changed first, then refreshes).
+payloads (changed first, then refreshes), ignore list (when due, 0.7.0+).
 
 - **`Rssi`**: one address over the RSSI interval. Mean = `rssi_sum_dbm / count`; `rssi_max_dbm`
   is the strongest advert. Scan responses are not counted, so RSSI means the same in passive
@@ -149,6 +149,7 @@ value at boot. The chip ID in every bucket still lets the gateway notice a board
 | `ignore` | `IgnoreRule` | only to all scanners: add a rule, or change whether it is saved (0.6.0+, below) |
 | `unignore` | `IgnoreRule` | only to all scanners: remove the rule with exactly this `addr` and `mask`; rejected if there is none |
 | `ignore_clear` | `IgnoreClear` 1-3 | only to all scanners: remove the rules kept until reboot (1), the saved ones (2) or all (3) |
+| `ignore_list` | true | 0.7.0+, one scanner or all: send the `IgnoreList` record in the next bucket |
 
 ### Ignore list (0.6.0+)
 
@@ -169,11 +170,17 @@ mask)`; public/random isn't compared. A mask of all zeros is rejected (that's `l
   Acks: `ignore added` / `changed` / `unchanged`, `unignored`, `ignore cleared`; `... NOT SAVED`
   when the flash write failed (the change still holds until reboot).
 - `Status.ignore_rules`, `ignore_saved` and `ignored` (adverts dropped in the last second) and
-  `Counters.ignored` (since boot) show it working. The rules themselves are only listed on the
-  console (`ignore`).
+  `Counters.ignored` (since boot) show it working.
+- **Readback (0.7.0+):** the scanner sends its whole list as an `IgnoreList` record (`Record`
+  field 7: every rule's `addr`, `mask` (always 6 bytes), `saved` and `hits`, plus `paused`) in
+  the next bucket after boot, after any change (console or gateway, pause included) and when
+  asked with `Command.ignore_list` = true. Asking is allowed per scanner or to all, so the
+  gateway can compare them. The record goes last in the bucket, outside the byte budget but
+  within 90 % of the line (a full 32-rule list is about 830 bytes); if it doesn't fit it waits
+  a tick. It never trims RSSI or moves the throttle.
 
 Text forms (console, `decode_frames.py --cmd`, gateway MQTT): `ignore <addr>[/<bits>|/<mask>]
-[save]`, `unignore <addr>[/<bits>|/<mask>]`, `ignore clear boot|saved|all`. Any address byte
+[save]`, `unignore <addr>[/<bits>|/<mask>]`, `ignore clear boot|saved|all`, `ignore list`. Any address byte
 may be `*`: `C1:7D:2B:*:*:*` = `C1:7D:2B:00:00:00/24`.
 
 Every accepted command is answered with a `CMD_OK` event in the scanner's next bucket, every

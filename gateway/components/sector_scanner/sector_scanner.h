@@ -44,6 +44,7 @@ enum Action : uint8_t {
   ACT_IGNORE = 12,        // IgnoreRule; arg = save
   ACT_UNIGNORE = 13,      // IgnoreRule
   ACT_IGNORE_CLEAR = 14,  // arg = IgnoreClear: 1 until-reboot rules, 2 saved, 3 all
+  ACT_IGNORE_LIST = 15,   // ask for the IgnoreList record (one scanner or all)
 };
 static const size_t ADDR_LEN = 6;
 
@@ -100,6 +101,10 @@ class Sector : public uart::UARTDevice {
   bool have_chip() const { return this->have_chip_; }
   const uint8_t *chip() const { return this->chip_; }
   bool online() const { return this->last_bucket_ms_ != 0; }
+  /* Last IgnoreList seen: rules and saved flags (not hits), sorted, for comparing scanners */
+  bool have_ignore() const { return this->have_ignore_; }
+  const std::string &ignore_sig() const { return this->ignore_sig_; }
+  uint32_t ignore_rules() const { return this->ignore_rules_; }
   Settings &desired() { return this->desired_; }
   void request_settings() { this->needs_settings_ = true; }
 
@@ -127,6 +132,7 @@ class Sector : public uart::UARTDevice {
   void report_condition_();
   void handle_record_(const uint8_t *p, size_t len, const char *t);
   void handle_status_(const uint8_t *p, size_t len, const char *t);
+  void handle_ignore_list_(const uint8_t *p, size_t len, const char *t);
   void handle_counters_(const uint8_t *p, size_t len, const char *t);
   void handle_event_(const uint8_t *p, size_t len, const char *t);
   void add_rssi_(const uint8_t *p, size_t len);
@@ -189,6 +195,12 @@ class Sector : public uart::UARTDevice {
   bool any_rssi_{false};
 
   std::string state_[11];
+
+  /* Ignore list (scanner 0.7.0+): retained <sector>/ignore, compared across the mast */
+  bool have_ignore_{false};
+  std::string ignore_sig_;
+  std::string ignore_json_;
+  uint32_t ignore_rules_{0};
 };
 
 class SectorScanner : public Component {
@@ -221,6 +233,8 @@ class SectorScanner : public Component {
   bool enqueue(Command c);
   bool pending_for(const Sector *s) const;
   void on_ack(uint32_t cmd_seq, bool ok, int32_t action, const std::string &text, int pin);
+  /* After a sector's ignore list arrives: the list is mast-wide, so all reported lists must match */
+  void check_ignore_lists(const char *t);
   uint32_t effective_budget(uint32_t desired) const { return desired < this->budget_cap_ ? desired : this->budget_cap_; }
   uint32_t rssi_interval() const { return this->rssi_interval_; }
   void set_rssi_interval(uint32_t n) { this->rssi_interval_ = n; }
@@ -259,6 +273,7 @@ class SectorScanner : public Component {
   uint8_t pressure_windows_{0};
   uint8_t clean_windows_{0};
   int gateway_load_{-1};
+  bool ignore_mismatch_{false};
 
   /* Self-test: publishes go here instead of MQTT, commands and logs are suppressed */
   std::vector<std::pair<std::string, std::string>> *capture_{nullptr};

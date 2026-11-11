@@ -474,6 +474,11 @@ bool parse_command(const std::string &text, Command &c, std::string &err) {
     c.arg = v;
     return true;
   }
+  if (name == "ignore" && w.size() == 2 && arg == "list") {
+    c.action = ACT_IGNORE_LIST;
+    c.arg = 1;
+    return true;
+  }
   if (name == "ignore" && w.size() == 3 && arg == "clear") {
     static const char *const KINDS[] = {"boot", "saved", "all"};
     for (uint32_t k = 0; k < 3; k++)
@@ -539,6 +544,7 @@ std::string encode_command(const Command &c) {
     case ACT_EXT_ANTENNA:
     case ACT_PAYLOADS:
     case ACT_ACTIVE_SCAN:
+    case ACT_IGNORE_LIST:
       w.boolean(c.action, c.arg != 0); /* a oneof member is sent even when false */
       break;
     case ACT_INTERVALS: {
@@ -733,6 +739,7 @@ void Sector::handle_encoded(const uint8_t *enc, size_t len) {
     this->have_chip_ = true;
     this->have_seq_ = false;
     this->needs_settings_ = true;
+    this->have_ignore_ = false;
     if (!old.empty())
       this->hub_->event(this->pin_, this->chip_, false, CAT_SECURITY, SEV_WARN, "CHIP_CHANGED", 0, 0, 0,
                         "chip " + this->chip_hex_() + " replaced " + old, t);
@@ -863,7 +870,7 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
   pb::Reader r(p, len);
   pb::Field f;
   while (r.next(f)) {
-    if (f.wt != pb::LEN || f.num > 6) {
+    if (f.wt != pb::LEN || f.num > 7) {
       /* A record kind this gateway doesn't know (forward compatibility) */
       std::string sub = "raw/" + std::to_string(f.num);
       this->hub_->publish(this->topic_(sub.c_str()), f.wt == pb::VARINT ? std::to_string(f.v) : to_hex(f.p, f.len),
@@ -886,6 +893,9 @@ void Sector::handle_record_(const uint8_t *p, size_t len, const char *t) {
         break;
       case 6:
         this->handle_counters_(f.p, f.len, t);
+        break;
+      case 7:
+        this->handle_ignore_list_(f.p, f.len, t);
         break;
     }
   }
@@ -1132,6 +1142,78 @@ void Sector::handle_counters_(const uint8_t *p, size_t len, const char *t) {
   this->hub_->publish(this->topic_("counters"), j.s, false);
 }
 
+/* "C1:7D:2B:AC:03:BC", "C1:7D:2B:00:00:00/24" or "<addr>/<mask>", as the scanner's console prints it */
+static std::string rule_str(const uint8_t *addr, const uint8_t *mask) {
+  int bits = 0;
+  bool prefix = true, zeros = false;
+  for (size_t i = 0; i < 8 * ADDR_LEN; i++) {
+    bool one = mask[i / 8] & (0x80 >> (i % 8));
+    if (one && zeros)
+      prefix = false;
+    else if (one)
+      bits++;
+    else
+      zeros = true;
+  }
+  std::string r = addr_str(addr, ADDR_LEN, ':');
+  if (bits == 8 * (int) ADDR_LEN)
+    return r;
+  return r + "/" + (prefix ? std::to_string(bits) : addr_str(mask, ADDR_LEN, ':'));
+}
+
+/* IgnoreList: the scanner's rules at boot, after a change and on request; retained <sector>/ignore */
+void Sector::handle_ignore_list_(const uint8_t *p, size_t len, const char *t) {
+  struct Rule {
+    std::string rule;
+    bool saved;
+    uint32_t hits;
+  };
+  std::vector<Rule> rules;
+  bool paused = false;
+  pb::Reader r(p, len);
+  pb::Field f;
+  while (r.next(f)) {
+    if (f.num == 2 && f.wt == pb::VARINT) {
+      paused = f.b();
+    } else if (f.num == 1 && f.wt == pb::LEN) {
+      uint8_t addr[ADDR_LEN] = {}, mask[ADDR_LEN];
+      memset(mask, 0xff, sizeof(mask));
+      Rule e{"", false, 0};
+      pb::Reader ri(f);
+      pb::Field g;
+      while (ri.next(g)) {
+        if ((g.num == 1 || g.num == 2) && g.wt == pb::LEN && g.len == ADDR_LEN)
+          memcpy(g.num == 1 ? addr : mask, g.p, ADDR_LEN);
+        else if (g.num == 3 && g.wt == pb::VARINT)
+          e.saved = g.b();
+        else if (g.num == 4 && g.wt == pb::VARINT)
+          e.hits = g.u32();
+      }
+      e.rule = rule_str(addr, mask);
+      rules.push_back(e);
+    }
+  }
+
+  std::vector<std::string> sig;
+  J j;
+  j.obj().k("t").raw(t).k("chip").str(this->chip_hex_()).k("seq").i(this->seq_).k("paused").b(paused);
+  j.k("count").i(rules.size()).k("rules").arr();
+  for (auto &e : rules) {
+    j.obj().k("rule").str(e.rule).k("saved").b(e.saved).k("hits").i(e.hits).end_obj();
+    sig.push_back(e.rule + (e.saved ? " saved" : " boot"));
+  }
+  j.end_arr().end_obj();
+  std::sort(sig.begin(), sig.end());
+  this->ignore_sig_.clear();
+  for (auto &x : sig)
+    this->ignore_sig_ += x + ";";
+  this->ignore_rules_ = rules.size();
+  this->ignore_json_ = j.s;
+  this->have_ignore_ = true;
+  this->hub_->publish(this->topic_("ignore"), j.s, true);
+  this->hub_->check_ignore_lists(t);
+}
+
 void Sector::handle_event_(const uint8_t *p, size_t len, const char *t) {
   uint32_t category = 0, severity = 0, code = 0, cmd_seq = 0;
   int32_t value = 0, value2 = 0;
@@ -1187,6 +1269,7 @@ void Sector::clear_retained() {
     this->state_[i].clear();
   }
   this->hub_->publish(this->topic_(LEGACY_STATE), "", true);
+  this->hub_->publish(this->topic_("ignore"), this->ignore_json_, true);
   this->publish_online_(this->online());
   ESP_LOGI(TAG, "Sector %u: retained topics cleared", this->pin_);
 }
@@ -1240,6 +1323,12 @@ void Sector::reconcile_() {
   if (s.budget_pct != budget) {
     Command c;
     c.action = ACT_BUDGET, c.arg = budget, c.text = "budget " + std::to_string(budget);
+    send(c);
+  }
+  /* Ignore list: scanners send it at boot and on change; after a gateway restart, ask for it */
+  if (!this->have_ignore_) {
+    Command c;
+    c.action = ACT_IGNORE_LIST, c.arg = 1, c.text = "ignore list";
     send(c);
   }
   /* The RSSI interval is mast-wide: it may only go to every scanner at once */
@@ -1458,6 +1547,33 @@ bool SectorScanner::pending_for(const Sector *s) const {
     if (mine(c))
       return true;
   return false;
+}
+
+/* The ignore list is mast-wide: warn (SECURITY) when the online scanners' lists differ, and say
+ * when they match again. Hits don't count, only rules and whether they are saved. */
+void SectorScanner::check_ignore_lists(const char *t) {
+  std::string first, counts;
+  bool differ = false;
+  int n = 0;
+  for (auto *s : this->sectors_) {
+    if (!s->online() || !s->have_ignore())
+      continue;
+    if (n++ == 0)
+      first = s->ignore_sig();
+    else
+      differ |= s->ignore_sig() != first;
+    counts += (counts.empty() ? "" : ", ") + std::string("sector ") + std::to_string(s->pin()) + ": " +
+              std::to_string(s->ignore_rules());
+  }
+  if (differ == this->ignore_mismatch_)
+    return;
+  this->ignore_mismatch_ = differ;
+  if (differ)
+    this->event(-1, nullptr, false, CAT_SECURITY, SEV_WARN, "IGNORE_MISMATCH", n, 0, 0,
+                "ignore lists differ (" + counts + " rules); send ignore commands on all/cmd", t);
+  else
+    this->event(-1, nullptr, false, CAT_SECURITY, SEV_INFO, "IGNORE_MATCH", n, 0, 0,
+                "ignore lists match (" + counts + " rules)", t);
 }
 
 /* One command on the wire at a time: the next goes after the ack (or 2 s without one) */

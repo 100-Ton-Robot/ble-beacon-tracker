@@ -150,6 +150,7 @@ scanner's claim. `t` is the gateway's clock when it handled the bucket, epoch **
 | `<sector>/counters` | no | each counters record (10 s) | scanner totals since boot |
 | `events` | no | every scanner and gateway event | event JSON, below |
 | `security` | no | SECURITY-category events only | same JSON; this stream is the security record |
+| `<sector>/ignore` | yes | each `IgnoreList` record (scanner 0.7.0+: at its boot, on a change, on request) | `{"t","chip","seq","paused","count","rules":[{"rule":"C1:7D:2B:00:00:00/24","saved":true,"hits":12}]}` |
 | `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`) | the record's bytes as hex |
 | `<sector>/online` | yes | first bucket / none for 3 s | `online` / `offline` |
 | `<sector>/chip`, `claim`, `load` | yes | on change | chip ID / claimed sector (255 = unset) / load level |
@@ -221,6 +222,7 @@ Scanner codes are `Event.Code` names (PROTOCOL.md "Event codes"). Gateway codes 
 | `SECTOR_OK` | SECURITY, INFO | claim, pin sector |
 | `CHIP_CHANGED` | SECURITY, WARN | text "chip <new> replaced <old>" |
 | `CMD_NO_ACK` | COMMAND, WARN | `cmd_seq` = the command's seq |
+| `IGNORE_MISMATCH` / `IGNORE_MATCH` | SECURITY, WARN / INFO | online scanners compared; the scanners' ignore lists (rules and saved flags, not hits) differ / match again; text gives each sector's rule count |
 | `BUDGET_LOWERED` / `BUDGET_RAISED` | LOAD, WARN / INFO | new budget % |
 
 The log shows every event at its own severity as `[CATEGORY SEVERITY] sector N scanner|gateway: CODE text`.
@@ -258,6 +260,7 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `ignore <addr>[/bits\|/mask] [save]` | only on `all/cmd` (the ignore list is mast-wide), scanner 0.6.0+: drop that address (or range; `*` bytes allowed, e.g. `c1:7d:2b:*:*:*`) until the scanners reboot, or with `save` for good |
 | `unignore <addr>[/bits\|/mask]` | only on `all/cmd`: remove that rule (same address and mask) |
 | `ignore clear boot` / `saved` / `all` | only on `all/cmd`: remove the rules kept until reboot / the saved ones / all of them |
+| `ignore list` | scanner 0.7.0+, on `<sector>/cmd` or `all/cmd`: the scanner sends its rules, published on `<sector>/ignore`. The gateway asks by itself when it hasn't seen a scanner's list (e.g. after the gateway restarts) |
 
 Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
 event (on `events`). One command is on the wire at a time; the next goes after the ack, or

@@ -10,3 +10,6 @@ bletracker.Event.text         max_size:40
 bletracker.Command.target     max_size:8
 bletracker.IgnoreRule.addr    max_size:6
 bletracker.IgnoreRule.mask    max_size:6
+bletracker.IgnoreList.rules   max_count:32
+bletracker.IgnoreEntry.addr   max_size:6 fixed_length:true
+bletracker.IgnoreEntry.mask   max_size:6 fixed_length:true

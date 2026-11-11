@@ -31,6 +31,7 @@ message Record {
     Payload scan_rsp = 4;
     Event event = 5;
     Counters counters = 6;
+    IgnoreList ignore_list = 7;
   }
 }
 
@@ -207,6 +208,7 @@ message Command {
     IgnoreRule ignore = 12;      // add (or update) a rule
     IgnoreRule unignore = 13;    // remove the rule with this addr and mask (save unused)
     IgnoreClear ignore_clear = 14;
+    bool ignore_list = 15;       // true: send the IgnoreList record (to one scanner or all)
   }
 }
 
@@ -217,6 +219,21 @@ message IgnoreRule {
   bytes mask = 2;                // 6 bytes, same order; empty = all ones (this address only)
   bool save = 3;                 // kept in flash; false = until reboot (a saved rule re-added
                                  //   with false is removed from flash but stays until reboot)
+}
+
+// The scanner's whole ignore list, in the next bucket after boot, after any change (console
+// or gateway) and when asked (Command.ignore_list). Compare the scanners' lists: the list is
+// meant to be the same mast-wide.
+message IgnoreList {
+  repeated IgnoreEntry rules = 1;  // in the order the console lists them, up to 32
+  bool paused = 2;                 // console `ignore off`: rules kept but not applied
+}
+
+message IgnoreEntry {
+  bytes addr = 1;                // 6 bytes, masked, most significant first
+  bytes mask = 2;                // 6 bytes, same order
+  bool saved = 3;                // kept in flash (false: until reboot)
+  uint32 hits = 4;               // adverts it dropped since boot
 }
 
 enum IgnoreClear {

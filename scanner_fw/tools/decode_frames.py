@@ -23,7 +23,8 @@ Commands: listen on|off, flash on|off, ant int|ext, reboot,
           payloads on|off, active on|off, budget <10-90>,
           intervals [rssi=N] [payload=N] [refresh=N] [status=N] [counters=N]   (ticks),
           ignore <addr>[/bits|/mask] [save], unignore <addr>[/bits|/mask],
-          ignore clear boot|saved|all       (addr bytes may be *: C1:7D:2B:*:*:*)
+          ignore clear boot|saved|all       (addr bytes may be *: C1:7D:2B:*:*:*),
+          ignore list                       (the scanner sends its rules in the next bucket)
 --seq sets the command's seq (echoed in the scanner's CMD_OK / CMD_REJECTED event).
 """
 
@@ -119,6 +120,18 @@ def parse_rule(text: str) -> tuple[bytes, bytes]:
     return bytes(x & y for x, y in zip(addr, mask)), mask
 
 
+def rule_str(addr: bytes, mask: bytes) -> str:
+    """(addr, mask) -> 'C1:7D:2B:00:00:00/24' etc., as the scanner's console prints it."""
+    bits = format(int.from_bytes(mask, "big"), "048b")
+    a = ":".join(f"{x:02X}" for x in addr)
+    if bits == "1" * 48:
+        return a
+    n = bits.find("0")
+    if "1" not in bits[n:]:
+        return f"{a}/{n}"
+    return a + "/" + ":".join(f"{x:02X}" for x in mask)
+
+
 def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
     """'flash on' -> framed Command. chip_id empty or all zeros = every scanner."""
     if chip_id and len(chip_id) != CHIP_ID_LEN:
@@ -142,6 +155,8 @@ def build_cmd(text: str, chip_id: bytes = b"", seq: int = 0) -> bytes:
         for a in args:
             key, val = a.split("=")
             setattr(c.intervals, key, int(val))
+    elif name == "ignore" and args == ["list"]:
+        c.ignore_list = True
     elif name == "ignore" and args and args[0] == "clear":
         c.ignore_clear = {"boot": pb.IGNORE_CLEAR_TEMP, "saved": pb.IGNORE_CLEAR_SAVED,
                           "all": pb.IGNORE_CLEAR_ALL}[args[1]]
@@ -210,6 +225,12 @@ def show(b: pb.Bucket) -> None:
                   f"peak={s.line_peak_pct}% reasons={s.load_reasons} baud={s.baud} "
                   f"ignore={s.ignore_rules}({s.ignore_saved} saved) ignored={s.ignored} "
                   f"intervals=({MessageToDict(s.intervals)})")
+        elif k == "ignore_list":
+            lst = r.ignore_list
+            print(f"  ignore  {len(lst.rules)} rules{' (PAUSED)' if lst.paused else ''}")
+            for e in lst.rules:
+                print(f"          {rule_str(e.addr, e.mask):36} {'saved' if e.saved else 'until reboot':12} "
+                      f"{e.hits} hits")
         elif k == "counters":
             print(f"  counters {MessageToDict(r.counters)}")
         else:

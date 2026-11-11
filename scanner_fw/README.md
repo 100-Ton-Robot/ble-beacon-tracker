@@ -222,6 +222,9 @@ What you see and type:
   a security event, and the `[1s]` line shows `ignored=N` while there are rules. The gateway
   sends the same words, only on `all/cmd`: the list is mast-wide, every scanner ignores the
   same addresses (see [PROTOCOL.md](PROTOCOL.md)). The console works on its own board, for the bench.
+  The scanner sends its whole list to the gateway at boot, after each change and on
+  `ignore list` (0.7.0+); the gateway publishes it on `<sector>/ignore` and warns when the
+  scanners' lists differ.
 - `ant` / `ant int` / `ant ext`: show or switch antenna. The choice is saved in flash; a new
   board boots on `int` (onboard).
 - `status`: version, whether the image is confirmed, chip ID, boot and flash-mode counts,

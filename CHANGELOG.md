@@ -66,6 +66,17 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ## Scanner firmware
 
+### 0.7.0 (2026-11-11)
+
+- Added: ignore list readback. The scanner sends its whole list (`IgnoreList` record, `Record`
+  field 7: each rule's address, mask, saved flag and hits, plus paused) in the next bucket
+  after boot, after any change, and when asked (`Command.ignore_list`, field 15, to one
+  scanner or all; text `ignore list`). It goes last in the bucket, outside the byte budget,
+  so it never trims RSSI.
+- Gateway: publishes each scanner's list on retained `<sector>/ignore`, asks for it when it
+  hasn't seen one (e.g. after a gateway restart), and raises `IGNORE_MISMATCH` (SECURITY,
+  WARN) when the online scanners' lists differ, `IGNORE_MATCH` when they agree again.
+
 ### 0.6.0 (2026-11-11)
 
 - Added: ignore list. Up to 32 rules, each an address plus a mask (prefix `/24`, a full mask,
