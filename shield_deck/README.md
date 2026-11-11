@@ -1,63 +1,166 @@
-# Shield deck PCB (PCBWay)
+# Shield deck and plate templates
 
-Upload `shield_deck_gerbers.zip` to PCBWay's quick-order PCB page.
+Printable 1:1 drill templates for the electronics plates and back panel, stack views, the wiring diagram, and the Gerbers for the copper shield deck PCB. Everything is already built and in this folder: you only need the scripts to change something.
 
-## Order settings
+## Quick start (files in the repo, no software)
 
-| Setting | Value |
-| --- | --- |
-| Board type | Single pieces |
-| Size | 146 x 146 mm (round board, outline in the GKO layer) |
-| Layers | 2 |
-| Material | FR-4, TG130 or better |
-| Thickness | 1.6 mm |
-| Copper | 1 oz outer |
-| Min hole | 0.6 mm (stitching vias) |
-| Surface finish | HASL lead-free (or ENIG) - copper must be solderable |
-| Solder mask | Any colour |
-| Silkscreen | White, top only |
-| Quantity | 5 (minimum) |
-| Note to fab | "Round board. All holes plated; sizes are finished hole sizes. Large solid copper pour on both layers is intentional (RF shield)." |
+**Pick one build type first: alt (no pipe) or pipe.** Print and use only the pages for the one you pick; the plate pages are alternatives, not both.
 
-## What's on the board
+| Page | What | Alt (no pipe) | Pipe |
+| --- | --- | :---: | :---: |
+| 1 | Deck drill template (the 2-1/4" hole-saw circle is for the pipe only) | yes | yes |
+| 2 | Alt split plate | yes | - |
+| 3 | Pipe plate | - | yes |
+| 4 | Back panel | yes | yes |
+| 5 | Pipe stack views (not to scale) | - | yes |
+| 6 | Wiring diagram | yes | yes |
 
-- Solid copper on both sides, pulled back 0.5 mm from the edge, tied together by 36 plated vias on a 71 mm radius.
-- Exposed copper (no mask): 4 mm ring at the rim on both sides (copper-tape edge seal), 12 mm pads around every RP-SMA hole (nut contact), on the bottom a 6 mm strip along the triangle where the 120 mm reflector faces solder on, and a 9 mm pad round each M4 hole for its nut.
-- Top silkscreen: TOP, sector numbers S0-S2, an arrow for Sector 0, and hole letters (D = duck/monopole, P = patch, P2 = patch at the face end, C = dipole coax pass-through, M4 = bolt to the electronics plate).
+- **Alt (no pipe):** pages 1, 2, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
+- **Pipe:** pages 1, 3, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; the deck centre is opened with a 2-1/4" hole saw.
 
-Top = electronics side. Bottom = antenna side (the triangle seam strip is there).
+1. Print your pages of `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure the 100 mm scale bar on each page with a ruler before you drill.
+2. Order the deck PCB: upload `shield_deck_gerbers.zip` to a PCB fab. Steps and settings: [PCBWAY.md](PCBWAY.md).
+3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
+4. Drill the plate and back panel (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). Page 1 is the deck's own hole pattern, for checking the board (and marking the pipe's hole-saw cut).
+5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
 
-## Holes (finished, plated)
+### Drill sizes and zip ties
 
-| Hole | Dia. | Radius from centre | Direction |
-| --- | --- | --- | --- |
-| Duck / monopole RP-SMA (x3) | 6.5 mm | 65.6 mm (31 mm in front of each face) | Sector 0 / 120 / 240 deg |
-| Patch RP-SMA (x3) | 6.5 mm | 41.6 mm (7 mm in front of each face) | Sector 0 / 120 / 240 deg |
-| Patch-end RP-SMA "P2" (x3) | 6.5 mm | 48.6 mm (7 mm in front of each face, 25 mm off its centre toward its counter-clockwise end; moved in from 14 mm off the end on 2026-11-10 so the panel board's coax reaches it in back-panel positions A and C) | 329.0 / 89.0 / 209.0 deg |
-| Dipole coax pass-through (x3) | 10 mm | 20 mm (inside the core) | Sector 0 / 120 / 240 deg |
-| M4 bolt to the electronics plate (x3) | 4.8 mm | 59.1 mm (inside the core, in each corner) | Corners 60 / 180 / 300 deg |
-| Stitching vias (x36) | 0.6 mm | 71 mm | Every 10 deg |
+Holes you drill yourself (the deck PCB comes drilled from the fab). Counts are for one mast. Inch sizes are the nearest drill that works.
 
-RP-SMA connector thread OD is 6.3 mm, so 6.5 mm gives ~0.2 mm clearance. If the fab's plating tolerance worries you, request "+0.1 mm" or ream after delivery.
+| Drill | Inch | For | Alt (no pipe) | Pipe |
+| --- | --- | --- | :---: | :---: |
+| 4.8 mm | 3/16" | Plate: M4 bolts to the deck | 3 | 3 |
+| 4.8 mm | 3/16" | Plate: zip tie holes (pairs; any 3.0-4.8 mm fits a 2.5 mm tie) | 10 (3 XIAOs + 2 across the ESP32) | 6 (3 XIAOs) |
+| 3.4 mm | 9/64" | Plate: bus board M3 | 1 | 1 (skip if the bus goes on the pipe) |
+| 22.2 mm | 7/8" | Plate centre + enclosure top: 1/2" male pipe adapter thread | - | 2 (1 plate, 1 enclosure top) |
+| 57 mm hole saw | 2-1/4" | Deck centre, opened up for the pipe | - | 1 |
+| 25 mm | 1" | PoE splitter's 4" round box | 1 | - |
+| 2.4 mm | 3/32" | Back panel: M2 posts for the printed-dipole panel (page 4; 4 per position, A and C) | 8 per panel, 24 for 3 | 8 per panel, 24 for 3 |
+| 6.5 mm | 17/64" | Back panel: DIY dipole RP-SMA at the face centre (only for that antenna) | 1 per panel | 1 per panel |
+| 6.5 mm | 17/64" | Plate: antenna holes (dotted on pages 2-3, reference only, not by design) | 0 (up to 9) | 0 (up to 9) |
 
-The M4 holes sit where a 7 mm (across flats) M4 nut, under the deck inside the core, has two flats flush against the faces' inner sides (`FACE_THICK = 1.6` mm boards) in each corner; solder the nut to the deck pad and both faces. 4.8 mm gives the bolt a little room to find the nut. If the faces are a different thickness, or a seam fillet fills the corner, change `FACE_THICK` / `NUT_GAP` and regenerate.
+Don't use 1/4" (6.35 mm) for the RP-SMA holes: the thread is 6.3 mm.
 
-Exact coordinates: `hole_table.csv`.
+Zip ties: 2.5 mm wide (they fit the 4.8 mm holes and the HS-100 mounts' 3.2 mm slots). Lengths allow for the strap round the part plus a tail to pull on.
 
-## Changing it
+| Length | For | Alt (no pipe) | Pipe |
+| --- | --- | :---: | :---: |
+| 100 mm (4") | Each XIAO to the plate, across its back through its hole pair | 3 | 3 |
+| 100 mm (4") | Coax clamped in each 1/2" HS-100 tie mount | 3 | 3 |
+| 150 mm (6") | ESP32 to the plate, through its two hole pairs (room for standoffs) | 2 | - |
+| 150 mm (6") | ESP32 to the pipe (round the pipe and board) | - | 2 |
+| 200 mm (8") | PoE splitter to the pipe (round the pipe and splitter body) | - | 2 |
+| | **Total** | **6 x 100, 2 x 150** | **6 x 100, 2 x 150, 2 x 200** |
 
-Every number (measurements, part sizes, placements, clearance rules) is a row in [`parameters.csv`](parameters.csv): `name, value, unit, source, group, note`. `source` says where it came from: `measured`, `spec`, `estimated`, `assumed`, `design` (a choice), `rule` or `drawing` (page layout only). Several numbers in one cell, separated by spaces, form a tuple (e.g. `x0 y0 w h`). Unit `in` is converted to mm on load. Values worked out from others (`MOUNT_RADIUS`, `POST_SHIFT`, ...) are computed in the scripts, not stored.
+Buy a few spares, and 2 more 150 mm ties if the pipe build's bus board goes on the pipe. Also 3 x 1/2" HS-100 adhesive tie mounts (both builds).
 
-- Deck (`group` = `deck`): edit, then `python make_shield_deck.py` (Gerbers, preview, `hole_table.csv`). Sized for the enclosure (146 mm disc; tape any gap at the edge). If the enclosure is wider where the deck sits, raise `DISC_DIAMETER` (e.g. 160). `PATCH_OFFSET = 7` because the measured panel's connector axis is in line with its housing back, so the panel stands 7 mm off the face to clear the plug nut.
-- Templates (every other group): edit, then `python make_templates.py` (needs `pip install reportlab`).
+## Next
 
-Check the upload in PCBWay's online Gerber viewer before paying.
+- **Order the deck PCB:** [PCBWAY.md](PCBWAY.md): order steps, fab settings, what's on the board and the hole table.
+- **Build or change the files:** [Using the scripts](#using-the-scripts): change a measurement, [lay out a plate in Inkscape](#lay-out-a-plate-in-inkscape), regenerate the Gerbers, PDF and SVGs, [when something goes wrong](#when-something-goes-wrong).
 
-## Laying out a plate in Inkscape
+## Using the scripts
 
-1. `python make_plate_svg.py` draws both plates from the CSV: `plate_layout.svg` (alt split plate, page 2) and `pipe_plate_layout.svg` (pipe plate, page 3). 1 unit = 1 mm, top view, plate 12 o'clock up.
-2. In Inkscape, each part is a group on its own layer, with the holes it needs inside it. Move and rotate whole groups; don't scale, flip or ungroup them. Double-click into a part to slide its tie-hole pair or bus M3 hole along it. The plate, M4 and antenna holes (with their 8 mm keep-out rings) and the deck jacks are locked layers. On the pipe plate S1 and S2 are clones of S0 turned 120 deg, so move S0. The bus stays radial there.
-3. `python read_plate_svg.py` writes the new positions into `parameters.csv` and checks the `rules` rows: 8 mm from antenna holes, 2 mm coax run clearance, 1.5 mm between parts, 2 mm between holes, 3 mm inside the rim. Use `--dry-run` to preview the changes and `--check` to check without reading the SVGs. It exits non-zero if a rule fails.
-4. `python make_templates.py` for the printable PDF. Re-run `make_plate_svg.py` whenever you edit the CSV by hand, so the SVGs match it again.
+Everything here is generated from one file of numbers, [`parameters.csv`](parameters.csv). Change numbers there, or move parts in Inkscape and let the scripts write the numbers back. Don't hand-edit the outputs (Gerbers, PDF, SVGs): the next run overwrites them.
 
-The `rules` rows are the same margins the current layouts were searched with. The tightest gaps are 1.51 mm (S0 tie hole to the ESP32) and 8.49 mm (an alt tie hole to S0's P2), so check them with the real parts.
+### Setup (once)
+
+1. Install Python 3.10 or later.
+2. `pip install reportlab`. This is only needed for the PDF templates; the deck Gerbers need nothing extra.
+3. Install [Inkscape](https://inkscape.org) 1.x, but only if you want to lay out a plate by dragging parts.
+4. Run every command from this `shield_deck/` folder.
+
+### Files
+
+| File | What it is | Made by |
+| --- | --- | --- |
+| `parameters.csv` | Every measurement, size, placement and clearance rule | You (or `read_plate_svg.py`) |
+| `params.py` | Loads the CSV for the other scripts | - |
+| `shield_deck_gerbers.zip`, `shield_deck_preview.svg`, `hole_table.csv` | Deck PCB Gerbers (any fab), a picture of it, hole coordinates | `make_shield_deck.py` |
+| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring | `make_templates.py` |
+| `plate_layout.svg`, `pipe_plate_layout.svg` | Alt and pipe plates for laying out in Inkscape | `make_plate_svg.py` |
+
+### Print the templates
+
+1. `python make_templates.py`
+2. Print `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page").
+3. Measure the 100 mm scale bar on each page with a ruler before you drill.
+
+The pages, in order (pick one build type, alt or pipe, and print only its pages: [which pages](#quick-start-files-in-the-repo-no-software)):
+
+1. Deck drill template (both)
+2. Alt split plate (alt only)
+3. Pipe plate (pipe only)
+4. Back panel (both)
+5. Pipe stack views, not to scale (pipe only)
+6. Wiring diagram (both)
+
+### Change a measurement or size
+
+1. Open `parameters.csv` in a spreadsheet or text editor and change the `value` cell. Keep the name as it is.
+2. Rebuild whatever uses it:
+   - **Deck rows** (`group` = `deck`): run `python make_shield_deck.py` and re-order the board ([PCBWAY.md](PCBWAY.md)).
+   - **Plate placement rows** (`alt` or `pipe`): run `python make_plate_svg.py` so the Inkscape files match the CSV, then `python read_plate_svg.py --check`.
+   - **Anything else**: run `python make_templates.py`.
+
+Some deck examples:
+
+- **Wider enclosure:** if the enclosure is wider where the deck sits, raise `DISC_DIAMETER` (e.g. to 160). It's sized at 146 mm now; tape any gap at the edge.
+- **Different patch panel:** `PATCH_OFFSET` is 7 because the measured panel's connector axis is in line with its housing back, so the panel stands 7 mm off the face to clear the plug nut. A different panel needs its own value.
+
+How the cells read:
+
+- **`value`:** one number, or several separated by spaces for a group of values. For example, `ESP32` is `x0 y0 w h` and `ALT_S0` is `x y angle`.
+- **Units:** sizes are in mm and angles in degrees, counter-clockwise from +x. Placement coordinates use the plate's top view: 12 o'clock up, y up, origin at the plate centre. A value whose `unit` is `in` is converted to mm on load.
+- **`source`:** says how far to trust a number:
+  - `measured`
+  - `spec` (datasheet or standard)
+  - `estimated`
+  - `assumed`
+  - `design` (a choice)
+  - `rule` (a clearance to keep)
+  - `drawing` (only moves things on a page)
+- **What isn't stored:** values worked out from others (`MOUNT_RADIUS`, `POST_SHIFT`, ...) are computed in the scripts, so they can't drift.
+- **If you remeasure a part:** update its `value`, set `source` to `measured`, and add the date to `note`.
+
+### Lay out a plate in Inkscape
+
+1. `python make_plate_svg.py`. This redraws both SVGs from the CSV. Skip it if the SVGs already match (e.g. right after a pull).
+2. Open `plate_layout.svg` (alt plate) or `pipe_plate_layout.svg` (pipe plate) in Inkscape. The drawing is 1 unit = 1 mm, top view, plate 12 o'clock up. Dashed parts hang under the plate.
+3. Arrange the parts:
+   - **Moving parts:** click a part to select it as one group (outline plus its holes). Drag it and rotate it (click it again for the rotate handles). Don't scale, flip or ungroup it.
+   - **Sliding a hole:** double-click into a part to move its tie-hole pair or the bus M3 hole along the part. Moves sideways are dropped.
+   - **Locked layers:** the plate, the M4 and antenna holes and the deck jacks are locked. The antenna holes are drawn dotted: they are there for reference (deck and plate line up), and can be drilled, but not by design. The dotted red ring round each antenna hole is the 8 mm keep-out.
+   - **Pipe plate:** move only S0. S1 and S2 are clones that follow it, turned 120 deg. The bus stays pointing outward, M3 toward the rim.
+   - **Keep the page:** don't change the page size (Document Properties). The reader refuses a resized page.
+4. Save as **Inkscape SVG**, same file name.
+5. `python read_plate_svg.py --dry-run`. This lists what would change in the CSV and writes nothing.
+6. `python read_plate_svg.py`. This writes the new positions into `parameters.csv` and checks the rules:
+   - Every rule shows `ok` or `FAIL`, with the worst gap and where it is.
+   - On a failure, move that part and repeat from step 5.
+   - It only reads one plate if you name it: `python read_plate_svg.py alt` or `python read_plate_svg.py pipe`.
+7. `python make_templates.py`, then print pages 2 and 3 (alt and pipe plates) and check them against the real parts before drilling.
+8. Commit `parameters.csv` and the SVG together so they stay in step.
+
+### The rules
+
+The `rules` rows of `parameters.csv` set the margins. Change one there and re-run `python read_plate_svg.py --check`.
+
+| Rule | Default | Keeps |
+| --- | --- | --- |
+| `RULE_ANT_CLEAR` | 8 mm | Parts, tie mounts and holes this far from an antenna hole's edge (the stiff coax rises straight up from its jack) |
+| `RULE_COAX_CLEAR` | 2 mm | Each coax run (IPEX4 -> tie mount -> its sector's antenna holes) this far from other parts |
+| `RULE_PART_GAP` | 1.5 mm | Parts, and a hole and someone else's part, this far apart (on the pipe plate also clear of the adapter hex) |
+| `RULE_HOLE_GAP` | 2 mm | Drilled holes this far apart, edge to edge |
+| `RULE_RIM_HOLE`, `RULE_RIM_PART` | 3 mm | Holes and parts this far inside the plate rim |
+
+The current layouts pass with little room to spare. The tightest gaps are 1.51 mm (S0's tie hole to the ESP32) and 8.49 mm (an alt tie hole to S0's P2), so check those with the real parts.
+
+### When something goes wrong
+
+- **`no element with id 's0'`:** a part was ungrouped or its ID changed. Undo that, or run `make_plate_svg.py` and redo the move.
+- **"is flipped" or "is scaled":** undo the flip or scale (Object > Transform). Flipping would swap which side the IPEX4 is on.
+- **"page viewBox is ...":** the page size was changed. Run `make_plate_svg.py` and move the parts again.
+- **`No module named reportlab`:** run `pip install reportlab`.
+- **The CSV and SVG disagree:** whichever you edited last wins. After editing the CSV, run `make_plate_svg.py`. After moving parts in Inkscape, run `read_plate_svg.py`.

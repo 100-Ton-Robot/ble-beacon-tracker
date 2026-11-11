@@ -5,7 +5,7 @@
 
 Each part is one group (its own layer) holding its outline and the holes it needs, so dragging / rotating the group
 moves its holes with it. Tie holes and the bus M3 hole are sub-groups: enter the group (double-click) and drag them
-along the part to move them. The plate, its M4 bolt holes, the drilled-through antenna holes and the deck jacks below
+along the part to move them. The plate, its M4 bolt holes, the antenna holes (dotted, reference only: drillable but not by design) and the deck jacks below
 are locked reference layers. After moving parts, run  python read_plate_svg.py  to write the new positions back into
 parameters.csv and check the clearance rules, then  python make_templates.py  for the PDF.
 
@@ -137,10 +137,11 @@ def m4_and_antennas():
             b += hole(x, -y, d, "M4 bolt to deck")
             b += f'<circle cx="{x:.2f}" cy="{-y:.2f}" r="4" {REF}/>'                 # spacer, approx
             b += text(x, -y + 7, "M4", 2.5, "#d40000")
-    for d, x, y, tag in t.plate_antenna_holes():                               # drilled through, over the deck jacks
-        b += hole(x, -y, d, f"{tag[:-4]} antenna hole")
+    for d, x, y, tag in t.plate_antenna_holes():                               # reference only (dotted), over the deck jacks
+        b += hole(x, -y, d, f"{tag[:-4]} antenna hole (reference, not by design)").replace(
+            "/>", ' stroke-dasharray="0.6 0.9"/>', 2)
         b += f'<circle cx="{x:.2f}" cy="{-y:.2f}" r="{d / 2 + t.RULE_ANT_CLEAR:.2f}" {REF.replace("#999", "#d40000")} opacity="0.5"/>'
-        b += text(x, -y - d / 2 - 1, tag[:-4], 2, "#d40000")
+        b += text(x, -y - d / 2 - 1, f"{tag[:-4]} ref", 2, "#d40000")
     return layer("layer_m4", f"M4 + antenna holes, {t.RULE_ANT_CLEAR:g} mm keep-out (locked)", b, locked=True)
 
 

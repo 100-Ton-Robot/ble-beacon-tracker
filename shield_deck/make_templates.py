@@ -853,7 +853,7 @@ def alt_plate_page(c):
     letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
     turn = math.radians(PLATE_TURN)
     for d, x, y, lab in g.holes:
-        if lab in ("via", "M4 mount", "core feed") or d == 6.5:   # 6.5 mm jacks are drilled through (below)
+        if lab in ("via", "M4 mount", "core feed") or d == 6.5:   # 6.5 mm jacks are drawn below (dotted, reference)
             continue
         dx, dy = x - g.CX, y - g.CY
         px, py = dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn)
@@ -934,10 +934,13 @@ def alt_plate_page(c):
 
     holes = alt_plate_holes()
     for d, x, y, tag in holes:
+        if tag.endswith(" ant"):               # antenna holes: dotted, for reference only (not by design)
+            c.setDash(0.6, 1.2)
         c.setLineWidth(0.5)
         c.circle(*P(x, y), d / 2 * mm)
         c.setLineWidth(0.2)
         crosshair(c, x + ox, y + oy, d / 2)
+        c.setDash()
         c.setFont("Helvetica-Bold", 7)
         if tag == "M4":                        # outward from the centre, clear of the parts
             r = math.hypot(x, y)
@@ -948,7 +951,7 @@ def alt_plate_page(c):
             c.drawCentredString(*P(x * k, y * k - 1), f"{tag.split()[0]} wires {d:g}")
         elif tag.endswith(" ant"):             # antenna jack holes: name + size, above
             c.setFont("Helvetica", 6)
-            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g}")
+            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g} ref")
         elif tag.endswith("tie"):              # every tie hole: its size just outward of it
             c.setFont("Helvetica", 5.5)
             r = math.hypot(x, y)
@@ -963,7 +966,7 @@ def alt_plate_page(c):
         "Hanging from the ceiling, top down: enclosure top, this module plate, everything else under it, deck, core.",
         f"Drill: 3 x {PLATE_M4:g} mm (M4) bolts to the deck, on the deck's M4 holes; {PLATE_M3:g} mm (M3) bus board. No harness holes.",
         f"Tie hole pairs {TIE_HOLE:g} mm (any 3.0-{TIE_HOLE:g} mm fits a 2.5 mm tie): one across each XIAO, two across the ESP32.",
-        "Antenna holes: 9 x 6.5 mm, the deck's D / P / P2 jacks, drilled through so deck and plate line up hole for hole.",
+        "Antenna holes (dotted, 9 x 6.5 mm): the deck's D / P / P2 jacks, shown for reference only. Not by design; drill if you like.",
         "XIAOs (in the gaps between the sectors' holes) on VHB + a zip tie (grey bar), IPEX4 dot -> orange coax -> 1/2\" HS-100",
         "tie mount, which clamps it, then on (dashed orange) to its own sector's D / P / P2 jack in use: one smooth sweep, bending",
         "down through the spacer gap. Nothing sits within 8 mm of an antenna hole (the coax rises straight from its jack).",
@@ -1015,8 +1018,8 @@ def ant_label_y(x, y, d, holes):
 
 
 def plate_antenna_holes():
-    """The deck's 6.5 mm antenna jack holes (D, P, P2) in the plate frame: drilled through both plates so deck,
-    plate and every page line up hole for hole (user, 2026-11-09)."""
+    """The deck's 6.5 mm antenna jack holes (D, P, P2) in the plate frame, drawn dotted on both plates for reference
+    so deck, plate and every page line up; they can be drilled but are not by design (user, 2026-11-10)."""
     letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2"}
     turn = math.radians(PLATE_TURN)
     out = []
@@ -1140,17 +1143,20 @@ def fl_plate_page(c):
 
     holes = fl_plate_holes()
     for d, x, y, tag in holes:
+        if tag.endswith(" ant"):               # antenna holes: dotted, for reference only (not by design)
+            c.setDash(0.6, 1.2)
         c.setLineWidth(0.5)
         c.circle(*P(x, y), d / 2 * mm)
         c.setLineWidth(0.2)
         crosshair(c, x + ox, y + oy, d / 2)
+        c.setDash()
         c.setFont("Helvetica-Bold", 7)
         r = math.hypot(x, y)
         if tag == "M4":
             c.drawCentredString(*P(x * (r + 8) / r, y * (r + 8) / r - 1), f"M4 {d:g}")
         elif tag.endswith(" ant"):             # antenna jack holes: name + size, above
             c.setFont("Helvetica", 6)
-            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g}")
+            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g} ref")
         elif tag.endswith("tie"):                     # every tie hole: its size beside it
             c.setFont("Helvetica", 5.5)
             c.drawString(*P(x + d / 2 + 0.5, y + d / 2), f"tie {d:g}")
@@ -1163,7 +1169,7 @@ def fl_plate_page(c):
         "Hanging from the ceiling, top down: nut, enclosure top, this module plate, modules + wiring under it, deck, core.",
         f"Drill: 3 x {PLATE_M4:g} mm (M4) bolts to the deck, on the deck's M4 holes; {PLATE_M3:g} mm (M3) bus board;",
         f"tie hole pairs {TIE_HOLE:g} mm (3.0-{TIE_HOLE:g} fits a 2.5 mm tie), one per XIAO. No pigtail or feed holes: the parts hang under the plate.",
-        "Antenna holes: 9 x 6.5 mm, the deck's D / P / P2 jacks, drilled through so deck and plate line up hole for hole.",
+        "Antenna holes (dotted, 9 x 6.5 mm): the deck's D / P / P2 jacks, shown for reference only. Not by design; drill if you like.",
         f"Centre (blue): {ADAPTER_HOLE:g} mm (7/8\") hole for the 1/2\" male adapter's thread, which also goes through the",
         "enclosure top; the nut on top (dashed, size est.) clamps both. Ethernet comes down the pipe (page 5).",
         "EU: a 20 mm x 1/2\" BSP male adaptor (R 1/2, 21 mm thread) fits the same 22 mm hole, held by a 1/2\" BSP backnut.",
@@ -1433,14 +1439,50 @@ def stack_page(c):
     c.drawString((18 + 50 * k) * mm, 13.5 * mm, "50 mm at drawing scale")
 
 
+BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-10): builders pick one, alt or pipe
+    deck_page: ("BOTH BUILDS", "alt and pipe (the 2-1/4\" hole-saw circle is pipe only)", (0.3, 0.3, 0.3)),
+    alt_plate_page: ("ALT BUILD ONLY (no pipe)", "pick one: alt or pipe", (0.1, 0.35, 0.7)),
+    fl_plate_page: ("PIPE BUILD ONLY", "pick one: alt or pipe", (0.1, 0.5, 0.25)),
+    face_page: ("BOTH BUILDS", "alt and pipe", (0.3, 0.3, 0.3)),
+    stack_page: ("PIPE BUILD ONLY", "pick one: alt or pipe", (0.1, 0.5, 0.25)),
+    wiring_page: ("BOTH BUILDS", "alt and pipe", (0.3, 0.3, 0.3)),
+}
+
+
+def build_tag(c, page, n):
+    """Box naming the build type the page is for, plus the page set of each build. Right of the scale bar,
+    below the titles; on the wiring page (no room there) beside the title."""
+    head, sub, rgb = BUILD_TAGS[page]
+    sets = "Alt: pages 1, 2, 4, 6   Pipe: pages 1, 3, 4, 5, 6"
+    x1 = PAGE_W - 12 * mm
+    y1 = PAGE_H - (6.5 if page is wiring_page else 27.5) * mm
+    w = max(c.stringWidth(f"p{n}  {head}", "Helvetica-Bold", 8.5), c.stringWidth(sub, "Helvetica", 6),
+            c.stringWidth(sets, "Helvetica", 6)) + 4 * mm
+    h = 10 * mm
+    c.saveState()
+    c.setStrokeColorRGB(*rgb)
+    c.setLineWidth(1)
+    c.setFillColorRGB(*(1 - (1 - v) * 0.1 for v in rgb))
+    c.roundRect(x1 - w, y1 - h, w, h, 1.5 * mm, fill=1)
+    c.setFillColorRGB(*rgb)
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(x1 - w + 2 * mm, y1 - 3.6 * mm, f"p{n}  {head}")
+    c.setFont("Helvetica", 6)
+    c.drawString(x1 - w + 2 * mm, y1 - 6.3 * mm, sub)
+    c.setFillGray(0.3)
+    c.drawString(x1 - w + 2 * mm, y1 - 8.8 * mm, sets)
+    c.restoreState()
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     out = os.path.join(here, "shield_deck_templates.pdf")
     c = canvas.Canvas(out, pagesize=letter)
     c.setTitle("Shield deck, back panel, electronics plate templates and plate wiring")
     # drill templates first (deck, plates, back panel), then the stack view, wiring diagram last (user, 2026-11-09)
-    for page in (deck_page, alt_plate_page, fl_plate_page, face_page, stack_page, wiring_page):
+    for n, page in enumerate((deck_page, alt_plate_page, fl_plate_page, face_page, stack_page, wiring_page), 1):
         page(c)
+        build_tag(c, page, n)
         c.showPage()
     c.save()
     print("wrote", out)
