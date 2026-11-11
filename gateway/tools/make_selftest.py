@@ -55,6 +55,8 @@ CMD_VECTORS = [
     ("flash on", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae100120018a8700"),
     ("reboot", "38cd69b0ed39e516", "120a0838cd69b0ed39e516100138a5018d5c00"),
     ("ignore list", "", "0710017801863900"),
+    ("debug tx1m on", "", "081001800101a87b00"),
+    ("debug off", "", "051001800103896b00"),
 ]
 
 CHIP = bytes.fromhex("38cd69b0ed39e516")
@@ -88,7 +90,16 @@ def ignored(a):
 
 
 def vtuple(v):
-    return tuple(int(x) for x in v.split("."))
+    """As compare_versions in the gateway: three numeric parts, each the leading digits (missing = 0)."""
+    parts = []
+    for x in (v.split(".") + ["", "", ""])[:3]:
+        d = ""
+        for ch in x:
+            if not ch.isdigit():
+                break
+            d += ch
+        parts.append(int(d) if d else 0)
+    return tuple(parts)
 
 
 # ------------------------------------------------------------------ JSON as the gateway writes it
@@ -133,6 +144,19 @@ def name_str(b):
         return b.decode("utf-8")
     except UnicodeDecodeError:
         return "".join(chr(x) if x < 0x80 else "?" for x in b)
+
+
+def clean_text(b, limit):
+    """Scanner text as the gateway passes it on: at most `limit` bytes, control characters and
+    DEL as '?', every non-ASCII byte too unless the whole text is valid UTF-8."""
+    b = b[:limit]
+    try:
+        b.decode("utf-8")
+        utf8 = True
+    except UnicodeDecodeError:
+        utf8 = False
+    return bytes(0x3F if x < 0x20 or x == 0x7F or (x >= 0x80 and not utf8) else x
+                 for x in b).decode("utf-8")
 
 
 def uuid_str(b):
@@ -188,6 +212,7 @@ class Sector:
 
     def __init__(self, pin):
         self.pin, self.lost, self.bad, self.last_seq = pin, 0, 0, None
+        self.bad_records = 0
         self.rssi_interval = 1
         self.version, self.fw_cmp = None, None
         self.out = []
@@ -221,25 +246,38 @@ class Sector:
     def bad_frame(self):
         self.bad += 1
 
-    def bucket(self, b, unknown_records=()):
+    def bucket(self, b, unknown_records=(), extra=()):
+        """extra: records after b's own, in wire order: pb.Record, ("event", cat, sev, code,
+        text bytes) for text a pb2 string can't hold, ("raw", num, payload) for unknown kinds,
+        ("bad",) for a record the gateway must drop as malformed"""
         chip = b.chip_id.hex()
         if self.last_seq is not None and b.seq > self.last_seq:
             self.lost += b.seq - self.last_seq - 1
         self.last_seq = b.seq
-        suspect = False  # only an expected_chip mismatch, not configured in the self-test
+        suspect = False  # no expected_chip on the test sector; the RX pin is the sector
 
         devs = []
-        for r in b.records:
+        for r in list(b.records) + list(extra):
+            if isinstance(r, tuple):
+                if r[0] == "event":
+                    _, cat, sev, code, text = r
+                    self.event(True, cat, sev, CODES[code], 0, 0, 0, clean_text(text, 64))
+                elif r[0] == "raw" and r[1] <= 63:
+                    self.pub(f"raw/{r[1]}", r[2].hex())
+                else:
+                    self.bad_records += 1
+                continue
             k = r.WhichOneof("kind")
             if k == "event":
                 e = r.event
                 self.event(True, e.category, e.severity, CODES[e.code], e.value, e.value2,
-                           e.cmd_seq, e.text)
+                           e.cmd_seq, clean_text(e.text.encode(), 64))
             elif k == "status":
                 s = r.status
                 st = {"t": None, "chip": chip, "seq": b.seq, "pin_sector": self.pin,
                       "suspect": suspect, "lost": self.lost, "bad": self.bad,
-                      "rx_overflow": 0, "version": s.version}
+                      "bad_records": self.bad_records, "rx_overflow": 0,
+                      "version": clean_text(s.version.encode(), 24)}
                 for f in ("ext_antenna", "listening", "active_scan", "payloads", "flash_mode",
                           "client", "test_image", "adverts", "dropped", "devices", "load_reasons",
                           "line_peak_pct", "budget_pct"):
@@ -251,7 +289,7 @@ class Sector:
                     st[f] = getattr(s, f)
                 self.rssi_interval = s.intervals.rssi
                 self.pub("status", dumps(st))
-                self.firmware(s.version)
+                self.firmware(st["version"])
             elif k == "counters":
                 c = {"t": None, "chip": chip, "seq": b.seq}
                 for f in pb.Counters.DESCRIPTOR.fields:
@@ -259,6 +297,9 @@ class Sector:
                 self.pub("counters", dumps(c))
             elif k == "rssi":
                 x = r.rssi
+                if len(x.addr) != 6:
+                    self.bad_records += 1
+                    continue
                 if ignored(x.addr):
                     continue
                 devs.append([addr(x.addr), x.random, x.adv_type, mean1(x.rssi_sum_dbm, x.count),
@@ -266,6 +307,9 @@ class Sector:
                              x.tx_1m_dbm if x.HasField("tx_1m_dbm") else None])
             elif k in ("advert", "scan_rsp"):
                 x = getattr(r, k)
+                if len(x.addr) != 6 or len(x.data) > 31:
+                    self.bad_records += 1
+                    continue
                 if ignored(x.addr):
                     continue
                 a = {"id": addr(x.addr), "mast": MAST, "sector": self.pin, "chip": chip, "t": None,
@@ -274,9 +318,24 @@ class Sector:
                      "refresh": x.refresh, "age_ms": x.age_ticks * b.tick_ms, "data": x.data.hex()}
                 a.update(ad_fields(x.data))
                 self.pub(f"adv/{addr(x.addr, '')}", dumps(a))
+            elif k == "tx_drops":
+                t = r.tx_drops
+                drops, omitted = [], t.omitted
+                for x in t.drops:
+                    if len(x.addr) != 6:
+                        omitted += 1  # not published
+                        continue
+                    drops.append({"id": addr(x.addr), "random": x.random,
+                                  "format": pb.TxFormat.Name(x.format)[len("TX_FORMAT_"):].lower(),
+                                  "raw_dbm": x.raw_dbm, "tx_1m_dbm": x.tx_1m_dbm, "count": x.count})
+                self.pub("debug/tx_1m", dumps({"t": None, "chip": chip, "seq": b.seq, "drops": drops,
+                                               "omitted": omitted}))
         # Records this pb2 doesn't know: the generator appends them last, so they come last
         for num, payload in unknown_records:
-            self.pub(f"raw/{num}", payload.hex())
+            if num <= 63:
+                self.pub(f"raw/{num}", payload.hex())
+            else:
+                self.bad_records += 1
         if devs or self.rssi_interval == 1:
             rs = {"t": None, "seq": b.seq, "t_ms": b.t_ms, "tick_ms": b.tick_ms, "chan": b.chan,
                   "load": b.load, "chip": chip, "suspect": suspect,
@@ -343,9 +402,11 @@ def bucket_a():
     b.records.add(scan_rsp=pb.Payload(addr=bytes.fromhex("112233445566"), adv_type=4,
                                       rssi_dbm=-70, data=rsp, refresh=True, age_ticks=2))
     assert len(adv) <= 31 and len(rsp) <= 31
-    # Unknown record kind (Record field 9) and unknown Bucket field 20, both to be skipped
+    # Unknown record kind (Record field 9) and unknown Bucket field 20, both to be skipped, and
+    # the retired sector claim (Bucket field 2) a scanner before 0.5.0 still sends: ignored
     unknown = bytes([0x08, 0x2A])
-    body = b.SerializeToString() + ld(15, ld(9, unknown)) + key(20, 0) + ref_varint(1)
+    body = (b.SerializeToString() + ld(15, ld(9, unknown)) + key(20, 0) + ref_varint(1) +
+            key(2, 0) + ref_varint(1))
     return b, body, [(9, unknown)]
 
 
@@ -371,7 +432,42 @@ def bucket_d():
     il.rules.add(addr=bytes.fromhex("c17d2b000000"), mask=bytes.fromhex("ffffff000000"), saved=True,
                  hits=12)
     b.records.add(ignore_list=il)
+    # Debug summary (scanner 0.8.0+): the 3-byte address is left out and counted in omitted
+    td = b.records.add().tx_drops
+    td.drops.add(addr=bytes.fromhex("c0ffee000002"), random=True, format=pb.TX_FORMAT_IBEACON,
+                 raw_dbm=127, tx_1m_dbm=127, count=3)
+    td.drops.add(addr=bytes.fromhex("c0ffee000003"), format=pb.TX_FORMAT_EDDYSTONE_UID,
+                 raw_dbm=-100, tx_1m_dbm=-141, count=1)
+    td.drops.add(addr=bytes.fromhex("c0ffee"), format=pb.TX_FORMAT_EDDYSTONE_URL, raw_dbm=90,
+                 tx_1m_dbm=49, count=2)
+    td.omitted = 2
     return b, b.SerializeToString(), []
+
+
+def bucket_e():
+    """Malformed input the gateway must clean or drop, then a status showing bad_records"""
+    b = pb.Bucket(chip_id=CHIP, seq=105, t_ms=21000, tick_ms=200, chan=0, load=0)
+    bad_text = b"bad \xff\x1b[31m red"
+    event = key(1, 0) + ref_varint(0) + key(2, 0) + ref_varint(1) + ld(7, bad_text)
+    long_ad = bytes([39, 0xFF]) + bytes(38)
+    st = status()
+    st.status.version = "0.9\x1b[2J"
+    wire = [
+        (ld(5, event), ("event", 0, 1, 0, bad_text)),
+        (pb.Record(rssi=pb.Rssi(addr=bytes(5), count=1)).SerializeToString(), ("bad",)),
+        (pb.Record(advert=pb.Payload(addr=bytes(6), data=long_ad)).SerializeToString(), ("bad",)),
+        (ld(100, bytes([0x08, 0x01])), ("bad",)),               # unknown kind past 63
+        (key(2, 0) + ref_varint(5), ("bad",)),                  # known kind, not a sub-message
+        (ld(10, bytes([0x08, 0x2A])), ("raw", 10, bytes([0x08, 0x2A]))),
+        (st.SerializeToString(), st),
+    ]
+    body = b.SerializeToString() + b"".join(ld(15, w) for w, _ in wire)
+    return b, body, [], [m for _, m in wire]
+
+
+def bad_chip():
+    """A bucket whose chip ID isn't 8 bytes: dropped whole, counted as a bad frame"""
+    return ref.frame(pb.Bucket(chip_id=CHIP[:7], seq=106).SerializeToString())
 
 
 def corrupt(body):
@@ -397,7 +493,16 @@ def main():
 
     sec = Sector(PIN)
     frames = []
-    for make in (bucket_a, bucket_b, None, bucket_d):
+    for make in (bucket_a, bucket_b, None, bucket_d, bad_chip, bucket_e):
+        if make is bad_chip:
+            frames.append(bad_chip())
+            sec.bad_frame()
+            continue
+        if make is bucket_e:
+            b, body, unknown, extra = make()
+            frames.append(ref.frame(body))
+            sec.bucket(b, unknown, extra)
+            continue
         if make is None:
             frames.append(corrupt(bucket_d()[1]))
             try:
@@ -419,7 +524,7 @@ def main():
         f.write("static const CmdVector CMD_VECTORS[] = {\n")
         for text, chip, hexstr in CMD_VECTORS:
             f.write(f"    {{{c_str(text)}, {c_str(chip)}, {c_str(hexstr)}}},\n")
-        f.write("};\n\n// Framed buckets (hex, each ending in 00); the third has a bad CRC\n")
+        f.write("};\n\n// Framed buckets (hex, each ending in 00); the third has a bad CRC, the fifth a 7-byte chip ID\n")
         f.write("static const char *const FRAMES[] = {\n")
         for fr in frames:
             f.write(f"    {c_str(fr.hex())},\n")

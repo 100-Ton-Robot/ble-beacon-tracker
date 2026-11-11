@@ -152,9 +152,10 @@ uart:
     baud_rate: 115200
     rx_buffer_size: 4096
 
-# The RX pin is the sector (scanners have no sector of their own since firmware 0.5.0).
-# expected_chip (16 hex digits) per sector adds a board check: another chip on that pin is a
-# SECURITY error, marks its data suspect and turns on "Sector N wrong chip".
+# The RX pin is the sector (scanners have no sector of their own since firmware 0.5.0). A
+# different chip on a pin is a SECURITY warning (CHIP_CHANGED).
+# expected_chip (16 hex digits) per sector pins it to one board: any other chip is a SECURITY
+# error, marks that sector's data suspect and turns on "Sector N wrong chip".
 # scanner_firmware: the latest scanner firmware (defaults to the one the component was written
 # for); a scanner reporting an older one raises FIRMWARE_OUTDATED and "Sector N firmware outdated".
 # ignore: the mast's default ignore list, one for all sectors. The gateway drops RSSI and advert

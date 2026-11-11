@@ -27,10 +27,22 @@ scanners' own ignore lists, 0.7.0 to read them back): v2 and v1 frames are dropp
   in `status`, `ignored` in `counters`; "Sector N ignored" sensor (adverts per second).
 - Changed (2026-11-11): `ignore` / `unignore` / `ignore clear` are accepted only on `all/cmd`
   (one list for the whole mast). Self-test regenerated: firmware check, ignore list and the
-  new command vectors and an ignore list record (24 commands, 17 messages).
+  new command vectors and an ignore list record.
 - Changed (2026-11-11): the gateway asks a scanner for its ignore list (`ignore list`) only once
   its status shows 0.7.0 or later; a 0.6.0 scanner would reject the request every minute.
-
+- Fixed (2026-11-11): input from the scanners is checked before it is published. A bucket whose
+  chip ID isn't 8 bytes is dropped (a bad frame; a shorter one used to be zero-padded); single
+  records with an address that isn't 6 bytes, advert data over 31 bytes, a known kind that isn't
+  a sub-message or an unknown kind above 63 are dropped and counted in the new `bad_records`
+  (status JSON; logged at most once a minute). Unknown kinds 9-63 still go to `raw/<n>`.
+  Scanner `version` and event `text` are cleaned like advert names (control characters as
+  `?`, non-ASCII as `?` unless valid UTF-8).
+- Fixed (2026-11-11): MQTT commands with control or non-ASCII characters or over 128
+  characters are dropped, and warnings no longer repeat the rejected text (log injection).
+- Fixed (2026-11-11): `tools/make_selftest.py` runs again; the self-test data is regenerated
+  from it and covers the retired claim field, `ignore list`, `debug`, `TxDrops`, a short chip
+  ID, malformed records and unclean text (with the firmware check and ignore list: 26 commands,
+  23 messages). The firmware check compares a cleaned version the same way in both.
 - Changed (2026-11-02): reads protocol 3 (protobuf `Bucket` every 200 ms, CRC + COBS) with a
   small hand-written wire-format reader (`pb_wire.h`); unknown fields are skipped and unknown
   record kinds published as hex on `<sector>/raw/<n>`. UART RX buffers 4096 bytes.
@@ -82,10 +94,36 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Docs
 
+- Added `SECURITY.md` (2026-11-11): how to report a vulnerability, and the gaps from the input-validation review that
+  are accepted as they are (MCUboot downgrade, unauthenticated D7 commands, MQTT commands
+  authorised by the broker login), why, and what would reopen them.
 - READMEs match gateway v2. Notes that only applied to one PC were made general. This changelog
   was added.
 
 ## Scanner firmware
+
+### 0.8.0 (unreleased)
+
+- Fixed: the advertised 1 m power was not range-checked. Eddystone UID/URL 0 m power below
+  -87 dBm wrapped when 41 was subtracted (-100 came out as +115 dBm), and any iBeacon byte was
+  passed on as is (0x7F read as "none"). Values outside -100..+20 dBm at 1 m are now dropped
+  (`tx_1m_dbm` left out, the advert still counted) and counted in the new
+  `Counters.tx_1m_dropped` (field 16).
+- Added: debug output the gateway turns on, off at every boot. `Command.debug` (field 16,
+  `DebugFlag` bits, one scanner or all; text `debug tx1m on|off`, `debug off`) and
+  `Status.debug` (field 20). `DEBUG_TX_1M`: a `TxDrops` record (`Record` field 8) in the
+  bucket after each second with dropped 1 m powers: per address (up to 16, the rest counted
+  in `omitted`) the format, the byte as advertised, what it works out to at 1 m and how many
+  adverts. It uses what RSSI and payloads left of the budget, so it never trims RSSI.
+- Gateway: `<sector>/counters` now includes `ignored` (field 15, missing since 0.6.0) and
+  `tx_1m_dropped`. `debug` commands on `<sector>/cmd` and `all/cmd`; `TxDrops` published on
+  `<sector>/debug/tx_1m`, retained state `<sector>/debug`.
+- `decode_frames.py` builds the `debug` commands and shows `TxDrops` and `Status.debug`.
+- Fixed: event text is printable ASCII; anything else becomes `?` (the old version in
+  `VERSION_CHANGED` comes from flash and could hold any byte).
+- Fixed: the console's `budget`, `chan` and `minrssi` read the whole argument as a number
+  (`budget 50x` was taken as 50, `chan 38x` as 38).
+- Not built or flashed yet: no image in `scanner_fw/release/`.
 
 ### 0.7.0 (2026-11-11)
 

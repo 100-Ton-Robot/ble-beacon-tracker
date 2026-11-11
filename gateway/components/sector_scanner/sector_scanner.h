@@ -34,6 +34,7 @@ enum Action : uint8_t {
   ACT_LISTEN = 3,
   ACT_FLASH = 4,
   ACT_EXT_ANTENNA = 5,
+  /* 6 was sector (the scanner's sector claim), retired in scanner 0.5.0 */
   ACT_REBOOT = 7,
   ACT_PAYLOADS = 8,
   ACT_ACTIVE_SCAN = 9,
@@ -43,7 +44,10 @@ enum Action : uint8_t {
   ACT_UNIGNORE = 13,      // IgnoreRule
   ACT_IGNORE_CLEAR = 14,  // arg = IgnoreClear: 1 until-reboot rules, 2 saved, 3 all
   ACT_IGNORE_LIST = 15,   // ask for the IgnoreList record (one scanner or all)
+  ACT_DEBUG = 16,         // arg = DebugFlag bits to have on (0 = all off); not kept applied
 };
+/* DebugFlag bits (bletracker.proto) */
+static const uint32_t DEBUG_TX_1M = 1;
 static const size_t ADDR_LEN = 6;
 
 /* Intervals in ticks, field order of bletracker.Intervals; 0 = unchanged in a command */
@@ -143,10 +147,11 @@ class Sector : public uart::UARTDevice {
   void handle_record_(const uint8_t *p, size_t len, const char *t);
   void handle_status_(const uint8_t *p, size_t len, const char *t);
   void handle_ignore_list_(const uint8_t *p, size_t len, const char *t);
+  void handle_tx_drops_(const uint8_t *p, size_t len, const char *t);
   void handle_counters_(const uint8_t *p, size_t len, const char *t);
   void handle_event_(const uint8_t *p, size_t len, const char *t);
-  void add_rssi_(const uint8_t *p, size_t len);
-  void publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t);
+  bool add_rssi_(const uint8_t *p, size_t len);
+  bool publish_payload_(const uint8_t *p, size_t len, bool scan_rsp, const char *t);
   void set_state_(uint8_t i, const std::string &v);
   void publish_online_(bool online);
   void reconcile_();
@@ -183,6 +188,9 @@ class Sector : public uart::UARTDevice {
   uint32_t lost_{0};
   uint32_t bad_{0};
   uint32_t bad_window_{0};
+  uint32_t bad_records_{0};          // records dropped as malformed, since boot
+  uint32_t bad_records_logged_{0};
+  uint32_t bad_records_ms_{0};
   uint32_t rx_high_{0};
   uint32_t rx_high_window_{0};
   uint32_t last_bucket_ms_{0};

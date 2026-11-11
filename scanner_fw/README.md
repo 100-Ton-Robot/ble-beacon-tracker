@@ -197,7 +197,8 @@ What you see and type:
   (most beacons), 4 scan response, 5 extended. `print off` to stop; it scrolls fast.
 - `list on`: a table each second, one row per device heard in that second, strongest first:
   `address type med max n tx1m adv` = median and max RSSI (dBm), adverts that second,
-  advertised 1 m power (iBeacon, or Eddystone UID/URL 0 m power minus 41; blank if none),
+  advertised 1 m power (iBeacon, or Eddystone UID/URL 0 m power minus 41; blank if none or
+  outside -100..+20 dBm),
   advert type. Up to 64 devices; the median uses that second's last 32 adverts.
   `minrssi -80` hides weaker devices (`minrssi -127` shows all). `list off` to stop.
 - `list csv`: the same data as CSV
@@ -262,8 +263,9 @@ it). Full spec: [PROTOCOL.md](PROTOCOL.md), schema: [proto/bletracker.proto](pro
   address (every tick: sum, count and max, so the mean is exact), and, once the gateway turns
   them on, changed advert / scan response bytes plus a refresh every 10 s.
 - Commands are protobuf too: listen, flash, antenna, reboot, payloads, active scanning,
-  intervals, budget, ignore / unignore / ignore clear. Each is acknowledged with an event in the
-  next bucket.
+  intervals, budget, ignore / unignore / ignore clear / ignore list, debug (0.8.0+: `debug tx1m
+  on` sends a per-second summary of adverts whose 1 m power was out of range and dropped; off
+  at every boot). Each is acknowledged with an event in the next bucket.
 
 The firmware builds its C code from the schema with nanopb (in NCS, `CONFIG_NANOPB`). For the
 Python tools, `tools/bletracker_pb2.py` is generated with the toolchain's protoc:

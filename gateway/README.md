@@ -5,11 +5,12 @@ Reads the three sector scanners' protocol 3 stream (protobuf buckets every 200 m
 [`../scanner_fw/proto/bletracker.proto`](../scanner_fw/proto/bletracker.proto)) and publishes
 it to MQTT (layout v3, below): one RSSI message per sector per bucket, the raw advert and scan
 response bytes split into Theengs-style fields, status, counters, events and a separate
-security stream. The RX pin a scanner is wired to is its sector. The gateway checks each
-scanner's firmware version against the latest it knows, drops addresses on the mast's ignore
-list, keeps the settings the scanners forget at boot applied, passes commands to the scanners
-and lowers their byte budget when it can't keep up. Needs scanner firmware **0.5.0 or later**
-(0.6.0 for the scanners' own ignore lists, 0.7.0 for reading them back); older (v2) frames are dropped as bad.
+security stream. The RX pin a scanner is wired to is its sector; the gateway watches each pin's
+chip ID for a board swap, checks each scanner's firmware version against the latest it knows,
+checks the scanners' input, drops addresses on the mast's ignore list, keeps the settings the
+scanners forget at boot applied, passes commands to the scanners and lowers their byte budget
+when it can't keep up. Needs scanner firmware **0.5.0 or later** (0.6.0 for the scanners' own
+ignore lists, 0.7.0 for reading them back, 0.8.0 for `debug`); older (v2) frames are dropped as bad.
 
 Home Assistant sees only the gateway's own entities, over the ESPHome API: health sensors,
 the chip ID, firmware version and wrong-chip / outdated-firmware alarms per sector, the
@@ -86,15 +87,17 @@ used by the scanners).
 
 ## Sectors
 
-The sector is the gateway RX pin a scanner's D6 is wired to; scanners have no sector of their
-own since firmware 0.5.0, so wiring is the only source of truth.
+A scanner doesn't know its sector: the sector is the gateway RX pin its D6 is wired to, so
+wiring is the only source of truth. (Scanners before 0.5.0 also sent a saved sector claim; the
+gateway ignores it.) What the gateway checks is the scanner's chip ID, sent in every bucket:
 
-- Optional `expected_chip` per sector (16 hex digits): a different chip on that pin is a
-  `CHIP_MISMATCH` (ERROR, security), logged on first detection and then once a minute while it
-  lasts; `suspect: true` on that sector's `rssi`, `adv` and `status`; the API binary sensor
-  "Sector N wrong chip" turns on. Data keeps flowing, labelled by the pin. Back to the
-  expected chip: `CHIP_OK` (INFO, security).
-- A pin whose chip changes at all raises `CHIP_CHANGED` (WARN, security).
+- **Chip changed**: a different chip on a pin than the last one seen there (board swap or
+  rewiring): `CHIP_CHANGED`, WARN (security), text "chip <new> replaced <old>".
+- **Expected chip** (optional `expected_chip` per sector, 16 hex digits): any other chip on
+  that pin is a `CHIP_MISMATCH`, logged as ERROR tagged `[SECURITY ERROR]` on first detection
+  and then once a minute while it lasts; `suspect: true` on that sector's `rssi`, `adv` and
+  `status`; the API binary sensor "Sector N wrong chip" turns on. Data keeps flowing,
+  labelled by the pin. When the expected chip is back: `CHIP_OK`, INFO (security).
 
 ## Scanner firmware check
 
@@ -140,6 +143,7 @@ the line. The gateway leaves those alone: change them over MQTT with the `ignore
 and `ignore clear` commands on `all/cmd` (below). The status fields `ignore_rules`,
 `ignore_saved` and `ignored`, and "Sector N ignored" (adverts per second), show them working.
 
+
 ## Settings the gateway keeps applied
 
 Scanners boot with payload records off, passive scanning, default intervals and a 70 % budget,
@@ -176,7 +180,8 @@ sector_scanner:
 
 ## MQTT output (layout v3)
 
-All under `bletracker/<mast>/`, QoS 0. `<sector>` is the gateway's RX pin (0-2). `t` is the gateway's clock when it handled the bucket, epoch **milliseconds**
+All under `bletracker/<mast>/`, QoS 0. `<sector>` is the gateway's RX pin (0-2), which is the
+scanner's sector. `t` is the gateway's clock when it handled the bucket, epoch **milliseconds**
 (null until SNTP has set the clock). `chip` is the scanner's chip ID, 16 lowercase hex.
 
 | Topic | Retained | When | Payload |
@@ -186,15 +191,17 @@ All under `bletracker/<mast>/`, QoS 0. `<sector>` is the gateway's RX pin (0-2).
 | `<sector>/rssi` | no | every bucket (5 Hz), or every RSSI interval when it's > 1 | batched RSSI, below |
 | `<sector>/adv/<ADDR>` | no | each payload record (changed bytes, refreshes) | advert / scan response, below |
 | `<sector>/status` | no | each status record (1 s) | scanner status + gateway link health, below |
-| `<sector>/counters` | no | each counters record (10 s) | scanner totals since boot |
+| `<sector>/counters` | no | each counters record (10 s) | scanner totals since boot (`Counters` fields by name, `ignored` and `tx_1m_dropped` included) |
 | `events` | no | every scanner and gateway event | event JSON, below |
 | `security` | no | SECURITY-category events only | same JSON; this stream is the security record |
 | `<sector>/ignore` | yes | each `IgnoreList` record (scanner 0.7.0+: at its boot, on a change, on request) | `{"t","chip","seq","paused","count","rules":[{"rule":"C1:7D:2B:00:00:00/24","saved":true,"hits":12}]}` |
-| `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`) | the record's bytes as hex |
+| `<sector>/debug/tx_1m` | no | each `TxDrops` record (scanner 0.8.0+, `debug tx1m on`): after a second with dropped 1 m powers | `{"t","chip","seq","drops":[{"id":"AA:BB:CC:DD:EE:FF","random":true,"format":"ibeacon","raw_dbm":127,"tx_1m_dbm":127,"count":3}],"omitted":0}`; `format` `ibeacon`, `eddystone_uid` or `eddystone_url`; `raw_dbm` as advertised (Eddystone: at 0 m) |
+| `<sector>/raw/<n>` | no | a record kind this gateway doesn't know (field `n` of `Record`, 9-63; higher ones are dropped and counted in `bad_records`) | the record's bytes as hex |
 | `<sector>/online` | yes | first bucket / none for 3 s | `online` / `offline` |
-| `<sector>/chip`, `version`, `load` | yes | on change | chip ID / scanner firmware version / load level |
+| `<sector>/chip`, `version`, `load` | yes | on change | chip ID / scanner firmware version / load level. (`claim` and the v2 `scanner_sector` are no longer published; their retained values are cleared at connect) |
 | `<sector>/flash`, `listening`, `client`, `test_image`, `active`, `payloads` | yes | on change | `on` / `off` |
 | `<sector>/ant` | yes | on change | `int` / `ext` |
+| `<sector>/debug` | yes | on change | `off` / `tx1m` (scanner debug output; older scanners: `off`) |
 
 `<ADDR>` in topics is 12 upper-case hex digits, no colons; in payloads `AA:BB:CC:DD:EE:FF`.
 
@@ -207,7 +214,8 @@ RSSI, one message per bucket (records in the scanner's order, strongest mean fir
 
 Each `devs` entry: address, random (vs public), advert type (0 ind, 1 direct, 2 scan,
 3 nonconn), mean RSSI (`sum / count`, one decimal, half away from zero), max RSSI, adverts
-counted, advertised power at 1 m or null. `seq`, `t_ms`, `tick_ms`, `chan` (37-39, 0 = all)
+counted, advertised power at 1 m or null (none, or outside -100..+20 dBm: the scanner drops
+it and counts it in `counters` `tx_1m_dropped`). `seq`, `t_ms`, `tick_ms`, `chan` (37-39, 0 = all)
 and `load` are the bucket's. With `devs` empty the scanner heard nothing in that interval.
 
 Advert / scan response (Theengs-style field names, so existing decoders work; no
@@ -231,17 +239,21 @@ device-specific decoding here):
 Status (each Status record, plus the gateway's view of the link):
 
 ```json
-{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"rx_overflow":0,
- "version":"0.6.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
+{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"bad_records":0,"rx_overflow":0,
+ "version":"0.7.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
  "client":false,"test_image":false,"adverts":123,"dropped":0,"devices":3,"load_reasons":0,"line_peak_pct":61,
  "budget_pct":70,"intervals":{"rssi":1,"payload":1,"refresh":50,"status":5,"counters":50},"baud":115200,
  "ignore_rules":3,"ignore_saved":2,"ignored":17}
 ```
 
-`lost`: buckets missed (seq gaps) since the gateway booted; `bad`: frames dropped (COBS, CRC or
-protobuf); `rx_overflow`: times the RX buffer was over three quarters full. The scanner
+`lost`: buckets missed (seq gaps) since the gateway booted; `bad`: frames dropped (COBS, CRC,
+protobuf, or a chip ID that isn't 8 bytes); `bad_records`: records dropped from good frames as
+malformed (an address that isn't 6 bytes, advert data over 31 bytes, a known record kind that
+isn't a sub-message, an unknown kind above 63), also logged at most once a minute; `rx_overflow`: times the RX buffer was over three quarters full. The scanner
 fields are as in `bletracker.proto` (`ignore_*` / `ignored`: the scanner's own ignore list, 0
-before 0.6.0).
+before 0.6.0). Text from a scanner (`version`, event `text`) is passed on
+cleaned: control characters become `?`, and so does every non-ASCII byte unless the text is
+valid UTF-8 (advert names: only the UTF-8 rule, control characters are JSON-escaped).
 
 Counters: `{"t","chip","seq"}` plus every `Counters` field by its proto name.
 
@@ -258,7 +270,7 @@ Scanner codes are `Event.Code` names (PROTOCOL.md "Event codes"). Gateway codes 
 | code | category / severity | value, value2 |
 | --- | --- | --- |
 | `CHIP_MISMATCH` | SECURITY, ERROR | -, pin sector; text names the expected chip |
-| `CHIP_OK` | SECURITY, INFO | -, pin sector |
+| `CHIP_OK` | SECURITY, INFO | -, pin sector; the expected chip is back |
 | `FIRMWARE_OUTDATED` | GENERAL, WARN | text `firmware <scanner>, latest <scanner_firmware>` |
 | `FIRMWARE_NEWER` / `FIRMWARE_OK` | GENERAL, INFO | text names both versions / the version |
 | `CHIP_CHANGED` | SECURITY, WARN | text "chip <new> replaced <old>" |
@@ -300,13 +312,15 @@ seen on its RX pin; ignored with a warning until one has been seen), or to
 | `ignore <addr>[/bits\|/mask] [save]` | only on `all/cmd`, scanner 0.6.0+: the scanners drop that address (or range; `*` bytes allowed, e.g. `c1:7d:2b:*:*:*`) until they reboot, or with `save` for good |
 | `unignore <addr>[/bits\|/mask]` | only on `all/cmd`: remove that rule (same address and mask) |
 | `ignore clear boot` / `saved` / `all` | only on `all/cmd`: remove the rules kept until reboot / the saved ones / all of them |
+| `debug tx1m on` / `debug tx1m off` / `debug off` | scanner 0.8.0+, on `<sector>/cmd` or `all/cmd`: per-second summary of adverts whose 1 m power the scanner dropped, on `<sector>/debug/tx_1m`. Off at every scanner boot, and the gateway doesn't turn it back on |
 | `ignore list` | scanner 0.7.0+, on `<sector>/cmd` or `all/cmd`: the scanner sends its rules, published on `<sector>/ignore`. The gateway asks by itself when it hasn't seen a scanner's list (e.g. after the gateway restarts), only once the scanner's status shows 0.7.0 or later |
 
 The ignore list is one for the whole mast, so the ignore commands are refused (with a warning)
 on a sector's `<sector>/cmd`. These change the scanners' own lists, not the gateway's YAML
 `ignore` list.
 
-Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
+Commands are ASCII: one with control or non-ASCII characters, or longer than 128 characters, is
+dropped with a warning that doesn't repeat it. Each command gets a gateway `seq`; the scanner answers with a `CMD_OK` or `CMD_REJECTED`
 event (on `events`). One command is on the wire at a time; the next goes after the ack, or
 after 2 s with a `CMD_NO_ACK` warning. The DEBUG log shows each command's bytes in hex,
 which match `decode_frames.py --cmd ... --seq N`.
@@ -323,11 +337,12 @@ Commands for the gateway itself go to `bletracker/<mast>/cmd`:
 With `self_test: true` (the default) the gateway checks itself once at boot, without touching
 MQTT or the scanners: the contract's command test vectors must encode byte for byte, and
 sample buckets (built and framed by the reference protobuf code in `tools/make_selftest.py`,
-covering every record kind, an unknown record kind and field, a lost bucket, an outdated
-firmware and recovery, records dropped by the ignore list, a bad CRC, odd advert names and a
-truncated AD structure) must produce exactly the expected MQTT messages. The self-test uses
-its own `scanner_firmware` and ignore list, not the YAML's. The result goes to the log and to
-the "Self test" text sensor, e.g. `PASS: commands 23/23, messages 17/17`; a FAIL logs each differing message.
+covering every record kind, an unknown record kind and field, the retired sector claim field,
+a lost bucket, an outdated firmware and recovery, records dropped by the ignore list, a bad CRC,
+a short chip ID, malformed records, unclean text, odd advert names and a truncated AD structure)
+must produce exactly the expected MQTT messages. The self-test uses its own `scanner_firmware`
+and ignore list, not the YAML's. The result goes to the log and to the "Self test" text sensor,
+e.g. `PASS: commands 26/26, messages 23/23`; a FAIL logs each differing message.
 After changing the JSON layout or the test vectors, regenerate:
 
 ```bash
@@ -338,6 +353,6 @@ python tools/make_selftest.py        # writes components/sector_scanner/selftest
 
 Over the ESPHome API, per sector: load level, lost buckets, bad frames (one at boot is
 normal, as the first frame is usually partial), devices heard, adverts ignored by the
-scanner per second, "wrong chip" and "firmware outdated" (problem binary sensors), the
-scanner's chip ID and firmware version, and buttons "flash mode" and "reboot scanner". For the
+scanner per second, "wrong chip" (`expected_chip` only) and "firmware outdated" (problem binary
+sensors), the scanner's chip ID and firmware version, and buttons "flash mode" and "reboot scanner". For the
 gateway: "Gateway load", "Self test", IP and MAC address.
