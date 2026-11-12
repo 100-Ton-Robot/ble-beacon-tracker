@@ -92,6 +92,13 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   and a per-mast file (`example-mast.yaml`). `bletracker-gateway.yaml` is no longer a device
   config on its own.
 
+### RF model
+
+- Added (2026-11-12): `rf_model/`, an openEMS (FDTD) model of one sector built from
+  `shield_deck/parameters.csv` (deck, core, whips at the D holes; monopole or dipole), with a
+  Dockerfile that builds openEMS v0.37.0 from source. First monopole result in
+  `rf_model/out/monopole/`.
+
 ### Docs
 
 - Added `SECURITY.md` (2026-11-11): how to report a vulnerability, and the gaps from the input-validation review that

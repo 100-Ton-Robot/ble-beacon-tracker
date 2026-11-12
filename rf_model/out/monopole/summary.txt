@@ -1,0 +1,20 @@
+antenna: monopole, element 29.2 mm, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [59, 61, 54] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11  -14.6 dB  Zin   64.7  +15.6j ohm
+  2440 MHz  S11  -12.6 dB  Zin   67.5  +21.9j ohm
+  2480 MHz  S11  -11.0 dB  Zin   70.6  +28.4j ohm
+
+peak 4.9 dBi at az 0, el -35 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         2.7      20      155 deg       12.5 dB
+   -15         3.9      30      145 deg       10.5 dB
+   -30         4.8       0      125 deg       48.2 dB
+   -45         4.3       0      125 deg        9.7 dB
+   -60         3.0       0      195 deg        7.1 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -29.3 dB
+  S2: -29.3 dB
