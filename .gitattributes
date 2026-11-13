@@ -3,3 +3,4 @@
 *.zip binary
 *.png binary
 *.kicad_pcb text eol=lf
+*.sh text eol=lf
