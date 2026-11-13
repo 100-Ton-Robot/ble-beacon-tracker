@@ -36,6 +36,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "shield_deck"))
 import params  # noqa: E402
+import runlog  # noqa: E402
 
 P = params.load()
 C0 = 299_792_458.0
@@ -152,7 +153,8 @@ def beamwidth(az, dbi):
 
 def main():
     a = args_()
-    out = a.out or os.path.join(HERE, "out", a.antenna)
+    # absolute: openEMS changes the working directory while it runs
+    out = os.path.abspath(a.out or os.path.join(HERE, "out", a.antenna))
     os.makedirs(out, exist_ok=True)
     sim = tempfile.mkdtemp(prefix=f"sector_{a.antenna}_")
 
@@ -210,7 +212,11 @@ def main():
         for j, p in enumerate(ports[1:], start=1):
             s21 = p.uf_tot[i0] / p1.uf_inc[i0]
             lines.append(f"  S{j}: {20 * np.log10(abs(s21)):.1f} dB")
-    text = "\n".join(lines) + "\n"
+    text = runlog.header() + "\n".join(lines) + "\n"
+    s11c = 20 * np.log10(abs(s11[i0]))
+    runlog.record(out, f"peak {dbi[tk, pk]:.1f} dBi at el {el[tk]:.0f}, S11 {s11c:.1f} dB at f0"
+                  + (f", isolation {20 * np.log10(abs(ports[1].uf_tot[i0] / p1.uf_inc[i0])):.1f} dB"
+                     if len(ports) > 1 else ""))
     with open(os.path.join(out, "summary.txt"), "w") as fh:
         fh.write(text)
     print(text)

@@ -1,0 +1,22 @@
+command: python3 sector_model.py --antenna monopole --coarse --out out/monopole_coarse
+date: 2026-11-13 03:12 UTC
+antenna: monopole, element 29.2 mm, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [47, 43, 42] cells (coarse)
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11  -13.8 dB  Zin   67.7  +16.4j ohm
+  2440 MHz  S11  -12.3 dB  Zin   70.8  +21.3j ohm
+  2480 MHz  S11  -11.0 dB  Zin   74.4  +26.2j ohm
+
+peak 4.5 dBi at az 0, el -35 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         2.7       0      155 deg       13.4 dB
+   -15         3.7     330      145 deg       12.1 dB
+   -30         4.4       0      135 deg       22.3 dB
+   -45         4.0       0      125 deg       12.5 dB
+   -60         2.3       0      185 deg        9.7 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -29.0 dB
+  S2: -29.0 dB

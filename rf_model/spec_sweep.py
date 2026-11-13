@@ -21,6 +21,7 @@ import tempfile
 import numpy as np
 
 import bearing_sim as bs
+import runlog
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BEAMWIDTHS = [60, 80, 90, 100, 110, 120, 140, 160, 180]
@@ -74,6 +75,7 @@ def main():
     ap.add_argument("--trials", type=int, default=2000)
     ap.add_argument("--out", default=os.path.join(HERE, "out", "spec_sweep"))
     a = ap.parse_args()
+    a.out = os.path.abspath(a.out)
     os.makedirs(a.out, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="spec_sweep_")
     lines = ["Idealised sector beams through bearing_sim (beacons 1-15 m out, mast 1.4 m above them,",
@@ -105,10 +107,13 @@ def main():
                   "   el   front dBi   az 90   worst az 120-240"]
         for el, (front, side, back) in back_levels(folder).items():
             lines.append(f"  {el:4d}   {front:8.1f}  {side:+6.1f}   {back:+8.1f} dB")
-    text = "\n".join(lines) + "\n"
+    text = runlog.header() + "\n".join(lines) + "\n"
     with open(os.path.join(a.out, "summary.txt"), "w") as fh:
         fh.write(text)
     print(text)
+    runlog.record(a.out, f"{len(BEAMWIDTHS)} beamwidths x {len(FLOORS)} floors x {len(NOISE)} noise cases"
+                  + (", compared with " + " ".join(os.path.basename(os.path.normpath(p)) for p in a.patterns)
+                     if a.patterns else ""))
 
 
 if __name__ == "__main__":

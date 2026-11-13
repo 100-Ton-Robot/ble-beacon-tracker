@@ -152,11 +152,59 @@ Recommended specs for the indoor, ceiling-hung mast:
 | Polarisation | Vertical, the same on all three (convention, not from this data) |
 | Fit | RP-SMA plug, at most about 170 mm below the deck and 12 mm across at the D holes |
 
+Reference antenna for the first tests: the HiRO H50327, a 2 dBi dual-band (2.4 / 5 GHz) dipole, RP-SMA, 108 mm
+long, 10 mm across, VSWR <= 1.92, swivelling 90 deg (set straight in the D hole). It's the `--antenna dipole` case
+and stays within the 120 mm faces. Its own pattern isn't published, so compare it with `out/dipole` in the RSSI walk.
+
 Against these, the monopoles miss on back rejection, and the ducks are close on beamwidth but 6-10 dB short on
 back rejection and weak looking steeply down. The printed-dipole panels (dipole over a reflector) are the likeliest
 to meet the specs; modelling them, or deepening the core behind the ducks, are the next things to try. Even a
 30 dB floor leaves a median of about 7-10 deg under room reflections; beyond that it's calibration and the proxies.
 
+
+## Reference antenna: HiRO H50327 (2026-11-12)
+
+The H50327 is 108 mm long, of which the swivel and connector take about 20-25 mm, so its 2.4 GHz element sits
+somewhere 25-105 mm below the deck; the maker doesn't say where. `run_all.sh` brackets it with the dipole's feed
+55, 65 and 75 mm below the deck (`out/h50327_c55`, `_c65`, `_c75`), all inside the 120 mm faces:
+
+| Feed depth | Peak | -3 dB width at el 0 / -30 | Gain at el -45 | Isolation | Median bearing error | 90% within |
+| --- | --- | --- | --- | --- | --- | --- |
+| 55 mm | 7.9 dBi | 95 / 125 deg | -2.5 dBi | -47 dB | 22 deg | 109 deg |
+| 65 mm | 8.0 dBi | 95 / 125 deg | -1.2 dBi | -45 dB | 20 deg | 63 deg |
+| 75 mm | 7.8 dBi | 95 / 115 deg | +1.1 dBi | -43 dB | 19 deg | 56 deg |
+
+- Where the element sits barely moves the median (19-22 deg, the same as the generic duck's 21 deg): expect about
+  20 deg in the first tests with the default noise.
+- Lower is slightly better: more gain looking steeply down, so close beacons fare better. At 55 mm the beam picks
+  up more from behind than in front at el -60, which gives the 109 deg tail (close beacons put on the wrong side).
+- The model's match (S11 about -4 dB) is its bare centre feed, not the antenna's: the maker gives VSWR <= 1.92.
+- What the specs can't give (the element's real position and pattern) the RSSI walk should: compare the measured
+  sector differences with these three cases.
+
+## Every simulation run
+
+All runs are kept. `run_all.sh` holds every run behind this README, in order, and re-runs the lot in about 4 min:
+
+```bash
+docker run --rm -v "$(pwd):/work" -w /work/rf_model bletracker-openems sh run_all.sh
+```
+
+Each run writes its own folder under `out/`; its `summary.txt` starts with the command and date, and
+`out/runs.csv` gets a row (date, script, folder, command, one-line result). Add new runs to `run_all.sh`, not
+only on the command line. Re-running all of them on 2026-11-12 reproduced the earlier results within 0.1 dB and
+1 deg (multi-threaded rounding).
+
+| Folder | What | Key result |
+| --- | --- | --- |
+| `out/monopole_coarse` | Quarter-wave whip, coarse mesh | Mesh check: within 0.5 dB of the full mesh |
+| `out/monopole` | Quarter-wave whip (29.2 mm) at the D hole | 4.9 dBi at el -35, 125-155 deg, -29 dB isolation |
+| `out/dipole` | Sleeve-dipole duck (58.4 mm, feed 45 mm down) | 7.5 dBi at the horizon, 105-125 deg, -51 dB isolation |
+| `out/dipole_len50` | Same duck, 50 mm element | Match changes, pattern doesn't (within 0.2 dB) |
+| `out/h50327_c55`, `_c65`, `_c75` | HiRO H50327, feed 55 / 65 / 75 mm down | 7.8-8.0 dBi, 95 deg wide at the horizon |
+| `out/bearing` | Bearing sim: monopole vs duck | Median 34 vs 21 deg |
+| `out/bearing_h50327` | Bearing sim: duck vs the three H50327 cases | Median 19-22 deg |
+| `out/spec_sweep` | Idealised beams: beamwidth x back floor x noise | Back rejection matters most; specs above |
 
 ## Limits
 

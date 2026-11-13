@@ -1,0 +1,11 @@
+date_utc,script,out,command,result
+2026-11-13 03:12,sector_model.py,out/monopole_coarse,python3 sector_model.py --antenna monopole --coarse --out out/monopole_coarse,"peak 4.5 dBi at el -35, S11 -12.3 dB at f0, isolation -29.0 dB"
+2026-11-13 03:12,sector_model.py,out/monopole,python3 sector_model.py --antenna monopole,"peak 4.9 dBi at el -35, S11 -12.6 dB at f0, isolation -29.3 dB"
+2026-11-13 03:12,sector_model.py,out/dipole,python3 sector_model.py --antenna dipole,"peak 7.5 dBi at el 0, S11 -4.9 dB at f0, isolation -50.7 dB"
+2026-11-13 03:12,sector_model.py,out/dipole_len50,python3 sector_model.py --antenna dipole --length 50 --out out/dipole_len50,"peak 7.5 dBi at el 0, S11 -9.3 dB at f0, isolation -48.6 dB"
+2026-11-13 03:13,sector_model.py,out/h50327_c55,python3 sector_model.py --antenna dipole --centre 55 --out out/h50327_c55,"peak 7.9 dBi at el 5, S11 -4.6 dB at f0, isolation -47.3 dB"
+2026-11-13 03:13,sector_model.py,out/h50327_c65,python3 sector_model.py --antenna dipole --centre 65 --out out/h50327_c65,"peak 8.0 dBi at el 5, S11 -4.3 dB at f0, isolation -44.7 dB"
+2026-11-13 03:14,sector_model.py,out/h50327_c75,python3 sector_model.py --antenna dipole --centre 75 --out out/h50327_c75,"peak 7.8 dBi at el 5, S11 -4.1 dB at f0, isolation -42.6 dB"
+2026-11-13 03:14,bearing_sim.py,out/bearing,python3 bearing_sim.py out/monopole out/dipole --out out/bearing,"median bearing error: monopole 34 deg, dipole 21 deg"
+2026-11-13 03:14,bearing_sim.py,out/bearing_h50327,python3 bearing_sim.py out/dipole out/h50327_c55 out/h50327_c65 out/h50327_c75 --out out/bearing_h50327,"median bearing error: dipole 21 deg, h50327_c55 22 deg, h50327_c65 20 deg, h50327_c75 19 deg"
+2026-11-13 03:16,spec_sweep.py,out/spec_sweep,python3 spec_sweep.py out/monopole out/dipole --out out/spec_sweep,"9 beamwidths x 5 floors x 3 noise cases, compared with monopole dipole"

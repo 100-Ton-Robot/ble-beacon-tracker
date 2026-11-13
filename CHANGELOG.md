@@ -103,6 +103,10 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   (results in `rf_model/out/bearing/`).
 - Added (2026-11-12): `rf_model/spec_sweep.py` (idealised beams through the bearing simulation) and
   recommended antenna specs in `rf_model/README.md`.
+- Added (2026-11-12): HiRO H50327 reference antenna modelled at three element depths
+  (`rf_model/out/h50327_c*`, bearing in `out/bearing_h50327`: median 19-22 deg). Every run is
+  now kept: `rf_model/run_all.sh` re-runs them all, each `summary.txt` starts with its command
+  and date, and `rf_model/out/runs.csv` logs every run. Fixed `--out` with a relative folder.
 
 ### Docs
 

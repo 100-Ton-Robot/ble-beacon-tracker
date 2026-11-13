@@ -1,0 +1,20 @@
+command: python3 bearing_sim.py out/dipole out/h50327_c55 out/h50327_c65 out/h50327_c75 --out out/bearing_h50327
+date: 2026-11-13 03:14 UTC
+fading 5.0 dB/advert, 3 adverts/s, room 3.0 dB, shadow 4.0 dB, window 1 s, mast 1.4 m above the beacon, beacons 1-15 m out, n 2.2
+
+pattern      |bearing error| deg: median  90%   rms   (<=5 m / >5 m median)   right sector   range error: median  90%
+dipole                              21    65    43      ( 25 /  17)              77.0%               45%  104%
+h50327_c55                          22   109    57      ( 27 /  17)              76.3%               47%  108%
+h50327_c65                          20    63    42      ( 23 /  17)              77.8%               44%  107%
+h50327_c75                          19    56    37      ( 21 /  17)              79.4%               43%  100%
+
+median |bearing error| deg, room reflections x tracker window (fading, adverts, shadow as above):
+  room dB  window s      dipole  h50327_c55  h50327_c65  h50327_c75
+        0         1          17          18          16          15
+        0         5           7           8           7           7
+        2         1          19          21          18          17
+        2         5          12          14          12          12
+        3         1          22          23          21          20
+        3         5          17          18          17          16
+        5         1          29          30          28          27
+        5         5          27          29          26          25

@@ -28,6 +28,8 @@ import os
 
 import numpy as np
 
+import runlog
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECTORS = (0.0, 120.0, 240.0)
 
@@ -132,6 +134,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--out", default=os.path.join(HERE, "out", "bearing"))
     a = ap.parse_args()
+    a.out = os.path.abspath(a.out)
     os.makedirs(a.out, exist_ok=True)
 
     noise = (f"fading {a.fading} dB/advert, {a.adverts} adverts/s, room {a.room} dB, shadow {a.shadow} dB, "
@@ -162,10 +165,12 @@ def main():
             b = argparse.Namespace(**{**vars(a), "room": room, "window": win, "trials": min(a.trials, 2000)})
             vals = [np.median(np.abs(simulate(p, b, np.random.default_rng(a.seed))["err"])) for p in a.patterns]
             lines.append(f"  {room:7.0f}  {win:8d}  " + "  ".join(f"{v:10.0f}" for v in vals))
-    text = "\n".join(lines) + "\n"
+    text = runlog.header() + "\n".join(lines) + "\n"
     with open(os.path.join(a.out, "summary.txt"), "w") as fh:
         fh.write(text)
     print(text)
+    runlog.record(a.out, "median bearing error: " + ", ".join(
+        f"{n} {np.median(np.abs(r['err'])):.0f} deg" for n, r in results.items()))
 
     import matplotlib
     matplotlib.use("Agg")
