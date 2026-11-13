@@ -38,6 +38,7 @@ On Linux with openEMS installed, `python3 sector_model.py ...` runs it directly.
 - `--antenna monopole`: a quarter-wave whip straight down from the D jack, the deck as its ground plane.
 - `--antenna dipole`: a rubber duck as a vertical half-wave dipole; `--centre` sets its feed point's depth below
   the deck (default 45 mm).
+- `--spacing` moves the antennas in or out from the faces (default `DUCK_SPACING`, 31 mm: the D hole).
 - `--length` sets the element length (default 0.95 x a quarter or half wavelength at `RF_FREQ`).
 - `--single` leaves out the other two sectors' antennas.
 - `--coarse` uses a coarser mesh for a quick check. On a 12-core PC the coarse run takes about 10 s and the full
@@ -182,6 +183,28 @@ somewhere 25-105 mm below the deck; the maker doesn't say where. `run_all.sh` br
 - What the specs can't give (the element's real position and pattern) the RSSI walk should: compare the measured
   sector differences with these three cases.
 
+## D-hole spacing (2026-11-12)
+
+Is 31 mm (`DUCK_SPACING`, about a quarter wave) in front of the face the best spot? The H50327 (feed 65 mm down)
+moved in and out with `--spacing`; 34 mm is as far out as a 6.5 mm hole fits on the 146 mm deck:
+
+| Spacing | Peak | -3 dB width at el 0 | Back third vs front, el 0 / -30 | Median bearing error | Model feed Zin |
+| --- | --- | --- | --- | --- | --- |
+| 15 mm | 8.8 dBi | 85 deg | -17.0 / -14.0 dB | 19 deg | 42 + 105j ohm |
+| 20 mm | 8.6 dBi | 85 deg | -16.4 / -13.4 dB | 19 deg | 69 + 115j ohm |
+| 25 mm | 8.4 dBi | 85 deg | -15.8 / -12.7 dB | 19 deg | 94 + 112j ohm |
+| 31 mm (D hole) | 8.0 dBi | 95 deg | -14.8 / -11.3 dB | 20 deg | 116 + 96j ohm |
+| 34 mm | 7.7 dBi | 105 deg | -14.3 / -10.7 dB | 21 deg | 123 + 85j ohm |
+
+- Closer to the copper gives a little more gain and back rejection (about 2-3 dB from 34 to 15 mm), but only about
+  1-2 deg of bearing: the room's reflections still dominate. 31 mm is not the optimum, but it's within 1 deg of it.
+- Closer also moves the antenna's impedance a long way (the model feed's resistance falls from 116 to 42 ohm).
+  The H50327's own match is designed for open air, so very close in it would be detuned and lose signal; the
+  model can't show how much, as it doesn't include the antenna's internal match.
+- So keep the D hole at 31 mm for the first tests. If the deck is redone, 20-25 mm is a reasonable step in, after
+  checking the real match there (NanoVNA or the RSSI walk). The reflector's shape (wider faces, wings) is still the
+  bigger lever.
+
 ## Every simulation run
 
 All runs are kept. `run_all.sh` holds every run behind this README, in order, and re-runs the lot in about 4 min:
@@ -202,7 +225,9 @@ only on the command line. Re-running all of them on 2026-11-12 reproduced the ea
 | `out/dipole` | Sleeve-dipole duck (58.4 mm, feed 45 mm down) | 7.5 dBi at the horizon, 105-125 deg, -51 dB isolation |
 | `out/dipole_len50` | Same duck, 50 mm element | Match changes, pattern doesn't (within 0.2 dB) |
 | `out/h50327_c55`, `_c65`, `_c75` | HiRO H50327, feed 55 / 65 / 75 mm down | 7.8-8.0 dBi, 95 deg wide at the horizon |
+| `out/h50327_c65_s15`, `_s20`, `_s25`, `_s34` | H50327 (feed 65 mm down) 15 / 20 / 25 / 34 mm in front of the face | 8.8 / 8.6 / 8.4 / 7.7 dBi; 31 mm is `out/h50327_c65` |
 | `out/bearing` | Bearing sim: monopole vs duck | Median 34 vs 21 deg |
+| `out/bearing_spacing` | Bearing sim: the five spacings | Median 19-21 deg |
 | `out/bearing_h50327` | Bearing sim: duck vs the three H50327 cases | Median 19-22 deg |
 | `out/spec_sweep` | Idealised beams: beamwidth x back floor x noise | Back rejection matters most; specs above |
 

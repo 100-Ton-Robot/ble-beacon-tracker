@@ -60,6 +60,8 @@ def args_():
     ap.add_argument("--centre", type=float, default=45.0,
                     help="dipole only: feed point depth below the deck, mm (a duck's base sits on the jack, "
                          "its feed about a quarter wave down)")
+    ap.add_argument("--spacing", type=float, default=P["DUCK_SPACING"],
+                    help="antenna axis -> copper face, mm (default DUCK_SPACING, the D hole)")
     ap.add_argument("--gap", type=float, default=1.0, help="feed gap, mm")
     ap.add_argument("--freq", type=float, default=P["RF_FREQ"] * 1e6, help="Hz, default RF_FREQ")
     ap.add_argument("--single", action="store_true", help="leave out the other two sectors' antennas")
@@ -103,7 +105,7 @@ def build(a):
     feeds = SECTORS if not a.single else SECTORS[:1]
     zl = [0.0]
     for i, s in enumerate(feeds):
-        x, y = pol(INRADIUS + P["DUCK_SPACING"], s)
+        x, y = pol(INRADIUS + a.spacing, s)
         if a.antenna == "monopole":
             z_feed_top, z_feed_bot = 0.0, -a.gap
             pec.AddBox([x, y, z_feed_bot], [x, y, -length], priority=10)
@@ -127,7 +129,7 @@ def build(a):
     mesh.AddLine("x", [-R, R, *[v[0] for v in verts], -R - margin, R + margin])
     mesh.AddLine("y", [-R, R, *[v[1] for v in verts], -R - margin, R + margin])
     mesh.AddLine("z", [*zl, -H, lowest - margin, margin])
-    x0, y0 = pol(INRADIUS + P["DUCK_SPACING"], 0.0)
+    x0, y0 = pol(INRADIUS + a.spacing, 0.0)
     mesh.AddLine("y", [y0 - fine, y0 + fine])
     mesh.AddLine("x", [x0 - fine, x0 + fine])
     for d in "xyz":
@@ -188,7 +190,7 @@ def main():
             for pi in range(len(az)):
                 fh.write(f"{az[pi]:.0f},{el[ti]:.0f},{dbi[ti, pi]:.2f}\n")
 
-    lines = [f"antenna: {a.antenna}, element {info['length']:.1f} mm"
+    lines = [f"antenna: {a.antenna}, element {info['length']:.1f} mm, {a.spacing:g} mm in front of the face"
              + (f", feed {a.centre:.0f} mm below the deck" if a.antenna == "dipole" else "")
              + (", other sectors left out" if a.single else ", other sectors' antennas in, 50 ohm"),
              f"f0 {info['f0'] / 1e6:.0f} MHz, mesh {info['cells']} cells{' (coarse)' if a.coarse else ''}",

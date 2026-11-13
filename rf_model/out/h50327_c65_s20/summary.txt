@@ -1,0 +1,22 @@
+command: python3 sector_model.py --antenna dipole --centre 65 --spacing 20 --out out/h50327_c65_s20
+date: 2026-11-13 03:23 UTC
+antenna: dipole, element 58.4 mm, 20 mm in front of the face, feed 65 mm below the deck, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [61, 62, 54] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11   -3.6 dB  Zin   62.7  +97.3j ohm
+  2440 MHz  S11   -3.0 dB  Zin   68.6 +114.7j ohm
+  2480 MHz  S11   -2.6 dB  Zin   75.5 +133.4j ohm
+
+peak 8.6 dBi at az 0, el 5 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         8.6       0       85 deg       20.1 dB
+   -15         7.3       0       85 deg       15.2 dB
+   -30         3.9       0      105 deg       17.2 dB
+   -45        -1.4       0      155 deg        7.3 dB
+   -60        -6.4     180      105 deg       -1.5 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -48.6 dB
+  S2: -48.6 dB
