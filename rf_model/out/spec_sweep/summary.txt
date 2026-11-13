@@ -1,0 +1,69 @@
+Idealised sector beams through bearing_sim (beacons 1-15 m out, mast 1.4 m above them,
+fading 5 dB/advert, 3 adverts/s, shadow 4 dB). Floor = how far the whole back sits below the front.
+Tables: median |bearing error| in deg; rows -3 dB beamwidth, columns floor in dB.
+
+default noise: room 3 dB, 1 s window
+   bw        6     10     15     20     30
+   60       50     35     26     19     10
+   80       46     32     20     14      8
+   90       45     30     19     13      9
+  100       43     28     18     13      9
+  110       42     27     18     13      9
+  120       42     27     18     14     10
+  140       42     28     19     15     11
+  160       44     30     21     17     13
+  180       47     32     24     19     17
+
+averaged: room 3 dB, 5 s window
+   bw        6     10     15     20     30
+   60       42     28     21     15      8
+   80       39     26     16     10      6
+   90       38     24     14     10      7
+  100       37     22     14     10      7
+  110       36     21     14     10      7
+  120       35     21     14     11      7
+  140       34     21     15     11      8
+  160       36     23     16     12      9
+  180       38     25     17     14     12
+
+antenna-limited: no room reflections, 5 s window
+   bw        6     10     15     20     30
+   60       24     15     10      6      3
+   80       20     11      7      4      3
+   90       19     10      6      4      3
+  100       17      9      6      4      3
+  110       16      9      6      4      3
+  120       15      9      6      5      3
+  140       15      9      6      5      3
+  160       16      9      6      5      3
+  180       16     10      7      5      4
+
+default noise, floor 20 dB: median, 90th percentile, right sector
+  pattern          median   p90   right sector   (<=5 m / >5 m median)
+  bw  60              19    80        93.2%      ( 18 /  19)
+  bw  80              14    47        91.0%      ( 14 /  14)
+  bw  90              13    36        89.0%      ( 13 /  13)
+  bw 100              13    33        86.2%      ( 13 /  13)
+  bw 110              13    36        83.5%      ( 14 /  13)
+  bw 120              14    41        80.2%      ( 14 /  13)
+  bw 140              15    52        74.8%      ( 15 /  15)
+  bw 160              17    69        69.8%      ( 16 /  17)
+  bw 180              19    87        64.0%      ( 19 /  19)
+  monopole            35   100        67.5%      ( 35 /  34)
+  dipole              22    67        76.4%      ( 26 /  18)
+
+monopole: front gain and back levels relative to it (compare with the floor above)
+   el   front dBi   az 90   worst az 120-240
+     0        2.7    -4.0       -5.3 dB
+   -15        3.7    -4.6       -6.1 dB
+   -30        4.8    -5.7       -5.6 dB
+   -45        4.3    -4.4       -5.5 dB
+   -55        3.4    -3.0       -5.1 dB
+
+dipole: front gain and back levels relative to it (compare with the floor above)
+   el   front dBi   az 90   worst az 120-240
+     0        7.5    -9.1      -13.9 dB
+   -15        6.4    -7.9      -12.5 dB
+   -30        3.8    -6.3      -10.5 dB
+   -45       -0.7    -4.4       -5.3 dB
+   -55       -4.8    -1.6       -0.8 dB

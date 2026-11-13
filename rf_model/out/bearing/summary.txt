@@ -1,0 +1,16 @@
+fading 5.0 dB/advert, 3 adverts/s, room 3.0 dB, shadow 4.0 dB, window 1 s, mast 1.4 m above the beacon, beacons 1-15 m out, n 2.2
+
+pattern      |bearing error| deg: median  90%   rms   (<=5 m / >5 m median)   right sector   range error: median  90%
+monopole                            34   101    59      ( 35 /  34)              66.7%               45%  100%
+dipole                              21    65    43      ( 25 /  17)              77.0%               45%  105%
+
+median |bearing error| deg, room reflections x tracker window (fading, adverts, shadow as above):
+  room dB  window s    monopole      dipole
+        0         1          27          17
+        0         5          13           7
+        2         1          31          19
+        2         5          21          12
+        3         1          35          22
+        3         5          29          17
+        5         1          43          29
+        5         5          40          27

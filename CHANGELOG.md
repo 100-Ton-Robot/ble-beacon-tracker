@@ -98,6 +98,11 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   `shield_deck/parameters.csv` (deck, core, whips at the D holes; monopole or dipole), with a
   Dockerfile that builds openEMS v0.37.0 from source. First monopole result in
   `rf_model/out/monopole/`.
+- Added (2026-11-12): rubber duck (sleeve dipole) result in `rf_model/out/dipole/`, and
+  `rf_model/bearing_sim.py`: bearing and range error from a pattern under BLE noise
+  (results in `rf_model/out/bearing/`).
+- Added (2026-11-12): `rf_model/spec_sweep.py` (idealised beams through the bearing simulation) and
+  recommended antenna specs in `rf_model/README.md`.
 
 ### Docs
 

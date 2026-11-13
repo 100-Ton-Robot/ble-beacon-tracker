@@ -1,4 +1,4 @@
-# RF model of a sector
+# RF model of a sector and bearing simulation
 
 `sector_model.py` simulates one sector of the mast with [openEMS](https://openems.de) (free, open-source FDTD).
 It builds the copper deck, the triangular core and the antennas at the three D holes from
@@ -48,12 +48,114 @@ On Linux with openEMS installed, `python3 sector_model.py ...` runs it directly.
 From `out/monopole/summary.txt`:
 
 - Match: S11 -14.6 / -12.6 / -11.0 dB at 2402 / 2440 / 2480 MHz (Zin about 65-71 + 16-28j ohm): fine for a
-  receiver; trimming the whip a little would centre it.
+  receiver. S11 still falls below 2300 MHz (-22 dB there), so the whip resonates below the band next to the core;
+  a shorter one (`--length`) would centre it.
 - Beam: peak 4.9 dBi about 35 deg below the horizon, straight out from the face. The -3 dB width is 125-155 deg
   depending on elevation, wider than the 120 deg sector, so neighbouring sectors overlap and can be compared.
 - Back: about 10-12 dB weaker behind than in front at most elevations (the single-angle front-to-back figures jump
   where a null lands on az 180, like the 48 dB at el -30).
 - Isolation: -29 dB from sector 0's whip to each of the others.
+
+## Rubber duck (sleeve dipole) (2026-11-12, full mesh)
+
+Most 2 dBi ducks are half-wave sleeve dipoles; `--antenna dipole` models one as a centre-fed 58 mm wire with its
+feed 45 mm below the deck, so it runs from 16 to 74 mm down, beside the face. From `out/dipole/summary.txt`:
+
+- Beam: peak 7.5 dBi at the horizon, -3 dB width 105-125 deg down to el -30, then it fades below about el -45
+  (the deck and core sit above and behind it). Narrower than the monopole and a better fit to 120 deg sectors.
+- Back: 15-22 dB weaker behind down to el -30.
+- Isolation: -51 dB to each of the other sectors.
+- Match: S11 about -5 dB, but that's the model's bare centre feed, not a real duck (which has its own sleeve
+  match). A 50 mm element gives about -9 dB with the same pattern within 0.2 dB and the same bearing result
+  within 1 deg, so the pattern doesn't depend on it.
+
+## Bearing simulation
+
+`bearing_sim.py` takes one or more `pattern.csv` folders, places 4000 beacons at random bearings 1-15 m out with
+the mast 1.4 m above them, adds BLE noise and works the bearing back out the way the tracker could: it fits the
+three sectors' RSSI differences to the pattern (so transmit power and path loss cancel). Range comes from the
+strongest sector, its fitted gain and a log-distance model. It needs only numpy and matplotlib:
+
+```bash
+docker run --rm -v "$(pwd):/work" -w /work/rf_model bletracker-openems python3 bearing_sim.py out/monopole out/dipole
+```
+
+Noise (dB, all settable): `--fading` per advert (5), `--adverts` per second per sector on the compared channel
+(3), `--room` per-sector reflections fixed for a place, which don't average out (3), `--shadow` common to all
+sectors, moving range only (4), `--window` seconds the tracker averages (1). These are typical indoor BLE values,
+not measured here; the RSSI walk should replace them.
+
+Results in `out/bearing/` (`summary.txt`, `error_vs_bearing.png`, `estimate_vs_true.png`, `errors_<pattern>.csv`).
+With the defaults:
+
+| Antenna | Median bearing error | 90% within | Strongest sector right | Median range error |
+| --- | --- | --- | --- | --- |
+| monopole | 34 deg | 101 deg | 67% | 45% |
+| rubber duck | 21 deg | 65 deg | 77% | 45% |
+
+Median bearing error as the room's reflections and the tracker's averaging change:
+
+| Room reflections | Window | Monopole | Duck |
+| --- | --- | --- | --- |
+| 0 dB | 1 s | 27 | 17 |
+| 0 dB | 5 s | 13 | 7 |
+| 3 dB | 1 s | 35 | 22 |
+| 3 dB | 5 s | 29 | 17 |
+| 5 dB | 5 s | 40 | 27 |
+
+What it shows:
+
+- The ducks' narrower beam cuts the monopoles' error by about a third to a half under the same noise.
+- The error is smallest at the edges between sectors (about 12-17 deg) and largest in the middle of a sector,
+  where the sector differences change slowly with bearing.
+- Averaging over time beats fading down, but not the room's fixed reflections: with 3 dB of those, 5 s only takes
+  the duck from 22 to 17 deg. Getting below that needs other information (the ESPHome proxies, a calibration walk
+  that measures each place's offsets, or movement over time).
+- Range is limited by shadowing, not the antenna: 4 dB of it is about 45% off on distance either way.
+
+## Antenna specs (spec sweep)
+
+`spec_sweep.py` runs idealised sector beams through the bearing simulation: each has a set -3 dB beamwidth and a
+floor, how far the whole back of the beam sits below the front. It also measures the real patterns' back levels so
+they can be read against the same tables. Results in `out/spec_sweep/summary.txt`:
+
+```bash
+docker run --rm -v "$(pwd):/work" -w /work/rf_model bletracker-openems python3 spec_sweep.py out/monopole out/dipole
+```
+
+Median bearing error (deg), default noise (room 3 dB, 1 s):
+
+| Beamwidth | Floor 6 dB | 10 dB | 15 dB | 20 dB | 30 dB |
+| --- | --- | --- | --- | --- | --- |
+| 80 deg | 46 | 32 | 20 | 14 | 8 |
+| 100 deg | 43 | 28 | 18 | 13 | 9 |
+| 120 deg | 42 | 27 | 18 | 14 | 10 |
+| 160 deg | 44 | 30 | 21 | 17 | 13 |
+
+- The floor behind the beam matters most. The beamwidth matters less: 80-140 deg are all near the best (13-15 deg
+  at a 20 dB floor), narrower beams pick the right sector more often but leave weak gaps between sectors, wider ones
+  blur the sectors together.
+- The real patterns fit the tables: the monopole's back third is only about 5 dB below its front (it simulates at
+  34 deg, between the 6 and 10 dB columns); the duck's is 10-14 dB below near the horizon but only 1-5 dB below at
+  el -45 to -55 (21 deg, the 10-15 dB columns). The single-angle front-to-back in `summary.txt` overstates both.
+
+Recommended specs for the indoor, ceiling-hung mast:
+
+| Spec | Target |
+| --- | --- |
+| Back rejection | Everything from az 120 to 240 at least 20 dB below the front (25-30 dB better) |
+| Horizontal -3 dB beamwidth | 90-120 deg (80-140 deg acceptable) |
+| Vertical coverage | Front gain within about 6 dB of the peak from the horizon down to el -55 (beacons 1-15 m out, 1.4 m below) |
+| Gain | About 7-10 dBi, which follows from the beamwidth; not critical on its own |
+| Match | S11 below -10 dB (VSWR < 2) across 2402-2480 MHz |
+| Matching between sectors | Three of the same antenna, or calibrated per sector: a gain difference acts like a fixed room reflection |
+| Polarisation | Vertical, the same on all three (convention, not from this data) |
+| Fit | RP-SMA plug, at most about 170 mm below the deck and 12 mm across at the D holes |
+
+Against these, the monopoles miss on back rejection, and the ducks are close on beamwidth but 6-10 dB short on
+back rejection and weak looking steeply down. The printed-dipole panels (dipole over a reflector) are the likeliest
+to meet the specs; modelling them, or deepening the core behind the ducks, are the next things to try. Even a
+30 dB floor leaves a median of about 7-10 deg under room reflections; beyond that it's calibration and the proxies.
 
 
 ## Limits
