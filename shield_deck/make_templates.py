@@ -1,5 +1,5 @@
 """1:1 printable PDF templates: shield deck drill template, electronics plate (both discs drawn the same way
-round, plate 12 o'clock up), the plate wiring diagram, the alt split plate, the pipe plate and its stack views, then the back panel
+round, plate 12 o'clock up), the plate wiring diagram, the pipe plate and its stack views, the no-pipe (alt) split plate, then the back panel
 (reflector face).
 
 Uses the same geometry as make_shield_deck.py. Run:  python make_templates.py
@@ -42,14 +42,18 @@ POST_SHIFT = BOARD_W / 2 - (POST_EDGE + BOARD_HOLE / 2 + POST_X / 2)  # ~3.5 mm:
 
 
 def scale_bar(c, x, y):
+    """100 mm check bars in both directions: across from (x, y) and down from its left end, ticks outward."""
     c.setLineWidth(0.6)
     c.line(x * mm, y * mm, (x + 100) * mm, y * mm)
+    c.line(x * mm, y * mm, x * mm, (y - 100) * mm)
     for k in range(0, 101, 10):
         h = 3 if k % 50 else 5
         c.line((x + k) * mm, y * mm, (x + k) * mm, (y + h) * mm)
+        c.line(x * mm, (y - k) * mm, (x - h) * mm, (y - k) * mm)
     c.setFont("Helvetica", 8)
-    c.drawString(x * mm, (y - 4) * mm, "0")
-    c.drawRightString((x + 100) * mm, (y - 4) * mm, "100 mm - check with a ruler before drilling")
+    c.drawString((x + 1.5) * mm, (y - 4) * mm, "0")
+    c.drawRightString((x + 100) * mm, (y - 4) * mm, "100 mm each way - check both with a ruler before drilling")
+    c.drawString((x + 1.5) * mm, (y - 100) * mm, "100 mm")
 
 
 def crosshair(c, x, y, r):
@@ -160,14 +164,13 @@ def deck_page(c):
         f"P / P2 6.5 mm = patch ({g.PATCH_OFFSET:g} mm in front of face; P2 {g.FACE_WIDTH / 2 - g.PATCH_END_INSET:g} mm off centre)",
         f"C 10 mm = dipole coax pass-through (inside core)    M4 {g.HOLE_M4:g} mm = bolts to the plate, nut flush in each core corner",
         "Core 10 mm at the centre = antenna coax into the core; open it up with a hole saw (centre mark) if needed.",
-        f"Blue dashed {PIPE_SAW:.1f} mm (2-1/4\" hole saw) = pipe layout only (page 3): the pipe passes into the core;",
+        f"Blue dashed {PIPE_SAW:.1f} mm (2-1/4\" hole saw) = pipe layout only (page 2): the pipe passes into the core;",
         "it removes the C holes. Other layouts keep the 10 mm core hole. EU: a 57 mm hole saw is the same size.",
         "Arrow points to Sector 0. Holes are symmetric, so the template also works flipped (labels read mirrored).",
         f"Drawn the same way round as the plates: plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it.",
     ]
     for n, t in enumerate(lines):
         c.drawString(15 * mm, (62 - n * 4.4) * mm, t)
-    scale_bar(c, 15, 22)
 
 
 def face_page(c):
@@ -258,11 +261,14 @@ def face_page(c):
         "screws + standoffs in the posts."], xc + POST_Y / 2, Y(yc + POST_SHIFT + POST_X / 2))
     callout(xl, Y(FACE_H / 2) + 14, [
         f"Centre {DIPOLE_HOLE:g} mm hole:",
-        "DIY dipole RP-SMA only."], xc - DIPOLE_HOLE / 2, Y(FACE_H / 2), right=False)
+        "DIY dipole",
+        "RP-SMA only."], xc - DIPOLE_HOLE / 2, Y(FACE_H / 2), right=False)
     callout(xl, Y(8), [
-        "Side edges: each meets the next",
-        "panel at 120 deg to form the",
-        "triangle; solder or tape the seam."], x0, Y(14), right=False)
+        "Side edges: each",
+        "meets the next panel",
+        "at 120 deg to form",
+        "the triangle; solder",
+        "or tape the seam."], x0, Y(14), right=False)
 
     # dimensions
     c.setFont("Helvetica", 8)
@@ -273,7 +279,6 @@ def face_page(c):
     c.drawString(15 * mm, (Y(FACE_H) - 16) * mm,
                  "Whips (rubber duck / monopole / dipole) don't mount on this face: they hang on the deck's D holes,")
     c.drawString(15 * mm, (Y(FACE_H) - 20.5) * mm, f"{g.DUCK_SPACING:g} mm in front of it (page 1).")
-    scale_bar(c, 15, 14)
 
 
 def pigtail_x():
@@ -396,7 +401,6 @@ def plate_page(c):
     ]
     for n, t in enumerate(notes):
         c.drawString(15 * mm, (60 - n * 4.1) * mm, t)
-    scale_bar(c, 15, 22)
 
 
 # Wiring diagram (last page), drawn over the wired part of the plate layout. Pin numbers: XIAO pins 1-7 = D0-D6,
@@ -829,7 +833,7 @@ def alt_plate_page(c):
 
     c.setFont("Helvetica-Bold", 13)
     c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
-                 f"ALT electronics plate (split) - {PLATE_DIAMETER:g} mm disc - PRINT AT 100% (Actual size)")
+                 f"NO-PIPE electronics plate (split) - {PLATE_DIAMETER:g} mm disc - PRINT AT 100% (Actual size)")
     c.setFont("Helvetica", 9)
     c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
                  "Viewed from the TOP. Radios, tie mounts, ESP32 + bus all hang UNDER the plate (dashed, seen through it).")
@@ -974,11 +978,10 @@ def alt_plate_page(c):
         "slim right-angle plug. A 90 deg adapter turns the RJ45 sideways; patch + USB-C lead to the PoE splitter's 4\" box.",
         "Bus by the ESP32's RJ45 end (VBUS 40). Spacers 25-30 mm. Clearances are tight (~2-3 mm): check with the real parts.",
         "Positions: parameters.csv (lay out in plate_layout.svg). The ESP32 only clears the deck's 10 mm centre hole: no hole saw.",
-        "OPTIONS (builder's choice): this alt split plate or the pipe plate (page 3). Wiring: page 6.",
+        "OPTIONS (builder's choice): this no-pipe split plate or the pipe plate (page 2). Wiring: page 6.",
     ]
     for n, t in enumerate(notes):
         c.drawString(15 * mm, (61 - n * 3.9) * mm, t)
-    scale_bar(c, 15, 12)
 
 
 # Pipe plate (2026-11-01, called the flange plate until the flange was dropped 2026-11-09): the PoE splitter and
@@ -1177,12 +1180,11 @@ def fl_plate_page(c):
         "1/2\" HS-100 tie mount (grey), which clamps it, then (dashed orange) down to whichever of its sector's D / P / P2",
         "jacks is in use, straight below its hole. 5V, GND, D7 to the bus beside them; D6 through the deck's centre hole to",
         "its ESP32 RX pin, beside TX, GND, VBUS coming up. Seen from the top the IPEX4 is on the left (the board is flipped).",
-        "OPTIONS (builder's choice): this pipe plate or the alt split plate (page 2); bus board under the plate by the adapter,",
+        "OPTIONS (builder's choice): this pipe plate or the no-pipe split plate (page 3); bus board under the plate by the adapter,",
         "or on the pipe inside the core (page 5: then skip the bus M3).",
     ]
     for n, t in enumerate(notes):
         c.drawString(15 * mm, (59 - n * 3.4) * mm, t)
-    scale_bar(c, 15, 9)
 
 
 # Stack views for the pipe plate (2026-11-01; flange replaced 2026-11-09): a 1/2" PVC male adapter's thread goes up
@@ -1225,7 +1227,7 @@ def stack_page(c):
     c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Pipe stack - top and side views - scale 0.6 (NOT a drilling template)")
     c.setFont("Helvetica", 9)
     c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                 "Hanging from the ceiling, top down: nut, enclosure top, module plate, modules, deck, core, ESP antenna. Frame: page 3.")
+                 "Hanging from the ceiling, top down: nut, enclosure top, module plate, modules, deck, core, ESP antenna. Frame: page 2.")
 
     # ---- top view: a cut through the core below the deck, looking down ----
     c.setFont("Helvetica-Bold", 8)
@@ -1399,9 +1401,9 @@ def stack_page(c):
         "the 11 o'clock corner is left for cables (and the bus option). Ethernet (PoE, green): from the ceiling down the adapter's",
         "bore and the pipe, out a side slot (about 12 x 16 mm, cut before gluing) beside the splitter. An RJ45 plug (11.7 mm wide)",
         "fits the ~16 mm bore: pull it through before fitting any boot, or crimp after. The adapter's thread goes up through the",
-        "module plate and the enclosure top; the nut on top clamps both. Modules and the bus hang under the plate (page 3).",
+        "module plate and the enclosure top; the nut on top clamps both. Modules and the bus hang under the plate (page 2).",
         "OPTION: the bus board can go on the pipe (dashed, 11 o'clock, opposite the ESP32 and splitter) instead of on the plate.",
-        "Side: dashed box = PoE splitter, behind the cut. XIAOs, tie mounts: as page 3. Estimates: adapter, nut,",
+        "Side: dashed box = PoE splitter, behind the cut. XIAOs, tie mounts: as page 2. Estimates: adapter, nut,",
         "enclosure top, splitter size, board depths, antenna length.",
         "EU parts: 20 mm PVC-U pressure pipe (20 mm OD, 1.3 mm under 1/2\" Sch 40; same holes), a 20 mm solvent-weld end cap,",
         "a 20 mm x 1/2\" BSP male adaptor and a 1/2\" BSP backnut, and a 57 mm hole saw for the deck. The RP-SMA bulkhead's",
@@ -1409,6 +1411,29 @@ def stack_page(c):
     ]
     for n, t in enumerate(notes):
         c.drawString(15 * mm, (72 - n * 3.6) * mm, t)
+
+    emt_notes = [                              # EMT option, in the free space right of the antenna line
+        "OPTION: 1/2\" EMT (steel conduit) instead of the PVC",
+        f"EMT: {EMT_OD:g} mm OD, {EMT_ID:g} mm bore (PVC: {PIPE_OD:g} / {PIPE_ID:g} mm).",
+        "Set-screw or compression connector + locknut in the",
+        f"same 7/8\" ({ADAPTER_HOLE:g} mm) hole; the deck hole stays.",
+        f"RJ45: a crimped head only just fits the {EMT_ID:g} mm bore",
+        "(check the connector's throat too). Make sure there is",
+        "NO boot or crimp sleeve on the plug going through.",
+        "Bond the tube to the deck all round where it passes:",
+        "copper collar, ground clamp + braid, or conductive",
+        "copper tape (solder won't take on galvanized steel).",
+        "ESP antenna: plastic cap or bushing, not bare steel.",
+        "Bushing on every cut or drilled hole a cable passes",
+        "near or through (side slot, tube ends), even deburred.",
+        "Outdoors: seal the zinc-copper bond (corrosion).",
+        "The drawing shows the PVC pipe.",
+    ]
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(143 * mm, 128.5 * mm, emt_notes[0])
+    c.setFont("Helvetica", 7)
+    for n, t in enumerate(emt_notes[1:], 1):
+        c.drawString(143 * mm, (128.5 - n * 3.4) * mm, t)
 
     end_notes = [                              # end plate guidance, in the free space under the top view
         "END PLATE: leave it off, or bond it all round - never",
@@ -1439,13 +1464,209 @@ def stack_page(c):
     c.drawString((18 + 50 * k) * mm, 13.5 * mm, "50 mm at drawing scale")
 
 
+LIGHT_MM_PER_NS = 299.792458            # speed of light: wavelength in mm = this / frequency in GHz
+DIM_INK = (0.1, 0.35, 0.7)
+COPPER_INK = (0.72, 0.42, 0.15)
+
+
+def formulas_page(c):
+    """Reference page: how the monopole (D) holes, the triangle core and the baseplate (shield deck) are sized.
+    Every number is worked out from parameters.csv, so the page follows any change there."""
+    k = FORMULA_SCALE
+    lam = LIGHT_MM_PER_NS / (RF_FREQ / 1000)
+    a, rin, rc, R = g.FACE_WIDTH, g.INRADIUS, g.CIRCUMRADIUS, g.R
+    d, p, t = g.DUCK_SPACING, g.PATCH_OFFSET, g.FACE_THICK
+    rD, rP = rin + d, rin + p
+    s2 = a / 2 - g.PATCH_END_INSET
+    rP2, aP2 = math.hypot(rP, s2), math.degrees(math.atan2(s2, rP))
+    rM = g.MOUNT_RADIUS
+
+    def dim(p0, p1, text, dx=0.0, dy=0.0, anchor="c", size=6.5):
+        """Dimension line between two page points (pt), end ticks, label at the middle shifted by (dx, dy) mm."""
+        c.saveState()
+        c.setStrokeColorRGB(*DIM_INK)
+        c.setFillColorRGB(*DIM_INK)
+        c.setLineWidth(0.4)
+        c.line(*p0, *p1)
+        ux, uy = p1[0] - p0[0], p1[1] - p0[1]
+        n = math.hypot(ux, uy) or 1
+        tx_, ty_ = -uy / n * 1.2 * mm, ux / n * 1.2 * mm
+        for q in (p0, p1):
+            c.line(q[0] - tx_, q[1] - ty_, q[0] + tx_, q[1] + ty_)
+        c.setFont("Helvetica-Bold", size)
+        mx, my = (p0[0] + p1[0]) / 2 + dx * mm, (p0[1] + p1[1]) / 2 + dy * mm
+        {"c": c.drawCentredString, "l": c.drawString, "r": c.drawRightString}[anchor](mx, my, text)
+        c.restoreState()
+
+    def table(x, y, title, items, w=88):
+        """Rows of (formula, result[, note]): formula left, result right at x + w, note in grey below."""
+        c.setFont("Helvetica-Bold", 9)
+        c.drawString(x * mm, y * mm, title)
+        y -= 5
+        for it in items:
+            c.setFont("Helvetica", 7.5)
+            c.drawString(x * mm, y * mm, it[0])
+            c.setFont("Helvetica-Bold", 7.5)
+            c.drawRightString((x + w) * mm, y * mm, it[1])
+            y -= 3.4
+            if len(it) > 2:
+                c.setFont("Helvetica", 6.3)
+                c.setFillGray(0.4)
+                for line in it[2].split("\n"):
+                    c.drawString((x + 3) * mm, y * mm, line)
+                    y -= 3.0
+                c.setFillGray(0)
+            y -= 0.9
+        return y
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Design formulas - monopoles, triangle, baseplate (NOT a template, not to size)")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                 "Worked from parameters.csv: change a value there and re-run make_templates.py, and every number here follows.")
+
+    # ---- top view of the baseplate (shield deck) and the triangle core, deck frame: S0 up ----
+    tx, ty = 62.0, 180.0
+
+    def T(r, deg):
+        q = math.radians(deg)
+        return (tx + r * k * math.sin(q)) * mm, (ty + r * k * math.cos(q)) * mm
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(tx * mm, (ty + R * k + 5) * mm, f"TOP VIEW: baseplate (shield deck) + triangle core, S0 up, scale {k:g}")
+    c.setLineWidth(0.8)
+    c.circle(tx * mm, ty * mm, R * k * mm)
+    c.saveState()
+    c.setStrokeColorRGB(*COPPER_INK)
+    c.setLineWidth(1.2)
+    tri = [T(rc, v) for v in g.VERTICES]
+    path = c.beginPath()
+    path.moveTo(*tri[0])
+    for q in tri[1:]:
+        path.lineTo(*q)
+    path.close()
+    c.drawPath(path)
+    c.restoreState()
+    c.setLineWidth(0.4)
+    for hd, x, y, lab in g.holes:
+        if lab != "via":
+            c.circle((tx + (x - g.CX) * k) * mm, (ty + (y - g.CY) * k) * mm, hd / 2 * k * mm)
+    c.setFont("Helvetica", 6)
+    for i, s in enumerate(g.SECTORS):
+        c.drawCentredString(*(v - 1.0 * mm for v in T(rD + 10, s)), f"D S{i}")
+    c.drawString(*(v + 1.5 * mm for v in T(rP2, -aP2)), "P2")
+
+    dim(T(0, 0), T(rin, 0), "r_in", dx=-1.2, anchor="r")                       # centre -> S0 face
+    dim(T(rin, 0), T(rD, 0), "d", dx=-1.2, anchor="r")                          # face -> D hole
+    dim(T(0, 60), T(rc, 60), "R_c", dx=1.0, dy=1.0, anchor="l")                 # centre -> corner
+    dim(T(0, 270), T(R, 270), "R", dy=1.2)                                      # centre -> rim
+    dim(T(0, 180), T(rM, 180), "r_M4", dx=1.2, anchor="l")                      # centre -> M4 (corner)
+    dim(T(0, 120), T(rP, 120), "r_P", dx=3.0, dy=-2.5, anchor="l")              # centre -> P hole
+    dim(T(0, 240), T(g.COAX_PASS_RADIUS, 240), "r_C", dx=-3.5, dy=-3.0, anchor="r")
+    dim(T(rin, 0), T(math.hypot(rin, s2), -math.degrees(math.atan2(s2, rin))), "s", dy=1.5)   # along the face to P2
+    c.setFont("Helvetica", 6.3)
+    c.setFillGray(0.35)
+    c.drawCentredString(tx * mm, (ty - R * k - 5) * mm,
+                        "Copper line = the triangle's outer (copper) faces.  Circles = deck holes.  Blue = the dimensions below.")
+    c.setFillGray(0)
+
+    # ---- triangle + baseplate formulas, right column ----
+    x = 120
+    y = table(x, PAGE_H / mm - 42, "TRIANGLE CORE (3 back panels)", [
+        ("a = FACE_WIDTH (side of the triangle)", f"{a:g} mm"),
+        ("r_in = a / (2 x sqrt 3)", f"{rin:.2f} mm", "centre -> face (inradius)"),
+        ("R_c = a / sqrt 3 = 2 x r_in", f"{rc:.2f} mm", "centre -> corner (circumradius)"),
+        ("height of the triangle = a x sqrt 3 / 2 = 3 x r_in", f"{3 * rin:.1f} mm"),
+        ("back panel = a x h  (h = FACE_H), make 3", f"{a:g} x {FACE_H:g} mm", "panels meet at 60 deg inside / 120 deg between faces"),
+        ("inner face = r_in - t  (t = FACE_THICK)", f"{rin - t:.2f} mm"),
+        ("corner clearance = R - R_c", f"{R - rc:.1f} mm", "must stay > 0: the corners sit inside the deck rim"),
+        ("a / lambda (reflector width per sector)", f"{a / lam:.2f}", "about one wavelength wide"),
+    ])
+    y = table(x, y - 3, "BASEPLATE (shield deck)", [
+        ("R = DISC_DIAMETER / 2", f"{R:g} mm"),
+        ("D hole: r_D = r_in + d  at 0 / 120 / 240 deg", f"{rD:.2f} mm"),
+        ("D rim margin = R - r_D - HOLE_RPSMA / 2", f"{R - rD - g.HOLE_RPSMA / 2:.1f} mm"),
+        ("P hole: r_P = r_in + p  (p = PATCH_OFFSET)", f"{rP:.2f} mm"),
+        ("P2: s = a / 2 - PATCH_END_INSET (along the face)", f"{s2:g} mm"),
+        ("P2: r = sqrt(r_P^2 + s^2), turned atan(s / r_P) CCW", f"{rP2:.2f} mm, {aP2:.1f} deg"),
+        ("C hole: r_C = COAX_PASS_RADIUS (inside the core)", f"{g.COAX_PASS_RADIUS:g} mm"),
+        ("M4: r_M4 = 2 x (r_in - t - NUT_AF / 2 - NUT_GAP)", f"{rM:.2f} mm",
+         "at the corners (60 / 180 / 300 deg): a hex nut in a 60 deg corner sits\n"
+         "twice its flat-to-face distance from the corner, two flats on the faces"),
+        ("stitch vias: STITCH_COUNT on STITCH_RADIUS", f"{g.STITCH_COUNT} on {g.STITCH_RADIUS:g} mm"),
+    ])
+
+    # ---- side view through the S0 axis: the monopole on its D hole in front of the S0 face ----
+    sx, sy = 62.0, 108.0                                     # page mm of the deck centre, underside
+    k = FORMULA_SCALE * 0.8                                  # side view drawn smaller to fit the page
+    L = lam / 4
+    base = 6.0                                               # drawn RP-SMA body below the deck (drawing only)
+
+    def S(xx, z):
+        return (sx + xx * k) * mm, (sy + z * k) * mm
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(sx * mm, (sy + 6) * mm, f"SIDE VIEW: cut through the S0 axis, deck on top, scale {k:g}")
+    c.setFillGray(0.6)
+    c.rect(*S(-R, 0), 2 * R * k * mm, max(t * k, 0.8) * mm, fill=1, stroke=0)
+    c.setFillGray(0)
+    c.saveState()
+    c.setStrokeColorRGB(*COPPER_INK)
+    c.setLineWidth(1.4)
+    c.line(*S(rin, 0), *S(rin, -FACE_H))                    # S0 face, copper side out
+    c.setLineWidth(0.5)
+    c.setDash(2, 1.5)
+    c.line(*S(-rc, 0), *S(-rc, -FACE_H))                    # back corner where S1 and S2 meet
+    c.line(*S(-rc, -FACE_H), *S(rin, -FACE_H))
+    c.restoreState()
+    c.setLineWidth(0.4)
+    c.rect(*S(rD - g.HOLE_RPSMA / 2, -base), g.HOLE_RPSMA * k * mm, base * k * mm)
+    c.setLineWidth(1.2)
+    c.line(*S(rD, -base), *S(rD, -base - L))                # quarter-wave radiator
+    c.setLineWidth(0.3)
+    c.setDash(1, 1.5)
+    c.line(*S(rD, -base - L), *S(rD, -base - L - 10))
+    c.setDash()
+    c.setFont("Helvetica", 6)
+    c.drawRightString(*S(rD - g.HOLE_RPSMA / 2 - 1.5, -base + 1), "RP-SMA")
+    c.drawCentredString(*S((rin - rc) / 2, -FACE_H / 2), "inside the core")
+    c.drawCentredString(*S((rin - rc) / 2, -FACE_H / 2 - 5), "(S1 / S2 faces meet at the back)")
+    dim(S(rin, -base - L - 10), S(rD, -base - L - 10), "d", dy=-3)
+    dim(S(rD + 6, -base), S(rD + 6, -base - L), "L", dx=1.0, anchor="l")
+    dim(S(rin - 6, 0), S(rin - 6, -FACE_H), "h", dx=-1.0, anchor="r")
+    dim(S(-rc, -FACE_H - 8), S(rin, -FACE_H - 8), "R_c + r_in", dy=-3)
+    c.setFont("Helvetica", 6.3)
+    c.setFillGray(0.35)
+    c.drawCentredString(sx * mm, (sy - (FACE_H + 8) * k - 9) * mm,
+                        "Whip drawn as a bare quarter-wave monopole; the deck is its ground plane, the face its reflector.")
+    c.setFillGray(0)
+
+    table(x, 118, "MONOPOLES (D holes)", [
+        ("f = RF_FREQ (BLE band centre)", f"{RF_FREQ:g} MHz"),
+        ("lambda = c / f", f"{lam:.1f} mm"),
+        ("d = lambda / 4  (whip -> copper face)", f"{lam / 4:.1f} mm",
+         f"DUCK_SPACING = {d:g} mm (d / lambda = {d / lam:.3f})"),
+        ("why: out and back 2d = lambda / 2 (180) + copper flip (180)", "360 deg",
+         "the reflected wave comes back in phase and adds to the forward wave"),
+        ("L = lambda / 4 (bare monopole over the deck)", f"{L:.1f} mm"),
+        ("rubber duck: lambda / 2 sleeve dipole element", f"~{lam / 2:.0f} mm"),
+        ("backed length = h = FACE_H below the deck", f"{FACE_H:g} mm",
+         "a whip longer than h hangs past the copper and loses some backing"),
+        ("D hole to the far corner = R_c + r_in + d", f"{rc + rD:.1f} mm"),
+    ])
+    c.setFont("Helvetica", 7.5)
+    c.drawString(15 * mm, 14 * mm,
+                 "Units: mm and degrees, clockwise from S0 (top view) unless marked CCW. Names in capitals are parameters.csv rows.")
+
+
 BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-10): builders pick one, alt or pipe
-    deck_page: ("BOTH BUILDS", "alt and pipe (the 2-1/4\" hole-saw circle is pipe only)", (0.3, 0.3, 0.3)),
-    alt_plate_page: ("ALT BUILD ONLY (no pipe)", "pick one: alt or pipe", (0.1, 0.35, 0.7)),
-    fl_plate_page: ("PIPE BUILD ONLY", "pick one: alt or pipe", (0.1, 0.5, 0.25)),
-    face_page: ("BOTH BUILDS", "alt and pipe", (0.3, 0.3, 0.3)),
-    stack_page: ("PIPE BUILD ONLY", "pick one: alt or pipe", (0.1, 0.5, 0.25)),
-    wiring_page: ("BOTH BUILDS", "alt and pipe", (0.3, 0.3, 0.3)),
+    deck_page: ("BOTH BUILDS", "pipe and no pipe (the 2-1/4\" hole-saw circle is pipe only)", (0.3, 0.3, 0.3)),
+    alt_plate_page: ("NO PIPE", "pick one: pipe or no pipe", (0.1, 0.35, 0.7)),
+    fl_plate_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
+    face_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
+    stack_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
+    wiring_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
+    formulas_page: ("REFERENCE", "both builds; no need to print", (0.3, 0.3, 0.3)),
 }
 
 
@@ -1453,10 +1674,10 @@ def build_tag(c, page, n):
     """Box naming the build type the page is for, plus the page set of each build. Right of the scale bar,
     below the titles; on the wiring page (no room there) beside the title."""
     head, sub, rgb = BUILD_TAGS[page]
-    sets = "Alt: pages 1, 2, 4, 6   Pipe: pages 1, 3, 4, 5, 6"
+    sets = "Pipe: pages 1, 2, 4, 5, 6   No pipe: pages 1, 3, 4, 6"
     x1 = PAGE_W - 12 * mm
     y1 = PAGE_H - (6.5 if page is wiring_page else 27.5) * mm
-    w = max(c.stringWidth(f"p{n}  {head}", "Helvetica-Bold", 8.5), c.stringWidth(sub, "Helvetica", 6),
+    w = max(c.stringWidth(head, "Helvetica-Bold", 8.5), c.stringWidth(sub, "Helvetica", 6),
             c.stringWidth(sets, "Helvetica", 6)) + 4 * mm
     h = 10 * mm
     c.saveState()
@@ -1466,7 +1687,7 @@ def build_tag(c, page, n):
     c.roundRect(x1 - w, y1 - h, w, h, 1.5 * mm, fill=1)
     c.setFillColorRGB(*rgb)
     c.setFont("Helvetica-Bold", 8.5)
-    c.drawString(x1 - w + 2 * mm, y1 - 3.6 * mm, f"p{n}  {head}")
+    c.drawString(x1 - w + 2 * mm, y1 - 3.6 * mm, head)
     c.setFont("Helvetica", 6)
     c.drawString(x1 - w + 2 * mm, y1 - 6.3 * mm, sub)
     c.setFillGray(0.3)
@@ -1479,10 +1700,15 @@ def main():
     out = os.path.join(here, "shield_deck_templates.pdf")
     c = canvas.Canvas(out, pagesize=letter)
     c.setTitle("Shield deck, back panel, electronics plate templates and plate wiring")
-    # drill templates first (deck, plates, back panel), then the stack view, wiring diagram last (user, 2026-11-09)
-    for n, page in enumerate((deck_page, alt_plate_page, fl_plate_page, face_page, stack_page, wiring_page), 1):
+    # drill templates first (deck, plates, back panel), then the stack view and wiring diagram (user, 2026-11-09),
+    # design formulas at the very end as a reference page (2026-11-12)
+    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, formulas_page)
+    for n, page in enumerate(pages, 1):
         page(c)
         build_tag(c, page, n)
+        c.setFont("Helvetica", 8)                                  # page number, bottom centre
+        c.setFillGray(0)
+        c.drawCentredString(PAGE_W / 2, 6 * mm, f"Page {n} of {len(pages)}")
         c.showPage()
     c.save()
     print("wrote", out)

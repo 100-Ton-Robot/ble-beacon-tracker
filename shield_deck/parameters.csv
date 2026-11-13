@@ -115,6 +115,8 @@ ADP_SOCK_OD,27.0,mm,estimated,stack,adapter socket the pipe glues into
 ADP_SOCK_H,22.0,mm,estimated,stack,
 PIPE_OD,21.3,mm,spec,stack,1/2 in Sch 40 PVC
 PIPE_ID,15.8,mm,spec,stack,1/2 in Sch 40 PVC
+EMT_OD,17.9,mm,spec,stack,"option instead of the PVC pipe: 1/2 in EMT (steel conduit), 0.706 in OD"
+EMT_ID,15.8,mm,spec,stack,"1/2 in EMT bore (0.622 in): a crimped RJ45 head only just fits, so no boot or crimp sleeve on it. Bushing on every cut or hole a cable passes, even deburred"
 CAP_OD,27.0,mm,estimated,stack,1/2 in PVC cap
 CAP_H,22.0,mm,estimated,stack,
 NOTCH_H,6.0,mm,assumed,stack,pigtail notch in the cap rim
@@ -133,3 +135,5 @@ RULE_PART_GAP,1.5,mm,rule,rules,between parts (a XIAO and its own tie mount exce
 RULE_HOLE_GAP,2.0,mm,rule,rules,edge to edge between drilled plate holes
 RULE_RIM_HOLE,3.0,mm,rule,rules,hole edge -> plate rim
 RULE_RIM_PART,3.0,mm,rule,rules,part outline -> plate rim
+RF_FREQ,2440.0,MHz,spec,formulas,"BLE band centre (2402-2480 MHz): sets the wavelength on the formulas page (page 7)"
+FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page drawing scale

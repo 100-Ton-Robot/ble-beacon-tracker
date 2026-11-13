@@ -7,7 +7,7 @@ Columns: name, value, unit, source, group, note.
 - source: measured / spec (datasheet, standard) / estimated / assumed / design (a choice) / rule (a clearance the
   layout must keep; read_plate_svg.py checks them) / drawing (only changes how a page is drawn).
 - group: deck (make_shield_deck.py), the rest make_templates.py and the SVG tools (panel, plate, wiring, alt, pipe,
-  stack, rules).
+  stack, rules, formulas).
 
 Values derived from others (MOUNT_RADIUS, POST_SHIFT, BUS_COLS, ...) stay computed in the scripts so they can't
 drift out of step with what they're derived from.
