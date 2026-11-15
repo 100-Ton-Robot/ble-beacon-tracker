@@ -107,7 +107,12 @@ STACK_SCALE,0.6,ratio,drawing,stack,
 PLATE_T,3.0,mm,assumed,stack,acrylic plate thickness
 SPACER,27.0,mm,design,stack,plate underside -> deck top (25-30 mm spacers; RP-SMA bulkhead backs need >= 25)
 DECK_T,1.6,mm,spec,stack,
-ENC_T,2.0,mm,assumed,stack,enclosure wall (HDPE) at the plate
+ENC_T,2.0,mm,assumed,stack,"enclosure wall (PP) at the plate; vendor sizes below imply ~3.5 mm side wall and up to ~8 mm base, not measured"
+ENC_OD,177.0,mm,spec,enclosure,"PP pail (housing, https://a.co/d/08ZUdBcy) outside diameter, vendor approx. 7 in"
+ENC_OH,188.0,mm,spec,enclosure,"PP pail outside height, vendor approx. 7.4 in"
+ENC_ID,170.0,mm,spec,enclosure,"PP pail inside diameter, vendor approx. 6.7 in"
+ENC_IH,180.0,mm,spec,enclosure,"PP pail inside height, vendor approx. 7.1 in"
+ENC_MOUTH_ID,160.0,mm,spec,enclosure,"PP pail opening inside diameter, vendor approx. 6.3 in: the deck and module plate pass through it"
 NUT_H,7.0,mm,estimated,stack,nut on the adapter thread
 ADP_HEX_W,30.0,mm,estimated,stack,adapter hex / shoulder width
 ADP_HEX_H,8.0,mm,estimated,stack,adapter hex / shoulder height
