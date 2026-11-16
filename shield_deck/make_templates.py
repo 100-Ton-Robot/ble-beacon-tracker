@@ -764,10 +764,12 @@ def jst_head(c, x0, top):
 # lights toward a detected beacon. Its 5 V comes from a second 4x4 pad board (same model as the bus board) that
 # sits between the PoE splitter and the ESP32: a USB-C socket pigtail takes the splitter's plug, a USB-C plug
 # pigtail feeds the ESP32, and the strip hangs off a fused row, so its current never passes through the ESP32.
-# Rows (user): 1 and 4 are + and - (the bulk capacitor spans them), 2 is the fused 5 V out, 3 a second GND row.
+# Rows (user): 1 and 4 are + and -, 2 is the fused 5 V out, 3 a second GND row (linked to row 4).
 # Drawn from the pad side, connections only, in page mm (LED_PAGE: board centre x, y and the pad pitch as drawn).
-# The capacitor is the leaded can: an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field. Option (user,
-# 2026-11-16): a 7343 polymer tantalum chip (7.3 x 4.3 mm) over the end column, on the same two pads.
+# The capacitor is a leaded can (user's pick, 2026-11-16: LED_CAP_CAN_PART, size in LED_CAP_CAN), legs spread to
+# rows 1 and 3; an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field. Option (user, 2026-11-16): a 7343
+# polymer tantalum chip (7.3 x 4.3 mm) over the end column, ends on rows 1 and 4.
+LED_CAP_CAN_PART = "KEMET A750EM337M1CAAE015"
 LED_CAP_CHIPS = (("T591X337M010ATE025", 125), ("T545Y337M010ATE035", 105), ("T525Y337M010ATE035", 125))  # user, 2026-11-16
 LED_CAP_SEARCH = ("Mouser search: 330 uF, 2917 case, 10 to 16 V polymer tantalum, in stock",
                   "https://www.mouser.com/en/c/passive-components/capacitors/tantalum-capacitors/tantalum-capacitors-polymer/?capacitance=330%20uF&case%20code%20-%20in=2917&termination%20style=SMD%2FSMT&voltage%20rating%20dc=10%20VDC~~16%20VDC&instock=y&rp=passive-components%2Fcapacitors%2Ftantalum-capacitors%2Ftantalum-capacitors-polymer%7C~Voltage%20Rating%20DC&sort=pricing&qty=1")
@@ -815,7 +817,7 @@ def led_page(c):
     lx = cols[0] - 14
     c.drawRightString(lx * mm, (rows[0] + 1.6) * mm, "row 1: 5 V in (+)")
     c.drawRightString(lx * mm, (rows[1] - 0.8) * mm, "row 2: 5 V out, fused")
-    c.drawRightString(lx * mm, (rows[2] - 0.8) * mm, "row 3: GND")
+    c.drawRightString(lx * mm, (rows[2] - 3.6) * mm, "row 3: GND")
     c.drawRightString(lx * mm, (rows[3] - 3.6) * mm, "row 4: GND (-)")
 
     def wire(col, pts, w=1.1):           # white halo first, as on the wiring page
@@ -834,19 +836,19 @@ def led_page(c):
         c.setFillGray(0)
         c.setStrokeGray(0)
 
-    # C1, the bulk capacitor: leaded can lying beside the pads, legs to rows 1 (+) and 4 (-)
-    capx, caph = cols[0] - 50, 14.0
+    # C1, the bulk capacitor: leaded can lying beside the pads, legs spread to rows 1 (+) and 3 (-)
+    capx, capy, caph = cols[0] - 50, rows[1], 10.0
     lead = (0.3, 0.3, 0.3)
-    wire(lead, ((cols[0], rows[0]), (capx, rows[0]), (capx, cy + caph)), 0.8)
-    wire(lead, ((cols[0], rows[3]), (capx, rows[3]), (capx, cy - caph)), 0.8)
+    wire(lead, ((cols[0], rows[0]), (capx, rows[0]), (capx, capy + caph)), 0.8)
+    wire(lead, ((cols[0], rows[2]), (capx, rows[2]), (capx, capy - caph)), 0.8)
     c.setLineWidth(0.8)
     c.setFillGray(0.9)
-    c.roundRect((capx - 7) * mm, (cy - caph) * mm, 14 * mm, 2 * caph * mm, 2 * mm, fill=1)
+    c.roundRect((capx - 7) * mm, (capy - caph) * mm, 14 * mm, 2 * caph * mm, 2 * mm, fill=1)
     c.setFillGray(0)
     c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(capx * mm, (cy - 1.2) * mm, "C1")
-    c.drawCentredString(capx * mm, (cy + caph - 5) * mm, "+")
-    c.drawCentredString(capx * mm, (cy - caph + 2.5) * mm, "-")
+    c.drawCentredString(capx * mm, (capy - 1.2) * mm, "C1")
+    c.drawCentredString(capx * mm, (capy + caph - 4.5) * mm, "+")
+    c.drawCentredString(capx * mm, (capy - caph + 2) * mm, "-")
 
     # C1 option: a 7343 polymer chip on the pad side over column a, ends on the same row 1 and row 4 pads
     c.saveState()
@@ -935,8 +937,9 @@ def led_page(c):
     text = [
         ("B", "Parts. F, C2 and L go on the pad side, on pads with no wire in them; the wires and C1's legs come through"),
         ("B", "from the other side."),
-        ("", f"C1   {LED_CAP_UF:g} uF, 10 to 16 V aluminium polymer capacitor, leaded, rated -55 to +105 C. Legs to rows 1 (+) and 4 (-);"),
-        ("", "       lay the can flat beside the pads and hold it with a dab of RTV. (An 8 mm SMD can would cover the pads.)"),
+        ("", f"C1   {LED_CAP_CAN_PART}: {LED_CAP_UF:g} uF 16 V aluminium polymer, leaded, {LED_CAP_CAN[0]:g} x {LED_CAP_CAN[1]:g} mm can, -55 to +105 C."),
+        ("", f"       Spread the legs from {LED_CAP_CAN[2]:g} mm to reach rows 1 (+) and 3 (-); lay the can flat beside the pads and hold it"),
+        ("", "       with a dab of RTV. Any leaded polymer can of 330 to 470 uF, 10 to 16 V, rated -55 C, does the same job."),
         ("", f"       Option (dashed): a {LED_CAP_CHIP_UF:g} uF 10 V polymer tantalum chip, 7343 (2917) case, on the pad side over the end"),
         ("", "       column, ends on rows 1 and 4, pushed out to the board edge. Polymer only: not solid (manganese dioxide)"),
         ("", "       tantalum. Coat the board against damp. KEMET, any of: " + ", ".join(

@@ -116,7 +116,8 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 - Added (2026-11-16): option page for an LED direction ring (templates page 7, after the wiring
   diagram; the design formulas are now page 8): a second 4x4 pad board between the PoE
   splitter and the ESP32 that feeds a WS2812B strip from a fused row, with its parts list.
-  The bulk capacitor is a leaded polymer can, or as an option a 7343 polymer tantalum chip.
+  The bulk capacitor is a leaded polymer can (KEMET A750EM337M1CAAE015, legs to rows 1 and 3),
+  or as an option a 7343 polymer tantalum chip.
   Sizes in `shield_deck/parameters.csv` (group `led`). Wiring only: the gateway does not drive
   the strip yet.
 

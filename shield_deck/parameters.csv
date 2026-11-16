@@ -140,7 +140,8 @@ FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page drawing scale
 LED_PIXELS,24,count,design,led,"LED direction ring option: pixels in the ring (2026-11-16). At LED_PER_M this sets the ring's diameter; keep it inside the deck (DISC_DIAMETER)"
 LED_PER_M,60,count,spec,led,strip pixels per metre
 LED_DATA_GPIO,1,pin,design,led,ESP32 GPIO driving the strip's data in (GPIO1 and GPIO2 are the free pins)
-LED_CAP_UF,470,uF,design,led,"C1, polymer bulk capacitor across rows 1 and 4 of the LED power board"
+LED_CAP_UF,330,uF,design,led,"C1, polymer bulk capacitor of the LED power board, legs to rows 1 (+) and 3 (-). User's pick 2026-11-16: KEMET A750EM337M1CAAE015, 16 V (was a generic 470 uF can across rows 1 and 4)"
+LED_CAP_CAN,6.3 9 2.5,mm,spec,led,"C1 can: diameter, height, lead spacing (KEMET A750 series datasheet table; not checked against a distributor listing)"
 LED_CAP_CHIP_UF,330,uF,design,led,"C1 option: polymer tantalum chip, 7343 (2917) case, 10 V, in place of the leaded can (part numbers: LED_CAP_CHIPS in make_templates.py)"
 LED_BYPASS_UF,0.1,uF,design,led,"C2, X7R ceramic across rows 2 and 3"
 LED_FUSE_A,2,A,design,led,"F, chip fuse between rows 1 and 2 (the strip's feed)"
