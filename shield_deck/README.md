@@ -38,7 +38,8 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 
 - **Power:** a second 4x4 pad board between the PoE splitter and the ESP32. A USB-C socket pigtail takes the splitter's plug, a USB-C plug pigtail feeds the ESP32, and the strip hangs off a fused row, so its current never passes through the ESP32.
 - **Size:** 24 pixels of 60-per-metre strip make a 127 mm ring, inside the 146 mm deck (`LED_PIXELS`, `LED_PER_M`). Keep the strip and its wires above the deck: the copper shades the antennas from them.
-- **Parts:** chosen for outdoor cold and heat (polymer capacitor, X7R ceramic, chip fuse); the page lists them, with a surface-mount option for the bulk capacitor (a 7343 polymer tantalum chip).
+- **Parts:** chosen for outdoor cold and heat (polymer capacitor, X7R ceramic, chip fuse); the page lists them.
+- **Bulk capacitor, surface-mount option:** a 330 uF 10 V polymer tantalum chip in the 7343 (2917) case, in place of the leaded can: KEMET T591X337M010ATE025, T545Y337M010ATE035 or T525Y337M010ATE035. Others that match: [Mouser search](https://www.mouser.com/en/c/passive-components/capacitors/tantalum-capacitors/tantalum-capacitors-polymer/?capacitance=330%20uF&case%20code%20-%20in=2917&termination%20style=SMD%2FSMT&voltage%20rating%20dc=10%20VDC~~16%20VDC&instock=y&rp=passive-components%2Fcapacitors%2Ftantalum-capacitors%2Ftantalum-capacitors-polymer%7C~Voltage%20Rating%20DC&sort=pricing&qty=1). Polymer only, not solid (manganese dioxide) tantalum.
 - **Status:** wiring only. The gateway firmware does not drive the strip yet, and the ring's effect on reception has not been measured.
 
 Page 8 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.

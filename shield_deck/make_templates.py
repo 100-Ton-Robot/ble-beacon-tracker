@@ -768,6 +768,11 @@ def jst_head(c, x0, top):
 # Drawn from the pad side, connections only, in page mm (LED_PAGE: board centre x, y and the pad pitch as drawn).
 # The capacitor is the leaded can: an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field. Option (user,
 # 2026-11-16): a 7343 polymer tantalum chip (7.3 x 4.3 mm) over the end column, on the same two pads.
+LED_CAP_CHIPS = (("T591X337M010ATE025", 125), ("T545Y337M010ATE035", 105), ("T525Y337M010ATE035", 125))  # user, 2026-11-16
+LED_CAP_SEARCH = ("Mouser search: 330 uF, 2917 case, 10 to 16 V polymer tantalum, in stock",
+                  "https://www.mouser.com/en/c/passive-components/capacitors/tantalum-capacitors/tantalum-capacitors-polymer/?capacitance=330%20uF&case%20code%20-%20in=2917&termination%20style=SMD%2FSMT&voltage%20rating%20dc=10%20VDC~~16%20VDC&instock=y&rp=passive-components%2Fcapacitors%2Ftantalum-capacitors%2Ftantalum-capacitors-polymer%7C~Voltage%20Rating%20DC&sort=pricing&qty=1")
+
+
 def led_ring_length():
     return LED_PIXELS * 1000.0 / LED_PER_M
 
@@ -932,9 +937,11 @@ def led_page(c):
         ("B", "from the other side."),
         ("", f"C1   {LED_CAP_UF:g} uF, 10 to 16 V aluminium polymer capacitor, leaded, rated -55 to +105 C. Legs to rows 1 (+) and 4 (-);"),
         ("", "       lay the can flat beside the pads and hold it with a dab of RTV. (An 8 mm SMD can would cover the pads.)"),
-        ("", f"       Option (dashed): a {LED_CAP_CHIP_UF:g} uF 10 V polymer tantalum chip, 7343 (2917) case, such as KEMET T545Y337M010ATE035,"),
-        ("", "       on the pad side over the end column, ends on rows 1 and 4, pushed out to the board edge. Polymer only:"),
-        ("", "       not solid (manganese dioxide) tantalum. Coat the board against damp."),
+        ("", f"       Option (dashed): a {LED_CAP_CHIP_UF:g} uF 10 V polymer tantalum chip, 7343 (2917) case, on the pad side over the end"),
+        ("", "       column, ends on rows 1 and 4, pushed out to the board edge. Polymer only: not solid (manganese dioxide)"),
+        ("", "       tantalum. Coat the board against damp. KEMET, any of: " + ", ".join(
+            f"{part} (to +{t} C)" for part, t in LED_CAP_CHIPS[:2]) + ","),
+        ("link", f"       {LED_CAP_CHIPS[2][0]} (to +{LED_CAP_CHIPS[2][1]} C). Others that match: "),
         ("", f"C2   {LED_BYPASS_UF:g} uF 50 V X7R ceramic, 1206, flexible (soft) termination, across rows 2 and 3."),
         ("", f"F     {LED_FUSE_A:g} A chip fuse, 1206, across rows 1 and 2: the strip is fused, the ESP32's feed is not."),
         ("", f"L     link (solder bridge or wire) joining rows 3 and 4.        R     {LED_SERIES_OHM:g} ohm in the data wire."),
@@ -953,8 +960,19 @@ def led_page(c):
     ]
     y = ybot - 20
     for style, s in text:
-        c.setFont("Helvetica-Bold" if style else "Helvetica", 8.5)
+        c.setFont("Helvetica-Bold" if style == "B" else "Helvetica", 8.5)
         c.drawString(15 * mm, y * mm, s)
+        if style == "link":                                  # clickable in the PDF; the README has the same link
+            x0 = 15 * mm + c.stringWidth(s, "Helvetica", 8.5)
+            w = c.stringWidth(LED_CAP_SEARCH[0], "Helvetica", 8.5)
+            c.setFillColorRGB(0.05, 0.25, 0.7)
+            c.drawString(x0, y * mm, LED_CAP_SEARCH[0])
+            c.setStrokeColorRGB(0.05, 0.25, 0.7)
+            c.setLineWidth(0.4)
+            c.line(x0, y * mm - 1, x0 + w, y * mm - 1)
+            c.linkURL(LED_CAP_SEARCH[1], (x0, y * mm - 2, x0 + w, y * mm + 8), relative=0)
+            c.setFillGray(0)
+            c.setStrokeGray(0)
         y -= 4.6
 
 
