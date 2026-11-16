@@ -141,6 +141,7 @@ LED_PIXELS,24,count,design,led,"LED direction ring option: pixels in the ring (2
 LED_PER_M,60,count,spec,led,strip pixels per metre
 LED_DATA_GPIO,1,pin,design,led,ESP32 GPIO driving the strip's data in (GPIO1 and GPIO2 are the free pins)
 LED_CAP_UF,470,uF,design,led,"C1, polymer bulk capacitor across rows 1 and 4 of the LED power board"
+LED_CAP_CHIP_UF,330,uF,design,led,"C1 option: polymer tantalum chip, 7343 (2917) case, 10 V, e.g. KEMET T545Y337M010ATE035, in place of the leaded can"
 LED_BYPASS_UF,0.1,uF,design,led,"C2, X7R ceramic across rows 2 and 3"
 LED_FUSE_A,2,A,design,led,"F, chip fuse between rows 1 and 2 (the strip's feed)"
 LED_SERIES_OHM,330,ohm,design,led,"R, in the data wire"

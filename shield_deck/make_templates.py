@@ -766,7 +766,8 @@ def jst_head(c, x0, top):
 # pigtail feeds the ESP32, and the strip hangs off a fused row, so its current never passes through the ESP32.
 # Rows (user): 1 and 4 are + and - (the bulk capacitor spans them), 2 is the fused 5 V out, 3 a second GND row.
 # Drawn from the pad side, connections only, in page mm (LED_PAGE: board centre x, y and the pad pitch as drawn).
-# The capacitor is the leaded can: an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field.
+# The capacitor is the leaded can: an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field. Option (user,
+# 2026-11-16): a 7343 polymer tantalum chip (7.3 x 4.3 mm) over the end column, on the same two pads.
 def led_ring_length():
     return LED_PIXELS * 1000.0 / LED_PER_M
 
@@ -841,6 +842,19 @@ def led_page(c):
     c.drawCentredString(capx * mm, (cy - 1.2) * mm, "C1")
     c.drawCentredString(capx * mm, (cy + caph - 5) * mm, "+")
     c.drawCentredString(capx * mm, (cy - caph + 2.5) * mm, "-")
+
+    # C1 option: a 7343 polymer chip on the pad side over column a, ends on the same row 1 and row 4 pads
+    c.saveState()
+    c.setDash(3, 2)
+    c.setStrokeGray(0.3)
+    c.setLineWidth(0.8)
+    c.roundRect((cols[0] - 10) * mm, (rows[3] - 4) * mm, 19 * mm, (3 * p + 8) * mm, 1.5 * mm)
+    c.restoreState()
+    c.setFont("Helvetica-Oblique", 6)
+    c.setFillGray(0.3)
+    c.drawCentredString((cols[0] - 0.5) * mm, (cy + 0.6) * mm, "C1 chip")
+    c.drawCentredString((cols[0] - 0.5) * mm, (cy - 2.2) * mm, "(option)")
+    c.setFillGray(0)
 
     # pigtails: socket on column b, plug on column d; red up from row 1, black down from row 4
     ytop, ybot = rows[0] + 18, rows[3] - 18
@@ -918,6 +932,9 @@ def led_page(c):
         ("B", "from the other side."),
         ("", f"C1   {LED_CAP_UF:g} uF, 10 to 16 V aluminium polymer capacitor, leaded, rated -55 to +105 C. Legs to rows 1 (+) and 4 (-);"),
         ("", "       lay the can flat beside the pads and hold it with a dab of RTV. (An 8 mm SMD can would cover the pads.)"),
+        ("", f"       Option (dashed): a {LED_CAP_CHIP_UF:g} uF 10 V polymer tantalum chip, 7343 (2917) case, such as KEMET T545Y337M010ATE035,"),
+        ("", "       on the pad side over the end column, ends on rows 1 and 4, pushed out to the board edge. Polymer only:"),
+        ("", "       not solid (manganese dioxide) tantalum. Coat the board against damp."),
         ("", f"C2   {LED_BYPASS_UF:g} uF 50 V X7R ceramic, 1206, flexible (soft) termination, across rows 2 and 3."),
         ("", f"F     {LED_FUSE_A:g} A chip fuse, 1206, across rows 1 and 2: the strip is fused, the ESP32's feed is not."),
         ("", f"L     link (solder bridge or wire) joining rows 3 and 4.        R     {LED_SERIES_OHM:g} ohm in the data wire."),
