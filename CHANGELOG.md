@@ -111,6 +111,14 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   `rf_model/out/h50327_c65_s*`, `out/bearing_spacing`): 31 mm is within 1 deg of the best;
   keep it.
 
+### Shield deck
+
+- Added (2026-11-16): option page for an LED direction ring (templates page 7, after the wiring
+  diagram; the design formulas are now page 8): a second 4x4 pad board between the PoE
+  splitter and the ESP32 that feeds a WS2812B strip from a fused row, with its parts list.
+  Sizes in `shield_deck/parameters.csv` (group `led`). Wiring only: the gateway does not drive
+  the strip yet.
+
 ### Docs
 
 - Added `SECURITY.md` (2026-11-11): how to report a vulnerability, and the gaps from the input-validation review that

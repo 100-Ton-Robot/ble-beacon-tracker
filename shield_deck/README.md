@@ -1,6 +1,6 @@
 # Shield deck and plate templates
 
-Printable 1:1 drill templates for the electronics plates and back panel, stack views, the wiring diagram, and the Gerbers for the copper shield deck PCB. Everything is already built and in this folder: you only need the scripts to change something.
+Printable 1:1 drill templates for the electronics plates and back panel, stack views, the wiring diagram, the LED direction ring option, and the Gerbers for the copper shield deck PCB. Everything is already built and in this folder: you only need the scripts to change something.
 
 ## Quick start (files in the repo, no software)
 
@@ -14,7 +14,8 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 | 4 | Back panel | yes | yes |
 | 5 | Pipe stack views (not to scale) | yes | - |
 | 6 | Wiring diagram | yes | yes |
-| 7 | Design formulas: monopole spacing, triangle, baseplate (reference, no need to print) | - | - |
+| 7 | Option: LED direction ring, its power board and strip wiring | option | option |
+| 8 | Design formulas: monopole spacing, triangle, baseplate (reference, no need to print) | - | - |
 
 - **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; the deck centre is opened with a 2-1/4" hole saw.
 - **No pipe:** pages 1, 3, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
@@ -33,7 +34,14 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 4. Drill the plate and back panel (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). Page 1 is the deck's own hole pattern, for checking the board (and marking the pipe's hole-saw cut).
 5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
 
-Page 7 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.
+**Option: LED direction ring** (page 7). A WS2812B strip wrapped into a ring above the deck, facing out, to light toward a detected beacon:
+
+- **Power:** a second 4x4 pad board between the PoE splitter and the ESP32. A USB-C socket pigtail takes the splitter's plug, a USB-C plug pigtail feeds the ESP32, and the strip hangs off a fused row, so its current never passes through the ESP32.
+- **Size:** 24 pixels of 60-per-metre strip make a 127 mm ring, inside the 146 mm deck (`LED_PIXELS`, `LED_PER_M`). Keep the strip and its wires above the deck: the copper shades the antennas from them.
+- **Parts:** chosen for outdoor cold and heat (polymer capacitor, X7R ceramic, chip fuse); the page lists them.
+- **Status:** wiring only. The gateway firmware does not drive the strip yet, and the ring's effect on reception has not been measured.
+
+Page 8 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.
 
 ### Drill sizes and zip ties
 
@@ -89,7 +97,7 @@ Everything here is generated from one file of numbers, [`parameters.csv`](parame
 | `parameters.csv` | Every measurement, size, placement and clearance rule | You (or `read_plate_svg.py`) |
 | `params.py` | Loads the CSV for the other scripts | - |
 | `shield_deck_gerbers.zip`, `shield_deck_preview.svg`, `hole_table.csv` | Deck PCB Gerbers (any fab), a picture of it, hole coordinates | `make_shield_deck.py` |
-| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, design formulas | `make_templates.py` |
+| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, design formulas | `make_templates.py` |
 | `plate_layout.svg`, `pipe_plate_layout.svg` | No-pipe (alt) and pipe plates for laying out in Inkscape | `make_plate_svg.py` |
 
 ### Print the templates
@@ -106,7 +114,8 @@ The pages, in order (pick one build type, pipe or no pipe, and print only its pa
 4. Back panel (both)
 5. Pipe stack views, not to scale (pipe only)
 6. Wiring diagram (both)
-7. Design formulas (reference, not to size)
+7. Option: LED direction ring (both, only if you add the ring)
+8. Design formulas (reference, not to size)
 
 ### Change a measurement or size
 

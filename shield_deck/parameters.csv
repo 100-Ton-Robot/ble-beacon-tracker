@@ -135,5 +135,15 @@ RULE_PART_GAP,1.5,mm,rule,rules,between parts (a XIAO and its own tie mount exce
 RULE_HOLE_GAP,2.0,mm,rule,rules,edge to edge between drilled plate holes
 RULE_RIM_HOLE,3.0,mm,rule,rules,hole edge -> plate rim
 RULE_RIM_PART,3.0,mm,rule,rules,part outline -> plate rim
-RF_FREQ,2440.0,MHz,spec,formulas,"BLE band centre (2402-2480 MHz): sets the wavelength on the formulas page (page 7)"
+RF_FREQ,2440.0,MHz,spec,formulas,"BLE band centre (2402-2480 MHz): sets the wavelength on the formulas page (page 8)"
 FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page drawing scale
+LED_PIXELS,24,count,design,led,"LED direction ring option: pixels in the ring (2026-11-16). At LED_PER_M this sets the ring's diameter; keep it inside the deck (DISC_DIAMETER)"
+LED_PER_M,60,count,spec,led,strip pixels per metre
+LED_DATA_GPIO,1,pin,design,led,ESP32 GPIO driving the strip's data in (GPIO1 and GPIO2 are the free pins)
+LED_CAP_UF,470,uF,design,led,"C1, polymer bulk capacitor across rows 1 and 4 of the LED power board"
+LED_BYPASS_UF,0.1,uF,design,led,"C2, X7R ceramic across rows 2 and 3"
+LED_FUSE_A,2,A,design,led,"F, chip fuse between rows 1 and 2 (the strip's feed)"
+LED_SERIES_OHM,330,ohm,design,led,"R, in the data wire"
+LED_PIXEL_MA,60 1,mA,spec,led,"WS2812B current per pixel: full white, dark (typical datasheet values)"
+LED_SUPPLY_A,2.4 0.3,A,estimated,led,"PoE splitter's 5 V rating, and what the gateway and three radios draw (not measured)"
+LED_PAGE,108.0 185.0 16.0,mm,drawing,led,"LED option page: board centre x and y on the page, pad pitch as drawn"

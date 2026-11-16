@@ -1,6 +1,6 @@
 """1:1 printable PDF templates: shield deck drill template, electronics plate (both discs drawn the same way
 round, plate 12 o'clock up), the plate wiring diagram, the pipe plate and its stack views, the no-pipe (alt) split plate, then the back panel
-(reflector face).
+(reflector face). After the wiring diagram: the LED direction ring option (its power board and strip wiring).
 
 Uses the same geometry as make_shield_deck.py. Run:  python make_templates.py
 Print at 100% / "Actual size" and check the 100 mm scale bar with a ruler.
@@ -758,6 +758,187 @@ def jst_head(c, x0, top):
         "sector's ESP RX pin (labels on the drawing). Female half on the far tail keeps 5V covered.",
     )):
         c.drawString(tx * mm, (top - 7 - n * 4) * mm, s)
+
+
+# Option: LED direction ring (2026-11-16, user). A WS2812B strip wrapped into a ring above the deck, facing out,
+# lights toward a detected beacon. Its 5 V comes from a second 4x4 pad board (same model as the bus board) that
+# sits between the PoE splitter and the ESP32: a USB-C socket pigtail takes the splitter's plug, a USB-C plug
+# pigtail feeds the ESP32, and the strip hangs off a fused row, so its current never passes through the ESP32.
+# Rows (user): 1 and 4 are + and - (the bulk capacitor spans them), 2 is the fused 5 V out, 3 a second GND row.
+# Drawn from the pad side, connections only, in page mm (LED_PAGE: board centre x, y and the pad pitch as drawn).
+# The capacitor is the leaded can: an 8 mm SMD can's 8.3 mm base is wider than the 7.6 mm pad field.
+def led_ring_length():
+    return LED_PIXELS * 1000.0 / LED_PER_M
+
+
+def led_page(c):
+    cx, cy, p = LED_PAGE
+    cols = [cx + (k - 1.5) * p for k in range(4)]            # a-d, left to right
+    rows = [cy + (1.5 - k) * p for k in range(4)]            # rows 1-4, top to bottom
+    top = PAGE_H / mm
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (top - 15) * mm, "Option: LED direction ring - power board")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (top - 21) * mm,
+                 "Not to scale: shows connections only. A second 4x4 pad board, the same model as the bus board (page 6).")
+    c.drawString(15 * mm, (top - 25.5) * mm,
+                 "PoE splitter's USB-C plug -> socket pigtail -> this board -> plug pigtail -> ESP32; this board -> strip.")
+
+    # board: outline, row copper, pads
+    c.setStrokeGray(0.55)
+    c.setLineWidth(0.6)
+    c.rect((cols[0] - 12) * mm, (rows[3] - 12) * mm, (3 * p + 24) * mm, (3 * p + 24) * mm)
+    c.setStrokeGray(0.85)
+    c.setLineWidth(5)
+    for y in rows:
+        c.line(cols[0] * mm, y * mm, cols[3] * mm, y * mm)
+    c.setStrokeGray(0.45)
+    c.setLineWidth(0.5)
+    for y in rows:
+        for x in cols:
+            c.setFillGray(0.85)
+            c.circle(x * mm, y * mm, 2.0 * mm, fill=1)
+            c.setFillGray(1)
+            c.circle(x * mm, y * mm, 0.7 * mm, fill=1)
+    c.setFillGray(0.35)
+    c.setFont("Helvetica-Oblique", 6.5)
+    c.drawCentredString(cols[2] * mm, (rows[0] + 8) * mm, "pad side (rows bridged)")
+    c.setFillGray(0)
+    c.setFont("Helvetica-Bold", 6.5)
+    lx = cols[0] - 14
+    c.drawRightString(lx * mm, (rows[0] + 1.6) * mm, "row 1: 5 V in (+)")
+    c.drawRightString(lx * mm, (rows[1] - 0.8) * mm, "row 2: 5 V out, fused")
+    c.drawRightString(lx * mm, (rows[2] - 0.8) * mm, "row 3: GND")
+    c.drawRightString(lx * mm, (rows[3] - 3.6) * mm, "row 4: GND (-)")
+
+    def wire(col, pts, w=1.1):           # white halo first, as on the wiring page
+        for lw, setcol in ((3.0, lambda: c.setStrokeGray(1)), (w, lambda: c.setStrokeColorRGB(*col))):
+            setcol()
+            c.setLineWidth(lw)
+            c.setLineJoin(1)
+            path = c.beginPath()
+            path.moveTo(pts[0][0] * mm, pts[0][1] * mm)
+            for x, y in pts[1:]:
+                path.lineTo(x * mm, y * mm)
+            c.drawPath(path)
+        c.setFillColorRGB(*col)
+        for x, y in (pts[0], pts[-1]):
+            c.circle(x * mm, y * mm, 0.8 * mm, fill=1, stroke=0)
+        c.setFillGray(0)
+        c.setStrokeGray(0)
+
+    # C1, the bulk capacitor: leaded can lying beside the pads, legs to rows 1 (+) and 4 (-)
+    capx, caph = cols[0] - 50, 14.0
+    lead = (0.3, 0.3, 0.3)
+    wire(lead, ((cols[0], rows[0]), (capx, rows[0]), (capx, cy + caph)), 0.8)
+    wire(lead, ((cols[0], rows[3]), (capx, rows[3]), (capx, cy - caph)), 0.8)
+    c.setLineWidth(0.8)
+    c.setFillGray(0.9)
+    c.roundRect((capx - 7) * mm, (cy - caph) * mm, 14 * mm, 2 * caph * mm, 2 * mm, fill=1)
+    c.setFillGray(0)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(capx * mm, (cy - 1.2) * mm, "C1")
+    c.drawCentredString(capx * mm, (cy + caph - 5) * mm, "+")
+    c.drawCentredString(capx * mm, (cy - caph + 2.5) * mm, "-")
+
+    # pigtails: socket on column b, plug on column d; red up from row 1, black down from row 4
+    ytop, ybot = rows[0] + 18, rows[3] - 18
+    wire(RED, ((cols[1], rows[0]), (cols[1], ytop)))
+    wire(BLACK, ((cols[1], rows[3]), (cols[1], ybot)))
+    wire(RED, ((cols[3], rows[0]), (cols[3], ytop)))
+    wire(BLACK, ((cols[3], rows[3]), (cols[3], ybot)))
+    c.setFont("Helvetica", 6.5)
+    c.setFillColorRGB(*RED)
+    c.drawRightString((cols[1] + 3) * mm, (ytop + 5.2) * mm, "red: USB-C socket pigtail")
+    c.drawRightString((cols[1] + 3) * mm, (ytop + 2.2) * mm, "(5 V in, from the PoE splitter's plug)")
+    c.drawString((cols[3] - 3) * mm, (ytop + 5.2) * mm, "red: USB-C plug pigtail")
+    c.drawString((cols[3] - 3) * mm, (ytop + 2.2) * mm, "(5 V to the ESP32-S3-ETH's USB-C)")
+    c.setFillGray(0)
+    c.drawRightString((cols[1] + 3) * mm, (ybot - 3.8) * mm, "black: USB-C socket pigtail (GND)")
+    c.drawString((cols[3] - 3) * mm, (ybot - 3.8) * mm, "black: USB-C plug pigtail")
+    c.drawString((cols[3] - 3) * mm, (ybot - 6.8) * mm, "(GND)")
+
+    # strip: 5 V from row 2, GND from row 3, data straight from the ESP32 through R
+    sx, sw = cols[3] + 30, 24.0
+    sy0, sy1 = rows[2] - 17, rows[1] + 8
+    dinx = sx + 12
+    wire(RED, ((cols[3], rows[1]), (sx, rows[1])))
+    wire(BLACK, ((cols[3], rows[2]), (sx, rows[2])))
+    wire(GREEN, ((dinx, sy0), (dinx, sy0 - 14)))
+    c.setLineWidth(0.8)
+    c.setFillGray(0.96)
+    c.rect(sx * mm, sy0 * mm, sw * mm, (sy1 - sy0) * mm, fill=1)
+    c.setFillGray(1)
+    for k in range(3):                                       # a few pixels
+        c.rect((sx + sw - 8) * mm, (sy1 - 9 - k * 11) * mm, 5 * mm, 5 * mm, fill=1)
+    c.rect((dinx - 1.6) * mm, (sy0 - 10.5) * mm, 3.2 * mm, 7 * mm, fill=1)      # R in the data wire
+    c.setFillGray(0)
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawString((sx + 1.5) * mm, (rows[1] - 0.8) * mm, "5V")
+    c.drawString((sx + 1.5) * mm, (rows[2] - 0.8) * mm, "GND")
+    c.drawCentredString(dinx * mm, (sy0 + 1.5) * mm, "DIN")
+    c.drawString((dinx + 2.6) * mm, (sy0 - 7.8) * mm, "R")
+    c.drawString((sx - 12) * mm, (sy1 + 5.6) * mm, f"WS2812B strip, {LED_PIXELS} pixels")
+    c.setFont("Helvetica-Oblique", 6)
+    c.drawString((sx - 12) * mm, (sy1 + 2.4) * mm, "pad order differs between strips: go by the printing")
+    c.setFont("Helvetica", 6.5)
+    c.setFillColorRGB(*GREEN)
+    c.drawString(sx * mm, (sy0 - 17.8) * mm, f"green: ESP32 GPIO{LED_DATA_GPIO}")
+    c.drawString(sx * mm, (sy0 - 20.8) * mm, "(header pin: Waveshare's pinout)")
+    c.setFillGray(0)
+
+    # chip parts on the pad side, each across two pads that have no wire in them
+    def chip(x, ya, yb, tag):
+        c.setStrokeGray(0)
+        c.setLineWidth(0.7)
+        c.setFillGray(1)
+        c.rect((x - 3) * mm, (yb - 2.6) * mm, 6 * mm, (ya - yb + 5.2) * mm, fill=1)
+        c.setFillGray(0.35)
+        c.rect((x - 3) * mm, (ya - 0.6) * mm, 6 * mm, 3.2 * mm, fill=1)
+        c.rect((x - 3) * mm, (yb - 2.6) * mm, 6 * mm, 3.2 * mm, fill=1)
+        c.setFillGray(0)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawCentredString(x * mm, ((ya + yb) / 2 - 1) * mm, tag)
+
+    chip(cols[2], rows[0], rows[1], "F")
+    chip(cols[1], rows[1], rows[2], "C2")
+    c.setStrokeGray(0.15)                                    # L: rows 3 and 4 joined
+    c.setLineWidth(3)
+    c.line(cols[2] * mm, rows[2] * mm, cols[2] * mm, rows[3] * mm)
+    c.setStrokeGray(0)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString((cols[2] + 2.2) * mm, ((rows[2] + rows[3]) / 2 - 1) * mm, "L")
+
+    ring_len = led_ring_length()
+    white_a = LED_PIXELS * LED_PIXEL_MA[0] / 1000.0
+    dark_a = LED_PIXELS * LED_PIXEL_MA[1] / 1000.0
+    text = [
+        ("B", "Parts. F, C2 and L go on the pad side, on pads with no wire in them; the wires and C1's legs come through"),
+        ("B", "from the other side."),
+        ("", f"C1   {LED_CAP_UF:g} uF, 10 to 16 V aluminium polymer capacitor, leaded, rated -55 to +105 C. Legs to rows 1 (+) and 4 (-);"),
+        ("", "       lay the can flat beside the pads and hold it with a dab of RTV. (An 8 mm SMD can would cover the pads.)"),
+        ("", f"C2   {LED_BYPASS_UF:g} uF 50 V X7R ceramic, 1206, flexible (soft) termination, across rows 2 and 3."),
+        ("", f"F     {LED_FUSE_A:g} A chip fuse, 1206, across rows 1 and 2: the strip is fused, the ESP32's feed is not."),
+        ("", f"L     link (solder bridge or wire) joining rows 3 and 4.        R     {LED_SERIES_OHM:g} ohm in the data wire."),
+        ("", ""),
+        ("B", "Notes"),
+        ("", "Before soldering, plug the PoE splitter into the socket pigtail and meter red to black: +5 V, red positive."),
+        ("", "The radios stay on VBUS (40) through the bus board (page 6). The strip's current never passes through the ESP32."),
+        ("", f"Strip: {LED_PIXELS} pixels at {LED_PER_M} per m = {ring_len:.0f} mm = a {ring_len / math.pi:.0f} mm ring, inside the"
+             f" {g.DISC_DIAMETER:g} mm deck. Mount it above the deck, facing out,"),
+        ("", "and keep it and its wires above the deck: the copper shades the antennas from it."),
+        ("", f"Current: about {dark_a:.2f} A all dark and {white_a:.1f} A all white. The splitter gives {LED_SUPPLY_A[0]:g} A; the gateway and"
+             f" radios use about {LED_SUPPLY_A[1]:g} A."),
+        ("", "The firmware must limit how many pixels light at once; the fuse backs that up."),
+        ("", f"Data: GPIO{LED_DATA_GPIO} (GPIO2 is the other free pin). The gateway firmware does not drive the strip yet."),
+        ("", "Outdoors: polymer and X7R parts hold their values down to -55 C; WS2812B is typically specified to -25 C only."),
+    ]
+    y = ybot - 20
+    for style, s in text:
+        c.setFont("Helvetica-Bold" if style else "Helvetica", 8.5)
+        c.drawString(15 * mm, y * mm, s)
+        y -= 4.6
 
 
 # Alternative split plate (2026-10-31; faces swapped 2026-11-10, user): no pigtail hole. The three XIAOs sit on the
@@ -1666,6 +1847,7 @@ BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-
     face_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
     stack_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
     wiring_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
+    led_page: ("OPTION", "LED direction ring; pipe and no pipe", (0.55, 0.35, 0.05)),
     formulas_page: ("REFERENCE", "both builds; no need to print", (0.3, 0.3, 0.3)),
 }
 
@@ -1676,7 +1858,7 @@ def build_tag(c, page, n):
     head, sub, rgb = BUILD_TAGS[page]
     sets = "Pipe: pages 1, 2, 4, 5, 6   No pipe: pages 1, 3, 4, 6"
     x1 = PAGE_W - 12 * mm
-    y1 = PAGE_H - (6.5 if page is wiring_page else 27.5) * mm
+    y1 = PAGE_H - (6.5 if page in (wiring_page, led_page) else 27.5) * mm
     w = max(c.stringWidth(head, "Helvetica-Bold", 8.5), c.stringWidth(sub, "Helvetica", 6),
             c.stringWidth(sets, "Helvetica", 6)) + 4 * mm
     h = 10 * mm
@@ -1701,8 +1883,9 @@ def main():
     c = canvas.Canvas(out, pagesize=letter)
     c.setTitle("Shield deck, back panel, electronics plate templates and plate wiring")
     # drill templates first (deck, plates, back panel), then the stack view and wiring diagram (user, 2026-11-09),
-    # design formulas at the very end as a reference page (2026-11-12)
-    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, formulas_page)
+    # the LED direction ring option after the wiring it adds to (2026-11-16), design formulas at the very end as a
+    # reference page (2026-11-12)
+    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, formulas_page)
     for n, page in enumerate(pages, 1):
         page(c)
         build_tag(c, page, n)
