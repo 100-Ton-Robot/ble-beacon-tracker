@@ -10,8 +10,8 @@ v2 gateway can't read it.
 
 ## Wiring and framing
 
-- `uart21`: **D6 = TX** to the gateway, **D7 = RX** from it, 115200 8N1, 3.3 V. Each scanner's
-  D6 has its own gateway RX pin. One gateway TX drives every scanner's D7.
+- `uart21`: **D8 = TX** to the gateway, **D7 = RX** from it, 115200 8N1, 3.3 V. Each scanner's
+  D8 has its own gateway RX pin. One gateway TX drives every scanner's D7.
 - Every message, in both directions: protobuf bytes, then a CRC-16/CCITT-FALSE of those bytes
   (poly 0x1021, init 0xFFFF, check "123456789" = 0x29B1, 2 bytes little-endian), COBS-encoded,
   then a 0x00 delimiter. Drop anything whose COBS, CRC or protobuf doesn't decode. The gateway
@@ -117,7 +117,7 @@ payloads (changed first, then refreshes), debug `TxDrops` (when on and due, 0.8.
 
 ## Sector
 
-The scanner doesn't know its sector. Each scanner's D6 is wired to its own gateway RX pin,
+The scanner doesn't know its sector. Each scanner's D8 is wired to its own gateway RX pin,
 and the gateway assigns the sector to that pin; wiring is the only source of truth. 0.4.x
 scanners sent a saved sector claim (`Bucket.sector`, field 2), had a `sector` command
 (field 6), a `SECTOR_NOT_SET` event (14) and a `SECTOR` setting (1); all are retired in 0.5.0

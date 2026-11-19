@@ -133,6 +133,10 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### 0.8.0 (unreleased)
 
+- Changed (2026-11-19): gateway TX moved from D6 (pin 7, P2.08) to D8 (pin 9, P2.01) so all
+  four harness wires (5V, GND, D7 RX, D8 TX) leave the XIAO from one pin row. Pin config in
+  `app.overlay` (uart21 pinctrl; `spi00` disabled, D8 was its SCK). Rewire before flashing:
+  a 0.8.0 board sends nothing on D6. Templates page 6 and the JST pinout updated to match.
 - Fixed: the advertised 1 m power was not range-checked. Eddystone UID/URL 0 m power below
   -87 dBm wrapped when 41 was subtracted (-100 came out as +115 dBm), and any iBeacon byte was
   passed on as is (0x7F read as "none"). Values outside -100..+20 dBm at 1 m are now dropped

@@ -10,7 +10,7 @@ syntax = "proto3";
 
 package bletracker;
 
-// Scanner -> gateway, one per tick (200 ms by default) on D6.
+// Scanner -> gateway, one per tick (200 ms by default) on D8.
 message Bucket {
   bytes chip_id = 1;             // 8 bytes, FICR device ID as hwinfo returns it
   reserved 2;                    // was sector (scanner's saved sector claim, dropped in 0.5.0:

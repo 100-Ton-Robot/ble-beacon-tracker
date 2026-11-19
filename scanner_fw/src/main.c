@@ -1,15 +1,15 @@
 /*
  * BLE scanner, one per sector. It doesn't know its sector: that is the gateway RX pin
- * its D6 is wired to.
+ * its D8 is wired to.
  *   1. boots, prints a banner, blinks the LED once a second
  *   2. passive scan at 100% duty, duplicates kept (active scanning on command)
  *   3. RF switch control so onboard vs external antenna can be compared
  *   4. 1 s aggregation per address for the console: median/max RSSI, count, 1 m power
- *   5. bucket stream to the gateway (D6 TX, D7 RX): one protobuf Bucket per 200 ms tick,
+ *   5. bucket stream to the gateway (D8 TX, D7 RX): one protobuf Bucket per 200 ms tick,
  *      typed records (RSSI, advert and scan response bytes, status, events, counters),
  *      each service on its own interval, a byte budget per tick and a throttle that
  *      sheds payloads before RSSI. Schema: proto/bletracker.proto, rules: PROTOCOL.md.
- *      Each scanner's D6 has its own gateway RX pin; D7 is shared by all three
+ *      Each scanner's D8 has its own gateway RX pin; D7 is shared by all three
  *   6. commands from the gateway on D7 (protobuf Command), addressed by chip ID since
  *      every scanner hears them, acknowledged with an event
  *   7. flash mode: connectable BLE with MCUmgr SMP so MCUboot images can be
@@ -133,7 +133,7 @@ static uint32_t devs_full;
 static uint8_t order[MAX_DEVS]; /* devs[] indices, strongest median first */
 
 /*
- * Bucket stream on uart21 (D6 TX, D7 RX), 115200 8N1. Each tick (TICK_MS) one frame:
+ * Bucket stream on uart21 (D8 TX, D7 RX), 115200 8N1. Each tick (TICK_MS) one frame:
  * protobuf Bucket (header fields, then Record submessages encoded one at a time), then
  * CRC-16/CCITT-FALSE (poly 0x1021, init 0xffff, LE) of the protobuf bytes, COBS-encoded,
  * followed by a 0x00 delimiter. Records per tick, in this order:
@@ -2698,7 +2698,7 @@ static int cmd_stream(const struct shell *sh, size_t argc, char **argv)
 		}
 		frame_dump = true;
 	}
-	shell_print(sh, "gateway uart21 (D6 TX): %s, buckets sent=%u skipped=%u seq=%u",
+	shell_print(sh, "gateway uart21 (D8 TX): %s, buckets sent=%u skipped=%u seq=%u",
 		    device_is_ready(gw_uart) ? "ready" : "NOT READY", buckets_sent,
 		    buckets_skipped, tick_seq);
 	return 0;
@@ -2774,7 +2774,7 @@ int main(void)
 	       ant_external ? "ext" : "int");
 
 	err = gw_uart_init();
-	printk("gateway uart: %s, %u baud\n", err ? "NOT READY" : "uart21, D6 TX / D7 RX (commands)",
+	printk("gateway uart: %s, %u baud\n", err ? "NOT READY" : "uart21, D8 TX / D7 RX (commands)",
 	       uart_baud);
 
 	err = bt_enable(NULL);

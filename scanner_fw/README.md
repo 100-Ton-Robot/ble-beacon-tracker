@@ -7,7 +7,7 @@ address, and optionally each address's raw advert and scan response bytes, plus 
 shedding payloads before RSSI. The gateway sends commands back on the same UART: listen, flash
 mode, antenna, payloads, active scanning, intervals, budget and the ignore list (addresses
 or address ranges whose adverts are dropped, saved in flash or until reboot). The stream is specified
-in [PROTOCOL.md](PROTOCOL.md) and [proto/bletracker.proto](proto/bletracker.proto). Each scanner's TX (D6) has its own gateway RX pin, which is how the gateway
+in [PROTOCOL.md](PROTOCOL.md) and [proto/bletracker.proto](proto/bletracker.proto). Each scanner's TX (D8) has its own gateway RX pin, which is how the gateway
 knows the sector (the scanner itself doesn't); the gateway's one TX drives all three scanners' RX (D7) through the bus board,
 so commands are addressed by chip ID. In flash mode the scanner takes signed firmware updates
 over BLE, so it can be updated with the box sealed. The antenna choice is kept in flash.
@@ -109,7 +109,7 @@ MCUboot stays in place and the saved settings survive. With several boards attac
 the board's USB parent device ID, and `status` afterwards confirms the chip ID and version.
 
 **No sector setup.** The scanner doesn't know or store its sector (since 0.5.0): the sector is
-the gateway RX pin its D6 is wired to, so wiring alone decides it. Any board can go in any
+the gateway RX pin its D8 is wired to, so wiring alone decides it. Any board can go in any
 position. 0.4.x boards had a `sector` command and saved claim; 0.5.0 deletes it at boot.
 
 The app's version comes from `VERSION`. Bump it for every release so `status` and the update app
@@ -256,7 +256,7 @@ fixed-address beacon for antenna tests.
 Protocol 3 since 0.4.0 (it replaces the v2 one-frame-per-second format; a v2 gateway can't read
 it). Full spec: [PROTOCOL.md](PROTOCOL.md), schema: [proto/bletracker.proto](proto/bletracker.proto).
 
-- `uart21`: **D6 = TX, D7 = RX**, 115200 8N1, 3.3 V. Each scanner's D6 goes to its own gateway
+- `uart21`: **D8 = TX, D7 = RX**, 115200 8N1, 3.3 V. Each scanner's D8 goes to its own gateway
   RX pin; the gateway's single TX drives every scanner's D7, so commands are addressed by chip ID.
 - Every 200 ms one `Bucket` (protobuf + CRC-16 + COBS + 0x00): chip ID, tick seq,
   uptime, channel, load level, then records: events, status (1 s), counters (10 s), RSSI per
@@ -274,7 +274,7 @@ Python tools, `tools/bletracker_pb2.py` is generated with the toolchain's protoc
 C:\ncs\toolchains\4f5b6ad6dd\opt\nanopb\generator-bin\protoc.exe -Iproto --python_out=tools proto/bletracker.proto
 ```
 
-To watch it from a PC, wire D6 to the RX of a 3.3 V USB-serial adapter (and GND), then
+To watch it from a PC, wire D8 to the RX of a 3.3 V USB-serial adapter (and GND), then
 (`pip install protobuf pyserial`):
 
 ```bash
