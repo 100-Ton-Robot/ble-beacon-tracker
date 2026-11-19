@@ -156,7 +156,7 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   `VERSION_CHANGED` comes from flash and could hold any byte).
 - Fixed: the console's `budget`, `chan` and `minrssi` read the whole argument as a number
   (`budget 50x` was taken as 50, `chan 38x` as 38).
-- Not built or flashed yet: no image in `scanner_fw/release/`.
+- Built 2026-11-19 (commit ee0c9f0): `scanner_fw/release/scanner_fw-0.8.0-dfu.zip`. Not flashed or tested on hardware yet.
 
 ### 0.7.0 (2026-11-11)
 
