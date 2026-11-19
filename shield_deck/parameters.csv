@@ -57,7 +57,7 @@ XIAO_TIE_DX,4.0 -4.0 4.0,mm,design,plate,retired plate page: tie offset along ea
 JST_L,15.0,mm,estimated,plate,mated inline JST pair length
 JST_W,12.0,mm,estimated,plate,mated inline JST pair width
 JST_PITCH,2.5,mm,estimated,plate,"pin rows inside the mated pair, pin 1 at the top"
-SECTOR_RX_PINS,34 32 31,pin,design,wiring,"ESP32 header pin receiving each sector's D6 (TX), S0-S2"
+SECTOR_RX_PINS,34 32 31,pin,design,wiring,"ESP32 header pin receiving each sector's D8 (TX), S0-S2"
 SECTOR_RX_GPIOS,17 16 18,pin,design,wiring,the same pins as GPIO numbers
 ESP_TX,35 21,pin,design,wiring,"ESP32 TX to the bus TX row (every XIAO's D7): header pin, GPIO"
 XIAO_ROW,7.6,mm,estimated,wiring,XIAO pad rows +- this from the centre line
@@ -69,7 +69,7 @@ WIRING_JST_YS,25.0 5.0 -13.0,mm,drawing,wiring,"far JST halves y: S0 lower than 
 JST_HALF,5.0,mm,drawing,wiring,one half of the pair as drawn (halves drawn apart)
 FAR_X0,10.8,mm,drawing,wiring,far halves a little right of the strip middle
 XIAO_JST_GAP,6.0,mm,drawing,wiring,XIAO USB end -> XIAO half: room for the 4 tail lanes
-XT_LANES,1.0 2.2 3.4 4.6,mm,drawing,wiring,"XIAO tail verticals right of the USB end: yellow, red, black, green"
+XT_LANES,1.0 2.2 3.4 4.6,mm,drawing,wiring,"XIAO tail verticals right of the USB end: red, black, yellow, green"
 XT_STEP,0.6,mm,drawing,wiring,lane spacing above / below the XIAO
 YELLOW_LANES,6.0 6.0 5.2,mm,drawing,wiring,yellow verticals to the ESP32 RX pins
 FEED_TX_LANE,4.8,mm,drawing,wiring,"ESP TX feed vertical, left of the bus pads"

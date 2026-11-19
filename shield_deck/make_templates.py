@@ -34,7 +34,7 @@ POST_SHIFT = BOARD_W / 2 - (POST_EDGE + BOARD_HOLE / 2 + POST_X / 2)  # ~3.5 mm:
 # level with S1's IPEX4 connector (decided 2026-10-31): the coax sweep from their deck jacks to it without hard
 # corners, MHF4 ends threaded up from below, and the hole (grommet or a dab of RTV) is their strain relief.
 # Each XIAO has a 4-wire tail to an inline JST pair (90 mm tails each side); the mated pair lies in the strip,
-# clear of the hole. Its far side runs back: TX (D6) to the sector's own
+# clear of the hole. Its far side runs back: TX (D8, was D6 until 2026-11-19) to the sector's own
 # ESP32 RX pin, the rest to the bus board at the top of the strip (rows: ESP TX to every D7, GND, spare, 5V). Zip ties through hole pairs; the bus board on one M3.
 # Three M4 bolts on spacers tie the plate to the deck through the deck's mount holes. The plate is turned
 # so its 12 o'clock is PLATE_TURN deg counter-clockwise of the deck's S0 arrow (top view); the bolts then land
@@ -395,7 +395,7 @@ def plate_page(c):
         "of the deck's S0 arrow, ~25 mm up.",
         f"Small holes: {TIE_HOLE:g} mm zip-tie pairs: one tie across each XIAO (USB-C toward the rim), two each across",
         "splitter and ESP32. Coax strain relief: grommet in the pigtail hole, or a dab of RTV once the coax are placed.",
-        "Dotted: mated JST pairs (unplug to reflash); far side D6 to its ESP32 RX pin, 3 wires to the bus.",
+        "Dotted: mated JST pairs (unplug to reflash); far side D8 TX to its ESP32 RX pin, 3 wires to the bus.",
         "Dashed: ESP32-S3-ETH 72.8 x 21 mm; splitter from a photo - lay it on the printout, tie holes "
         "{:g} mm outside its edges.".format(TIE_CLEAR),
     ]
@@ -413,10 +413,14 @@ ESP_PAD_X = ESP32[0] + ESP32[2] - 1.3   # header pads just inside the ESP32's ri
 ESP_PIN40_Y = ESP32[1] + ESP32[3] - 2.5
 BUS_COLS = tuple(POWER[0] + POWER[2] / 2 + k * 2.54 for k in (-1.5, -0.5, 0.5, 1.5))  # cols 1-4: ESP, S0, S1, S2
 RED, BLACK, YELLOW, GREEN = (0.85, 0.0, 0.0), (0.0, 0.0, 0.0), (0.85, 0.65, 0.0), (0.0, 0.6, 0.2)  # JST wire colours
-JST_PINS = ((RED, "red", "5V (14)"), (BLACK, "black", "GND (13)"), (YELLOW, "yellow", "D6 TX (7)"),
+JST_PINS = ((RED, "red", "5V (14)"), (BLACK, "black", "GND (13)"), (YELLOW, "yellow", "D8 TX (9)"),
             (GREEN, "green", "D7 RX (8)"))   # JST pins 1-4, crimp side, key peg up, left to right
 SECTOR_PINS = tuple(zip(SECTOR_RX_PINS, SECTOR_RX_GPIOS))   # (header pin, GPIO) of each sector's ESP32 RX
 WIRING_XIAO_X = XIAO_X + WIRING_XIAO_DX
+USBC_W, USBC_IN, USBC_OUT = 9.0, 6.0, 1.0   # wiring page only: USB-C outline, approximate (width, on board, overhang)
+BOTTOM_VIEW_TOP = 3.0                      # wiring page only: top edge of the bottom-view XIAO, plate mm
+WIRING_TEXT_TOP = 60.0                     # wiring page only: first line of the "wired the same" notes, above the radios
+WIRING_XIAO_YS = (18.0,) + tuple(XIAO_YS[1:])   # wiring page only: the drawn radio sits under the notes
 
 
 def esp_pin_y(n):
@@ -432,7 +436,7 @@ def esp_pin_y(n):
 
 def jst_halves(i):
     """Wiring page only: x0, y0 of sector i's far half (in the strip) and XIAO half (off its USB end)."""
-    return (FAR_X0, WIRING_JST_YS[i] - JST_W / 2), (WIRING_XIAO_X + XIAO_L / 2 + XIAO_JST_GAP, XIAO_YS[i] - JST_W / 2)
+    return (FAR_X0, WIRING_JST_YS[i] - JST_W / 2), (WIRING_XIAO_X + XIAO_L / 2 + XIAO_JST_GAP, WIRING_XIAO_YS[i] - JST_W / 2)
 
 
 def jst_pin_y(y0, n):
@@ -444,8 +448,8 @@ def wiring_routes():
     XIAO tail: pad -> that pin on the XIAO half; far tail: same pin on the far half -> ESP32 pin or bus pad."""
     xr = WIRING_XIAO_X + XIAO_L / 2
     pad = [xr - 2.88 - k * 2.54 for k in range(7)]   # pad x from the USB end; top: D0..D6, bottom: 5V, GND, 3V3, D10..D7
-    d6x, gndx, v5x = pad[6], pad[1], pad[0]
-    xy_, xr_, xb_, xg_ = (xr + d for d in XT_LANES)
+    d8x, d7x, gndx, v5x = pad[5], pad[6], pad[1], pad[0]   # TX moved D6 -> D8 (2026-11-19): all four on one edge
+    xr_, xb_, xy_, xg_ = (xr + d for d in XT_LANES)
     txr, gnd, v5 = BUS_ROWS[0], BUS_ROWS[1], BUS_ROWS[3]
     etx, getx = ESP_TX
 
@@ -464,7 +468,7 @@ def wiring_routes():
                        (BUS_COLS[0], txr)),
          None, f"GPIO{getx} TX ({etx}) -- bus TX row"),
     ]
-    for i, yc in enumerate(XIAO_YS):
+    for i, yc in enumerate(WIRING_XIAO_YS):
         top, bot = yc + XIAO_ROW, yc - XIAO_ROW
         above, below = yc + XIAO_W / 2 + XT_STEP, yc - XIAO_W / 2 - XT_STEP
         rx, grx = SECTOR_PINS[i]
@@ -495,9 +499,10 @@ def wiring_routes():
             black = ((fx, fp(2)), (bx(1), fp(2)), (bx(1), top_f + RISE[2]), (lb, top_f + RISE[2]),
                      (lb, tb), (bx(i + 1), tb), (bx(i + 1), gnd), (c, gnd))
         out += [
-            (YELLOW, ((d6x, top), (d6x, above), (xy_, above), (xy_, jp(3)), (jx, jp(3))), yellow,
-             f"D6 TX (7) -- JST 3 -- ESP32 GPIO{grx} RX ({rx})", f"GPIO{grx} RX ({rx}) -- {s} D6 TX (7)"),
-            (GREEN, ((d6x, bot), (d6x, below - 2 * XT_STEP), (xg_, below - 2 * XT_STEP), (xg_, jp(4)), (jx, jp(4))),
+            (YELLOW, ((d8x, bot), (d8x, below - 2 * XT_STEP), (xy_, below - 2 * XT_STEP), (xy_, jp(3)), (jx, jp(3))),
+             yellow,
+             f"D8 TX (9) -- JST 3 -- ESP32 GPIO{grx} RX ({rx})", f"GPIO{grx} RX ({rx}) -- {s} D8 TX (9)"),
+            (GREEN, ((d7x, bot), (d7x, below - 3 * XT_STEP), (xg_, below - 3 * XT_STEP), (xg_, jp(4)), (jx, jp(4))),
              green, f"D7 RX (8) -- JST 4 -- bus TX row, col S{i}", None),
             (BLACK, ((gndx, bot), (gndx, below - XT_STEP), (xb_, below - XT_STEP), (xb_, jp(2)), (jx, jp(2))),
              black, f"GND (13) -- JST 2 -- bus GND row, col S{i}", None),
@@ -588,7 +593,35 @@ def wiring_page(c):
     # XIAOs: outline, pads, name (no wire crosses a board)
     xl, xr = WIRING_XIAO_X - XIAO_L / 2, WIRING_XIAO_X + XIAO_L / 2
     pad = [xr - 2.88 - k * 2.54 for k in range(7)]
-    for i, yc in enumerate(XIAO_YS[:1]):     # one XIAO drawn: S1 and S2 are wired the same (note below it)
+    used = {9: ("D8", YELLOW), 8: ("D7", GREEN), 13: ("GND", BLACK), 14: ("5V", RED)}
+
+    def usb_outline(yc):                 # USB-C receptacle, approximate, light grey, overhanging the USB end
+        c.saveState()
+        c.setStrokeGray(0.75)
+        c.setLineWidth(0.4)
+        c.roundRect(*P(xr - USBC_IN, yc - USBC_W / 2), R(USBC_IN + USBC_OUT), R(USBC_W), R(0.8))
+        c.restoreState()
+
+    def pin_labels(yc, flipped):
+        """Pin number beside every pad (inside the board edge); used pins also named, in their wire colour.
+        Top view: D0-D6 (pins 1-7) on the upper row; the flipped (bottom) view swaps the rows."""
+        d_row, p_row = (-1, 1) if flipped else (1, -1)          # +1 = upper row
+        for k, px in enumerate(pad):
+            for side, n in ((d_row, k + 1), (p_row, 14 - k)):
+                py = yc + side * XIAO_ROW
+                c.setFillGray(0.25)
+                c.setFont("Helvetica-Bold", 4.5)
+                c.drawCentredString(*P(px, py - side * 1.5 - 0.4), str(n))
+                if n in used:
+                    name, col = used[n]
+                    c.setFillColorRGB(*col)
+                    if side == 1 and not flipped:   # top view, upper row: beside the number, clear of the IPEX4
+                        c.drawRightString(*P(px - 0.8, py - 1.9), name)
+                    else:
+                        c.drawCentredString(*P(px, py - side * 2.6 - 0.4), name)
+        c.setFillGray(0)
+
+    for i, yc in enumerate(WIRING_XIAO_YS[:1]):     # one XIAO drawn: S1 and S2 are wired the same (note below it)
         c.setStrokeGray(0.4)
         c.setLineWidth(0.6)
         c.rect(*P(xl, yc - XIAO_W / 2), R(XIAO_L), R(XIAO_W))
@@ -597,10 +630,10 @@ def wiring_page(c):
             c.circle(*P(px, yc + XIAO_ROW), R(0.5))
             c.circle(*P(px, yc - XIAO_ROW), R(0.5))
         c.setStrokeGray(0)
-        c.setFont("Helvetica-Bold", 10)
-        c.drawCentredString(*P(WIRING_XIAO_X + 2.0, yc + 3.3), f"S{i} XIAO")
-        c.setFont("Helvetica", 5.5)
-        c.drawRightString(*P(xr - 0.6, yc + 5.4), "USB-C")
+        usb_outline(yc)
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawString(*P(xl, yc + XIAO_W / 2 + 2.0), "XIAO nRF54L15 [1,2,3] - TOP VIEW (parts side up)")
+        pin_labels(yc, flipped=False)
         ix, iy = WIRING_XIAO_X - XIAO_IPEX[0], yc + XIAO_IPEX[1]     # IPEX4: two rings, not a pad
         c.setStrokeColorRGB(0.1, 0.3, 0.75)
         c.setLineWidth(0.8)
@@ -610,20 +643,22 @@ def wiring_page(c):
         c.setFillColorRGB(0.1, 0.3, 0.75)
         c.drawString(*P(ix + 1.6, iy - 0.6), "IPEX4")
         c.setFillGray(0)
+        c.setFont("Helvetica-Bold", 5.5)
+        c.saveState()                            # ANTENNA: rotated, just off the antenna edge, level with the IPEX4
+        c.translate(*P(xl - 1.2, iy))
+        c.rotate(-90)
+        c.drawCentredString(0, 0, "ANTENNA")
+        c.restoreState()
+        c.setFillGray(0)
         c.setStrokeGray(0)
 
-    for r, (col, xiao, _, _, _) in enumerate(routes):   # XIAO tails: S0 in full, S1 / S2 as stubs into their half
-        if xiao:
-            wire(col, xiao if r < 7 else xiao[-1:] and ((xiao[-1][0] - 4.0, xiao[-1][1]), xiao[-1]))
+    for r, (col, xiao, _, _, _) in enumerate(routes):   # XIAO tails: one radio drawn, all three are the same
+        if xiao and r < 7:
+            wire(col, xiao)
     c.setStrokeColorRGB(0, 0, 0)
-    c.setFont("Helvetica-Oblique", 6)
-    for i in (1, 2):
-        (_, _), (jx, jy) = jst_halves(i)
-        c.drawRightString(*P(jx + JST_HALF, jy + JST_W + 2.6), f"from S{i} XIAO,")
-        c.drawRightString(*P(jx + JST_HALF, jy + JST_W + 0.8), "wired as S0")
 
     for i in range(3):                  # the two JST halves: far half in the strip, XIAO half off the USB end
-        for (x0, y0), name in zip(jst_halves(i), ("far half", "XIAO half")):
+        for (x0, y0), name in list(zip(jst_halves(i), ("far half", "XIAO half")))[:2 if i == 0 else 1]:
             c.saveState()
             c.setFillGray(1)
             c.setFillAlpha(0.85)
@@ -640,7 +675,7 @@ def wiring_page(c):
                 c.drawString(*P(x0 + 0.9, jst_pin_y(y0, n) - 0.5), str(n))
     for r, (col, xiao, far, _, _) in enumerate(routes):  # wire ends and JST pins on top
         c.setFillColorRGB(*col)
-        for seg in (xiao if r < 7 else (xiao and xiao[-1:]), far):
+        for seg in (xiao if r < 7 else None, far):
             if seg:
                 for q in (seg[0], seg[-1]):
                     c.circle(*P(*q), R(0.45), fill=1, stroke=0)
@@ -667,7 +702,7 @@ def wiring_page(c):
     for col, _, pts, xiao_end, esp_end in routes:
         c.setFillColorRGB(*col)
         if xiao_end:
-            yc = XIAO_YS[k // 4]
+            yc = WIRING_XIAO_YS[k // 4]
             k += 1
             if k <= 4:                                 # S0 only
                 label(xl + 0.8, yc + xiao_label_y[col], xiao_end)
@@ -680,7 +715,7 @@ def wiring_page(c):
         ("Helvetica-Bold", "All three XIAOs are wired the same,"),
         ("Helvetica-Bold", "pad for pad, to their own JST:"),
         ("Helvetica-Bold", "5V (14) -> 1, GND (13) -> 2,"),
-        ("Helvetica-Bold", "D6 TX (7) -> 3, D7 RX (8) -> 4."),
+        ("Helvetica-Bold", "D8 TX (9) -> 3, D7 RX (8) -> 4."),
         ("Helvetica", ""),
         ("Helvetica", "Shared by every radio on the bus: 5V,"),
         ("Helvetica", "GND and the ESP32 TX (GPIO21) into"),
@@ -688,7 +723,7 @@ def wiring_page(c):
         ("Helvetica", "commands; each names one chip ID (or"),
         ("Helvetica", "all), and only the named radios act."),
         ("Helvetica", ""),
-        ("Helvetica", "Only D6 TX differs: each radio talks"),
+        ("Helvetica", "Only D8 TX differs: each radio talks"),
         ("Helvetica", "back on its own ESP32 RX pin, and"),
         ("Helvetica", "that pin is the sector. More radios ="),
         ("Helvetica", "one more JST pair, bus column and ESP"),
@@ -696,15 +731,47 @@ def wiring_page(c):
         ("Helvetica", "UARTs are all used: a 4th radio needs"),
         ("Helvetica", "another UART or a second gateway."),
     ]
-    tx0, ty0 = WIRING_XIAO_X - XIAO_L / 2 - 2.0, XIAO_YS[0] - XIAO_W / 2 - 5.5
+    # bottom view of the same XIAO: no wires, flipped over its long axis (USB-C stays on the right)
+    yb = BOTTOM_VIEW_TOP - XIAO_W / 2
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawString(*P(xl, BOTTOM_VIEW_TOP + 1.6), "XIAO nRF54L15 [1,2,3] - BOTTOM VIEW (flipped, USB-C right)")
+    usb_outline(yb)                      # drawn first: the board hides it, only the overhang shows
+    c.saveState()
+    c.setStrokeGray(0.4)
+    c.setFillGray(1)
+    c.setLineWidth(0.6)
+    c.setDash(2, 1.5)
+    c.rect(*P(xl, yb - XIAO_W / 2), R(XIAO_L), R(XIAO_W), fill=1)
+    c.restoreState()
+    c.setStrokeGray(0.4)
+    c.setLineWidth(0.3)
+    for px in pad:
+        c.circle(*P(px, yb + XIAO_ROW), R(0.5))
+        c.circle(*P(px, yb - XIAO_ROW), R(0.5))
+    c.setStrokeGray(0)
+    c.setFillGray(0.82)
+    c.setFont("Helvetica-Bold", 13)
+    c.drawCentredString(*P(WIRING_XIAO_X - 2.0, yb - 1.6), "BOTTOM")
+    c.setFillGray(0)
+    c.setFont("Helvetica-Bold", 5.5)
+    ya = yb - XIAO_W / 2 + XIAO_W / 5            # antenna end: label off the edge, arrow in, 1/5 up from the bottom
+    c.saveState()                                # ANTENNA: rotated, just off the antenna edge, 1/5 up from the bottom
+    c.translate(*P(xl - 1.2, ya))
+    c.rotate(-90)
+    c.drawCentredString(0, 0, "ANTENNA")
+    c.restoreState()
+    c.drawString(*P(xr + USBC_OUT + 0.8, yb - 0.6), "USB-C")   # beside the overhang, no arrow
+    pin_labels(yb, flipped=True)
+
+    tx0, ty0 = WIRING_XIAO_X - XIAO_L / 2 - 2.0, WIRING_TEXT_TOP
     for n, (font, t) in enumerate(same):
-        c.setFont(font, 6.5)
-        c.drawString(*P(tx0, ty0 - n * 1.75), t)
+        c.setFont(font, 6)
+        c.drawString(*P(tx0, ty0 - n * 1.45), t)
 
     c.setFont("Helvetica", 8.5)
     ny = oy + sc * vy0 - 9
     notes = [
-        "D6 -> its own ESP RX (the pin is the sector): S0 GPIO17 (34), S1 GPIO16 (32), S2 GPIO18 (31).",
+        "D8 TX -> its own ESP RX (the pin is the sector): S0 GPIO17 (34), S1 GPIO16 (32), S2 GPIO18 (31).",
         "ESP TX GPIO21 (35) -> bus TX row -> every D7. Feed: TX (35) -> TX row, VBUS (40) -> 5V row, GND (38) -> GND row.",
         "Bus: hole end up, rows bridged, 3rd row spare. ESP32 as drawn (RJ45 side up): VBUS (40) is the top right header pin.",
     ]
@@ -750,10 +817,10 @@ def jst_head(c, x0, top):
     tx = x0 + hw + 7
     c.setFont("Helvetica", 8.5)
     for n, s in enumerate((
-        "Pins left to right: 1 red 5V, 2 black GND, 3 yellow D6 TX, 4 green D7 RX.",
+        "Pins left to right: 1 red 5V, 2 black GND, 3 yellow D8 TX, 4 green D7 RX.",
         "Male and female halves carry the same colours in the same order on the crimp side,",
         "so the XIAO tail and the far tail match colour for colour through the joint.",
-        "XIAO tail: red -> 5V (14), black -> GND (13), yellow -> D6 (7), green -> D7 (8).",
+        "XIAO tail: red -> 5V (14), black -> GND (13), yellow -> D8 (9), green -> D7 (8).",
         "Far tail: red -> bus 5V row, black -> bus GND row, green -> bus TX row, yellow -> that",
         "sector's ESP RX pin (labels on the drawing). Female half on the far tail keeps 5V covered.",
     )):
@@ -1208,12 +1275,12 @@ def alt_plate_page(c):
 # so the plate carries only the three XIAOs and the bus board, on top, in the ring between the nut and the rim. Each XIAO sits beside its own sector axis (FL_XIAO_DA, clear of the antenna holes), between the M4 bolts, long axis
 # turned FL_XIAO_ROT off radial (nearly along the rim since P2 moved in, 2026-11-10). No pigtail hole (user, 2026-11-10): the coax runs flat from
 # IPEX4 to a 1/2" (12.5 mm) HS-100 adhesive tie mount past the IPEX4 end, then down its sector's nearest antenna
-# hole to the deck jack. 5V / GND / D7 run over the top to the bus board; D6 runs over the top to the feed hole and
+# hole to the deck jack. 5V / GND / D7 run over the top to the bus board; D8 (TX) runs over the top to the feed hole and
 # down it to its ESP32 RX pin in the core, beside TX, GND and VBUS coming up to the bus. The pipe carries the ESP antenna's
 # pigtail and is capped (stack views), so the PoE cable passes the plate rim instead.
 FL_UNDER_SIDE = -FL_IPEX_SIDE  # the XIAOs hang component side down under the plate (user, 2026-11-10), so seen
                                # from the top through the plate the IPEX4 is on the other side
-# No feed hole since 2026-11-10: the bus is under the plate, so TX, GND, VBUS and the three D6 pass the deck's
+# No feed hole since 2026-11-10: the bus is under the plate, so TX, GND, VBUS and the three D8 TX wires pass the deck's
 # 2-1/4" centre hole between the core and the bus without crossing the plate.
 
 
@@ -1397,7 +1464,7 @@ def fl_plate_page(c):
         "EU: a 20 mm x 1/2\" BSP male adaptor (R 1/2, 21 mm thread) fits the same 22 mm hole, held by a 1/2\" BSP backnut.",
         "Each XIAO (under the plate, component side down, beside its own sector): IPEX4 dot -> orange flat coax run ->",
         "1/2\" HS-100 tie mount (grey), which clamps it, then (dashed orange) down to whichever of its sector's D / P / P2",
-        "jacks is in use, straight below its hole. 5V, GND, D7 to the bus beside them; D6 through the deck's centre hole to",
+        "jacks is in use, straight below its hole. 5V, GND, D7 to the bus beside them; D8 TX through the deck's centre hole to",
         "its ESP32 RX pin, beside TX, GND, VBUS coming up. Seen from the top the IPEX4 is on the left (the board is flipped).",
         "OPTIONS (builder's choice): this pipe plate or the no-pipe split plate (page 3); bus board under the plate by the adapter,",
         "or on the pipe inside the core (page 5: then skip the bus M3).",
