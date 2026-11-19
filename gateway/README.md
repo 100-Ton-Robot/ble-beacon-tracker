@@ -102,9 +102,9 @@ gateway ignores it.) What the gateway checks is the scanner's chip ID, sent in e
 ## Scanner firmware check
 
 `scanner_firmware` is the latest scanner firmware (default: the version this component was
-written for, `0.7.0`). On every status the gateway compares the scanner's `version` with it:
+written for, `0.8.0`). On every status the gateway compares the scanner's `version` with it:
 
-- **Older**: `FIRMWARE_OUTDATED` (GENERAL, WARN, text `firmware 0.6.0, latest 0.7.0`) when first
+- **Older**: `FIRMWARE_OUTDATED` (GENERAL, WARN, text `firmware 0.7.0, latest 0.8.0`) when first
   seen or when the version changes, then every 10 minutes while it lasts; "Sector N firmware
   outdated" (problem binary sensor) turns on. Data keeps flowing.
 - **Newer**: one `FIRMWARE_NEWER` (INFO); not a problem.
@@ -240,7 +240,7 @@ Status (each Status record, plus the gateway's view of the link):
 
 ```json
 {"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"bad_records":0,"rx_overflow":0,
- "version":"0.7.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
+ "version":"0.8.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
  "client":false,"test_image":false,"adverts":123,"dropped":0,"devices":3,"load_reasons":0,"line_peak_pct":61,
  "budget_pct":70,"intervals":{"rssi":1,"payload":1,"refresh":50,"status":5,"counters":50},"baud":115200,
  "ignore_rules":3,"ignore_saved":2,"ignored":17}

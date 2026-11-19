@@ -17,6 +17,9 @@ when the image was built, where known.
 Needs scanner firmware **0.5.0 or later** (protocol 3 without the sector claim; 0.6.0 for the
 scanners' own ignore lists, 0.7.0 to read them back): v2 and v1 frames are dropped as bad.
 
+- Changed (2026-11-19): `scanner_firmware` default is now `0.8.0` (scanner TX on D8; the
+  gateway's RX pins are unchanged, only the XIAO end of the harness moves). 0.7.0 scanners now
+  raise `FIRMWARE_OUTDATED`. Self-test regenerated (still 26 commands, 23 messages).
 - Removed (2026-11-11): the sector claim check (scanner 0.5.0 has no sector): `claim` in
   `rssi` and `status`, the retained `claim` topic (deleted at connect), `SECTOR_MISMATCH`,
   `SECTOR_NOT_CONFIGURED`, `SECTOR_OK` and the `sector` command. The RX pin is the sector.

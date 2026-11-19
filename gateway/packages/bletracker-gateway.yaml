@@ -174,7 +174,7 @@ sector_scanner:
   active_scan: false
   budget: 70
   self_test: true
-  scanner_firmware: "0.7.0"
+  scanner_firmware: "0.8.0"
   ignore: []
   gateway_load:
     name: Gateway load

@@ -52,7 +52,7 @@ CONF_FIRMWARE_OUTDATED = "firmware_outdated"
 CONF_IGNORED = "ignored"
 
 # The scanner firmware this component was written for (scanner_fw/VERSION)
-LATEST_SCANNER_FIRMWARE = "0.7.0"
+LATEST_SCANNER_FIRMWARE = "0.8.0"
 
 # Scanner limits (PROTOCOL.md "Commands"); defaults = the scanner's own boot defaults
 INTERVALS = {

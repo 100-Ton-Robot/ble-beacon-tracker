@@ -60,7 +60,7 @@ CMD_VECTORS = [
 ]
 
 CHIP = bytes.fromhex("38cd69b0ed39e516")
-SCANNER_FIRMWARE = "0.7.0"
+SCANNER_FIRMWARE = "0.8.0"
 # Local ignore list: the first drops aabbccddeeff, the second c0ffee000002/03 (not ...01)
 IGNORE_RULES = ["aa:bb:cc:*:*:*", "c0:ff:ee:00:00:02/47"]
 CATEGORY = ["GENERAL", "SECURITY", "LOAD", "COMMAND"]
@@ -363,7 +363,7 @@ def ld(num, payload):
 
 
 def status(**kw):
-    s = pb.Status(version="0.7.0", listening=True, budget_pct=70, baud=115200,
+    s = pb.Status(version="0.8.0", listening=True, budget_pct=70, baud=115200,
                   intervals=pb.Intervals(rssi=1, payload=1, refresh=50, status=5, counters=50))
     for k, v in kw.items():
         setattr(s, k, v)
