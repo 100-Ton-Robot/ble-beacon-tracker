@@ -18,7 +18,7 @@ Noise, all in dB:
     python3 bearing_sim.py out/monopole --room 0 --window 5   # what the antenna alone allows
 
 Writes to out/bearing/ (or --out): summary.txt and, per pattern, error_vs_bearing.png and errors.csv.
-Mast geometry: --height is how far the mast is above the beacon (default 1.4 m: a 2.4 m garage ceiling, beacon
+Mast geometry: --height is how far the mast is above the beacon (default 1.4 m: a 2.4 m ceiling, beacon
 at 1 m); distances 1-15 m along the floor. Elevation seen from the mast is then -atan(height / distance).
 """
 import argparse

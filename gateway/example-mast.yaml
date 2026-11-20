@@ -1,4 +1,4 @@
-# Example mast: copy this file once per gateway (e.g. bletracker-garage.yaml), set the mast
+# Example mast: copy this file once per gateway (e.g. bletracker-mast1.yaml), set the mast
 # ID and the secrets, and keep packages/ and components/ next to it. Everything else is in
 # packages/bletracker-gateway.yaml.
 
@@ -8,7 +8,7 @@ substitutions:
   mast: example
   name: bletracker-${mast}
   friendly_name: BLE Tracker Example
-  # API encryption key (also the OTA key). Give each mast its own secret, e.g. api_key_garage.
+  # API encryption key (also the OTA key). Give each mast its own secret, e.g. api_key_mast1.
   api_key: !secret api_key
   # Optional: a local NTP server instead of pool.ntp.org
   # ntp_server: 192.0.2.1

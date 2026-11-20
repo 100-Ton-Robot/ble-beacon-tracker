@@ -19,7 +19,7 @@ are no Home Assistant entities per beacon, and MQTT carries only the beacon data
 commands (MQTT discovery is off).
 
 - `example-mast.yaml`: the per-mast device config. Copy it once per gateway (e.g.
-  `bletracker-garage.yaml`) and set the mast ID, name and API key secret; it stays on DHCP
+  `bletracker-mast1.yaml`) and set the mast ID, name and API key secret; it stays on DHCP
   unless you uncomment its static IP block.
 - `packages/bletracker-gateway.yaml`: everything shared by every mast, for the Waveshare
   ESP32-S3-ETH (pins from its [pinout](https://docs.waveshare.com/ESP32-S3-ETH), all in
@@ -37,12 +37,12 @@ the device name (`bletracker-<mast>`), so two gateways never share topics or a H
 device.
 
 ```yaml
-# bletracker-garage.yaml
+# bletracker-mast1.yaml
 substitutions:
-  mast: garage
+  mast: mast1
   name: bletracker-${mast}
-  friendly_name: BLE Tracker Garage
-  api_key: !secret api_key_garage
+  friendly_name: BLE Tracker Mast 1
+  api_key: !secret api_key_mast1
 
 packages:
   gateway: !include packages/bletracker-gateway.yaml
@@ -222,7 +222,7 @@ Advert / scan response (Theengs-style field names, so existing decoders work; no
 device-specific decoding here):
 
 ```json
-{"id":"C0:FF:EE:00:00:01","mast":"garage","sector":0,"chip":"38cd69b0ed39e516","t":1793476800123,"suspect":false,
+{"id":"C0:FF:EE:00:00:01","mast":"mast1","sector":0,"chip":"38cd69b0ed39e516","t":1793476800123,"suspect":false,
  "kind":"adv","rssi":-61,"random":true,"adv_type":3,"refresh":false,"age_ms":0,
  "data":"0201060709...","name":"T\"Ä\"","manufacturerdata":"4c000215aabb","servicedata":"010203",
  "servicedatauuid":"0x181a","txpower":-4,"uuids":["0x180f","0xfeaa"]}
