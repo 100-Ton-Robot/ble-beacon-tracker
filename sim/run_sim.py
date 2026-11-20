@@ -124,7 +124,8 @@ def main():
                  f"I2t {np.trapezoid(i[first] ** 2, t[first]):.3f} A2s", "info", "first ms"))
     rows.append(("Strip short: steady fuse current", f"{np.abs(i[late]).mean():.2f} A ({ratio:.0%} of rating)",
                  "WARN" if ratio < 2 else "pass",
-                 "below 200% the 251 series has no maximum opening time; splitter limits first"))
+                 "below 200% the 251 series has no maximum opening time; splitter limits first. "
+                 "Accepted risk (user, 2026-11-20): a strip short reboots the mast"))
     warns += ratio < 2
     rows.append(("Strip short: 5 V rail", f"{d['vvin'][late].mean():.2f} V", "WARN" if d["vvin"][late].mean() < 4 else "pass",
                  "ESP32 and XIAOs brown out"))

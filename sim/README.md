@@ -54,3 +54,6 @@ All checks pass; two warnings, both in `strip_short`:
 
 The splitter's limit, output capacitance and cord resistance are estimates and decide the last two
 points most. Measure them on the bench and update `parameters.csv`.
+
+The strip-short warning is an accepted risk (user, 2026-11-20): a strip short reboots the mast. It stays a
+warning so a change to the splitter or fuse values shows whether it still applies.

@@ -1326,6 +1326,9 @@ def uni_page(c):
         ("", "should read 5 V too. Then fit U1 and check: GPIO1 wire unplugged -> E1 low (R2); GPIO1 low -> E1 low;"),
         ("", "GPIO1 high -> E1 at about 5 V."),
         ("", "Insulating spacer between the copper and the pipe (needed on EMT). The separate boards on pages 6 and 7 still work."),
+        ("", "Accepted risk (user, 2026-11-20): a short on the strip does not blow F. The splitter current-limits first (~2.6 A"),
+        ("", "est.), F carries ~115% of its rating, the 5 V rail falls to ~0.35 V and the mast reboots until the short is cleared"),
+        ("", "(sim/run_sim.py, strip_short). Fix if it matters: a 1 A fuse with a 0.8 A firmware cap, or an eFuse on the strip feed."),
     ]
     y = yb
     for style, s in text:
