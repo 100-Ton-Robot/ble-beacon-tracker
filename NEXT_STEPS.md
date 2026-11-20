@@ -15,7 +15,7 @@ Aaron solders the harness on 2026-11-21. Order matters: the gateway goes last, o
   sends nothing on D6. Doc: `shield_deck/shield_deck_templates.pdf` page 6.
 - [ ] **Aaron / scanner**: DFU `scanner_fw/release/scanner_fw-0.8.0-dfu.zip` to all three radios
   (built 2026-11-19, never run on hardware). Doc: `scanner_fw/README.md`.
-- [ ] **gateway**: OTA the garage gateway with `scanner_firmware` 0.8.0 (commit 6c0fdbe, compiled
+- [ ] **gateway**: OTA the garage gateway with `scanner_firmware` 0.8.0 (commit 9fa1848, compiled
   2026-11-19); expect `PASS: commands 26/26, messages 23/23` and every sector's firmware at 0.8.0
   with no "outdated" problem. Doc: `gateway/README.md`.
 - [ ] **any**: try `debug tx1m on` on `all/cmd` and check `<sector>/debug/tx_1m` against real
