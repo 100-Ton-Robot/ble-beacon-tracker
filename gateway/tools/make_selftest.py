@@ -2,7 +2,7 @@
 
 The gateway checks itself at boot (`self_test: true`) against data made here, independently of
 its C++ code:
-  - the command test vectors from the ble_sector_gateway_contract atom, checked here against
+  - the command test vectors from the gateway contract, checked here against
     scanner_fw/tools/decode_frames.py, must encode byte for byte the same;
   - sample buckets built and framed with the reference protobuf code (bletracker_pb2), fed to a
     test sector on pin 0, must produce exactly the MQTT messages this script expects (MQTT
@@ -27,8 +27,8 @@ PREFIX = "selftest"
 MAST = "selftest"
 PIN = 0
 
-# Text, chip ID ("" = all), framed hex incl. trailing 00, seq 1. The first 13 are from the contract
-# atom (2026-11-02); the sector vectors went with scanner 0.5.0, the ignore and addressed ones
+# Text, chip ID ("" = all), framed hex incl. trailing 00, seq 1. The first 13 are from the gateway
+# contract (2026-11-02); the sector vectors went with scanner 0.5.0, the ignore and addressed ones
 # (2026-11-11) come from decode_frames.py --cmd (scanner 0.6.0).
 CMD_VECTORS = [
     ("payloads on", "", "0710014001bab500"),
@@ -51,15 +51,15 @@ CMD_VECTORS = [
     ("ignore clear boot", "", "07100170012fb000"),
     ("ignore clear saved", "", "07100170024c8000"),
     ("ignore clear all", "", "07100170036d9000"),
-    ("flash on", "2d31708df8982200", "0a0a082d31708df8982207100120015e0500"),
-    ("flash on", "cc1f4cbee227cbae", "110a08cc1f4cbee227cbae100120018a8700"),
-    ("reboot", "38cd69b0ed39e516", "120a0838cd69b0ed39e516100138a5018d5c00"),
+    ("flash on", "1122334455667788", "110a08112233445566778810012001825800"),
+    ("flash on", "8877665544332211", "110a088877665544332211100120015d8d00"),
+    ("reboot", "a1b2c3d4e5f60718", "120a08a1b2c3d4e5f60718100138a501f3e200"),
     ("ignore list", "", "0710017801863900"),
     ("debug tx1m on", "", "081001800101a87b00"),
     ("debug off", "", "051001800103896b00"),
 ]
 
-CHIP = bytes.fromhex("38cd69b0ed39e516")
+CHIP = bytes.fromhex("a1b2c3d4e5f60718")  # made-up chip ID
 SCANNER_FIRMWARE = "0.8.0"
 # Local ignore list: the first drops aabbccddeeff, the second c0ffee000002/03 (not ...01)
 IGNORE_RULES = ["aa:bb:cc:*:*:*", "c0:ff:ee:00:00:02/47"]

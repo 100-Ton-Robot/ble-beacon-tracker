@@ -1295,7 +1295,7 @@ void Sector::handle_counters_(const uint8_t *p, size_t len, const char *t) {
   this->hub_->publish(this->topic_("counters"), j.s, false);
 }
 
-/* "C1:7D:2B:AC:03:BC", "C1:7D:2B:00:00:00/24" or "<addr>/<mask>", as the scanner's console prints it */
+/* "AA:BB:CC:DD:EE:FF", "AA:BB:CC:00:00:00/24" or "<addr>/<mask>", as the scanner's console prints it */
 static std::string rule_str(const uint8_t *addr, const uint8_t *mask) {
   int bits = 0;
   bool prefix = true, zeros = false;

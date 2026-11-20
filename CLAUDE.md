@@ -17,4 +17,9 @@ in Home Assistant. See `README.md` and each folder's README.
   through Inkscape: `make_plate_svg.py` -> edit -> `read_plate_svg.py` (writes the CSV, checks rules).
 - Open work is in GitHub issues (conventions in `NEXT_STEPS.md`): check them before starting,
   comment or close them with the work.
+- **This repo is public.** No private data, locations or home context anywhere: files, commit
+  messages, issues, PRs. No place or room names (mast IDs are location names), IPs, hostnames,
+  real chip IDs or BLE addresses, home security settings or anyone's schedule. Examples use
+  made-up values (`mast1`, `AA:BB:CC:DD:EE:FF`, `a1b2c3d4e5f60718`). Work on a particular
+  installation is tracked outside this repo.
 - Never commit `secrets.yaml`, signing keys or personal notes (`*.local.md` is ignored).

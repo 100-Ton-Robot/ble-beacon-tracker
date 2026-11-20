@@ -18,7 +18,7 @@ namespace sector_scanner {
  * Both directions: protobuf bytes + CRC-16/CCITT-FALSE of them (LE), COBS-encoded, then 0x00.
  * Scanner -> gateway: one Bucket per 200 ms tick on each sector's own RX pin.
  * Gateway -> scanners: one Command per frame on the shared TX, addressed by chip ID (or all).
- * MQTT layout v3: /config/docs/bletracker_gateway.md "MQTT" and the contract atom.
+ * MQTT layout v3: gateway/README.md "MQTT".
  */
 static const size_t CHIP_ID_LEN = 8;
 static const size_t BUCKET_RAW_MAX = 3072;  /* largest bucket ~2.3 KB (PROTOCOL.md "Sizes") */

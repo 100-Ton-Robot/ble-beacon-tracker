@@ -1,7 +1,7 @@
 /*
  * Boot self-test (self_test: true): the gateway's own encoder and decoder against data generated
  * independently by gateway/tools/make_selftest.py from the reference protobuf code:
- *   - the contract atom's command test vectors must encode byte for byte the same;
+ *   - the gateway contract's command test vectors must encode byte for byte the same;
  *   - sample buckets fed to a scratch sector must publish exactly the expected MQTT messages, with the
  *     self-test's own scanner_firmware and ignore list in place of the YAML's.
  * Nothing goes to MQTT or the scanners while it runs. Result: log + "Self test" text sensor.

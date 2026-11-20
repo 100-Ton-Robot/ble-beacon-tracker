@@ -208,7 +208,7 @@ scanner's sector. `t` is the gateway's clock when it handled the bucket, epoch *
 RSSI, one message per bucket (records in the scanner's order, strongest mean first):
 
 ```json
-{"t":1793476800123,"seq":100,"t_ms":20000,"tick_ms":200,"chan":0,"load":0,"chip":"38cd69b0ed39e516","suspect":false,
+{"t":1793476800123,"seq":100,"t_ms":20000,"tick_ms":200,"chan":0,"load":0,"chip":"a1b2c3d4e5f60718","suspect":false,
  "devs":[["C0:FF:EE:00:00:01",true,3,-67.0,-60,3,-59],["11:22:33:44:55:66",false,0,-67.5,-66,2,null]]}
 ```
 
@@ -222,7 +222,7 @@ Advert / scan response (Theengs-style field names, so existing decoders work; no
 device-specific decoding here):
 
 ```json
-{"id":"C0:FF:EE:00:00:01","mast":"mast1","sector":0,"chip":"38cd69b0ed39e516","t":1793476800123,"suspect":false,
+{"id":"C0:FF:EE:00:00:01","mast":"mast1","sector":0,"chip":"a1b2c3d4e5f60718","t":1793476800123,"suspect":false,
  "kind":"adv","rssi":-61,"random":true,"adv_type":3,"refresh":false,"age_ms":0,
  "data":"0201060709...","name":"T\"Ä\"","manufacturerdata":"4c000215aabb","servicedata":"010203",
  "servicedatauuid":"0x181a","txpower":-4,"uuids":["0x180f","0xfeaa"]}
@@ -239,7 +239,7 @@ device-specific decoding here):
 Status (each Status record, plus the gateway's view of the link):
 
 ```json
-{"t":…,"chip":"38cd69b0ed39e516","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"bad_records":0,"rx_overflow":0,
+{"t":…,"chip":"a1b2c3d4e5f60718","seq":100,"pin_sector":0,"suspect":false,"lost":0,"bad":0,"bad_records":0,"rx_overflow":0,
  "version":"0.8.0","ext_antenna":false,"listening":true,"active_scan":false,"payloads":true,"flash_mode":false,
  "client":false,"test_image":false,"adverts":123,"dropped":0,"devices":3,"load_reasons":0,"line_peak_pct":61,
  "budget_pct":70,"intervals":{"rssi":1,"payload":1,"refresh":50,"status":5,"counters":50},"baud":115200,
@@ -260,7 +260,7 @@ Counters: `{"t","chip","seq"}` plus every `Counters` field by its proto name.
 Events (scanner and gateway alike):
 
 ```json
-{"t":…,"source":"scanner","sector":0,"chip":"38cd69b0ed39e516","category":"SECURITY","severity":"INFO",
+{"t":…,"source":"scanner","sector":0,"chip":"a1b2c3d4e5f60718","category":"SECURITY","severity":"INFO",
  "code":"BOOT","value":1,"value2":7,"cmd_seq":0,"text":"power-on"}
 ```
 

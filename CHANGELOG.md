@@ -138,6 +138,9 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Docs
 
+- Changed (2026-11-20): gateway examples and self-test use made-up chip IDs and addresses;
+  self-test regenerated (still 26 commands, 23 messages). `CLAUDE.md`: the repo is public, no
+  private or home context.
 - Changed (2026-11-20): example mast name `garage` replaced with `mast1` (README, example
   mast and secrets files, `bearing_sim.py` comment); examples stay generic.
 - Changed (2026-11-20): open work moved to GitHub issues #1-#12 with area, owner, `decision`
