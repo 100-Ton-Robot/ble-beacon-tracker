@@ -1,0 +1,31 @@
+* LED data path: ESP32 GPIO1 -> U1 74HCT125 gate 1 (behavioural) -> R -> data wire -> WS2812B DIN.
+* SHIFT=0 bypasses U1 (GPIO straight to R), the case without a level shifter.
+.include params.inc
+* WS2812B bits at 800 kHz (T0H 0.40 us, T1H 0.80 us, period 1.25 us): 1 0 1 1 0 0 1 0
+Vgp gp0 0 PWL(0 0
++ 1.000u 0 1.002u {GPIO_V} 1.800u {GPIO_V} 1.802u 0
++ 2.250u 0 2.252u {GPIO_V} 2.650u {GPIO_V} 2.652u 0
++ 3.500u 0 3.502u {GPIO_V} 4.300u {GPIO_V} 4.302u 0
++ 4.750u 0 4.752u {GPIO_V} 5.550u {GPIO_V} 5.552u 0
++ 6.000u 0 6.002u {GPIO_V} 6.400u {GPIO_V} 6.402u 0
++ 7.250u 0 7.252u {GPIO_V} 7.650u {GPIO_V} 7.652u 0
++ 8.500u 0 8.502u {GPIO_V} 9.300u {GPIO_V} 9.302u 0
++ 9.750u 0 9.752u {GPIO_V} 10.150u {GPIO_V} 10.152u 0 12u 0)
+Rgp gp0 gp {GPIO_R}
+T1 gp 0 a1 0 Z0=100 TD={GPIO_WIRE_TD}
+Cin a1 0 {U1_CIN}
+R2 a1 0 {PULLDOWN}
+* U1: threshold, ideal delay line (matched, so half amplitude), output resistance
+Bth th 0 V='5*(0.5+0.5*tanh((v(a1)-{U1_VTH})/0.08))'
+Rth th thd 50
+Tdel thd 0 thd2 0 Z0=50 TD={U1_TPD}
+Rthd thd2 0 50
+Rf thd2 ylo 1
+Cf ylo 0 2p
+Bout y0 0 V='{SHIFT} ? 2*v(ylo) : v(a1)'
+Rout1 y0 y {U1_ROUT}
+Rser y r1 {LED_SERIES}
+T2 r1 0 din 0 Z0={DIN_WIRE_Z0} TD={DIN_WIRE_TD}
+Cdin din 0 {DIN_C}
+Rdin din 0 1meg
+.end

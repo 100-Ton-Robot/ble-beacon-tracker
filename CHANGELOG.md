@@ -6,6 +6,12 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Simulation
+
+- New `sim/` (2026-11-20): ngspice models of the unified power + LED board and a model of the LED
+  direction ring, run by `sim/run_sim.sh`. All checks pass; a short on the strip is flagged: the
+  splitter current-limits before the 2 A fuse can open, and the 5 V rail collapses.
+
 ### Gateway
 
 Needs scanner firmware **0.5.0 or later** (protocol 3 without the sector claim; 0.6.0 for the

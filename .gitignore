@@ -17,3 +17,6 @@ experiments/*/out/
 
 # Personal working notes (Claude Code loads CLAUDE.local.md automatically)
 *.local.md
+
+# Simulation output (regenerate with sim/run_sim.sh)
+sim/out/

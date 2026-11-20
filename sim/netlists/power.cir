@@ -1,0 +1,57 @@
+* Unified board power path (templates page 8). Values come from sim/parameters.csv and
+* shield_deck/parameters.csv through params.inc; run_sim.py sets the case parameters
+* (TRAMP, TPLUG, TLED, DUTY, TSHORT, RSHORT) and the outputs.
+.include params.inc
+* splitter: ramped source, current limit (ILIM pushed into the output, the excess returned through a
+* near-ideal diode), output resistance, output capacitance
+Vsp sp0 0 PWL(0 0 {TRAMP} {SPLIT_V})
+Ilim sp0 sp1 {SPLIT_ILIM}
+Dlim sp1 sp0 dideal
+.model dideal d is=1e-14 n=0.05 rs=1e-4
+Rsp sp1 sp1b {SPLIT_ROUT}
+Vsens sp1b sp 0
+Csp sp spc {SPLIT_C}
+Resp spc 0 {SPLIT_ESR}
+* USB-C cord, with a switch that closes at TPLUG (hot plug)
+Sw sp cab0 ctl 0 swmod
+Vcabs cab0 cab1 0
+Vctl ctl 0 PWL(0 0 {TPLUG} 0 {TPLUG+1n} 1)
+.model swmod sw vt=0.5 vh=0.01 ron=1m roff=1e9
+Lcab cab1 cab2 {CORD_L}
+Rcab cab2 sock {CORD_R}
+* socket pigtail into strip A
+Lsock sock sk2 {PIGTAIL_L}
+Rsock sk2 vin {PIGTAIL_R}
+* C1
+Rc1 vin c1a {C1_ESR}
+Lc1 c1a c1b {C1_ESL}
+C1 c1b 0 {LED_CAP}
+* ESP32 through the plug pigtail
+Lplug vin pl2 {PIGTAIL_L}
+Rplug pl2 esp {PIGTAIL_R}
+Cesp esp 0 {ESP_C}
+Iesp esp 0 PWL(0 0 2m 0 2.5m {ESP_A})
+* three XIAOs, lumped
+Rhar vin xi {HARNESS_R}
+Cxi xi 0 {3*XIAO_C}
+Ixi xi 0 PWL(0 0 2m 0 2.5m {3*XIAO_A})
+* U1 supply and C3
+Ru1 vin u1 0.01
+C3 u1 0 {U1_C}
+* fuse, fused rail, C2
+Vfuse vin f1 0
+Rfuse f1 vled {FUSE_R}
+Lfuse vled vled2 {FUSE_L}
+C2 vled2 0 {LED_BYPASS}
+* strip feed and the strip's own decoupling
+Lstrip vled2 st1 {STRIP_FEED_L}
+Rstrip st1 strip {STRIP_FEED_R}
+Cpix strip 0 {LED_PIXELS*PIXEL_C}
+* strip load: dark current always, lit current in PWM pulses from TLED
+Iidle strip 0 {ILED_DARK}
+Bled strip 0 I='(time > {TLED}) ? ({ILED_WHITE}-{ILED_DARK}) * ((1/{PIXEL_PWM_HZ})*{DUTY} > (time - floor(time*{PIXEL_PWM_HZ})/{PIXEL_PWM_HZ}) ? 1 : 0) : 0'
+* fault: short at the strip end from TSHORT
+Ssh strip shn sctl 0 swmod
+Vsctl sctl 0 PWL(0 0 {TSHORT} 0 {TSHORT+1n} 1)
+Rsh shn 0 {RSHORT}
+.end

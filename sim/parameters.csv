@@ -1,0 +1,38 @@
+name,value,unit,source,group,note
+SPLIT_V,5.0,V,estimated,power,PoE splitter output voltage
+SPLIT_ROUT,0.02,ohm,estimated,power,splitter output resistance (regulation)
+SPLIT_ILIM,2.6,A,estimated,power,"splitter current limit; repo gives only the 2.4 A rating (LED_SUPPLY_A). Measure it: it decides the strip-short case"
+SPLIT_C,220,uF,estimated,power,splitter output capacitance
+SPLIT_ESR,0.03,ohm,estimated,power,ESR of the splitter's output capacitance
+CORD_R,0.06,ohm,estimated,power,"splitter's USB-C cord, VBUS + GND round trip (~20 cm)"
+CORD_L,0.25,uH,estimated,power,splitter's USB-C cord inductance
+PIGTAIL_R,0.011,ohm,spec,power,"each USB-C pigtail, 10 cm of 22 AWG, round trip"
+PIGTAIL_L,0.1,uH,estimated,power,each USB-C pigtail inductance
+C1_ESR,0.015,ohm,spec,power,KEMET A750EM337M1CAAE015 (E015 suffix = 15 mohm)
+C1_ESL,3,nH,estimated,power,C1 lead inductance
+ESP_A,0.25,A,estimated,power,ESP32-S3-ETH with W5500 at 5 V
+ESP_C,22,uF,estimated,power,capacitance on the ESP32 board's 5 V
+XIAO_A,0.017,A,estimated,power,each XIAO scanning (repo: 5-15 mA)
+XIAO_C,10,uF,estimated,power,capacitance on each XIAO's 5 V
+HARNESS_R,0.025,ohm,estimated,power,"three XIAO harnesses lumped in parallel (26 AWG, ~25 cm each, round trip)"
+U1_C,0.1,uF,design,power,"C3, U1 supply bypass (KEMET C320C104K5R5TA)"
+FUSE_R,0.05,ohm,estimated,power,"0251002.MXL cold resistance; check the datasheet table"
+FUSE_L,5,nH,estimated,power,fuse lead inductance
+STRIP_FEED_R,0.052,ohm,estimated,power,"strip feed 30 cm 22 AWG round trip plus strip copper"
+STRIP_FEED_L,0.3,uH,estimated,power,strip feed inductance
+PIXEL_C,0.1,uF,spec,power,decoupling per pixel on a WS2812B strip
+PIXEL_PWM_HZ,400,Hz,spec,power,"WS2812B PWM rate (datasheet minimum scan frequency); all pixels switch in phase, the worst case"
+SHORT_R,0.05,ohm,assumed,power,resistance of the fault in the strip-short case
+GPIO_V,3.3,V,spec,data,ESP32-S3 GPIO high level
+GPIO_R,40,ohm,estimated,data,ESP32-S3 GPIO output resistance at default drive
+GPIO_WIRE_TD,0.25,ns,estimated,data,"GPIO1 wire to the board, ~5 cm"
+U1_VTH,1.4,V,spec,data,"74HCT switching threshold (VIH 2 V, VIL 0.8 V)"
+U1_TPD,12,ns,spec,data,CD74HCT125 propagation delay at 5 V (typical)
+U1_ROUT,40,ohm,estimated,data,74HCT output resistance
+U1_CIN,5,pF,spec,data,74HCT input capacitance
+U1_ILEAK,1,uA,spec,data,74HCT input leakage (maximum)
+CPL_C,0.3,pF,estimated,data,"coupling from U1's output strip (E) to its input strip (D), ~20 mm side by side"
+DIN_WIRE_Z0,100,ohm,estimated,data,"data wire to the strip, ~30 cm"
+DIN_WIRE_TD,1.5,ns,estimated,data,data wire delay
+DIN_C,10,pF,estimated,data,WS2812B DIN input capacitance
+DIN_VIH,0.7,ratio,spec,data,WS2812B VIH as a fraction of VDD

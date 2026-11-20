@@ -1,0 +1,17 @@
+* ESP32 booting: GPIO1 high-impedance. U1's input leakage charges its input node; R2 (PULLDOWN) holds it.
+.include params.inc
+Ileak 0 a1 {U1_ILEAK}
+Cin a1 0 {U1_CIN+1p}
+Vcc vcc 0 5
+Dup a1 vcc dclamp
+Ddn 0 a1 dclamp
+.model dclamp d is=1e-15
+R2 a1 0 {PULLDOWN}
+Ccpl y a1 {CPL_C}
+Bth th 0 V='5*(0.5+0.5*tanh((v(a1)-{U1_VTH})/0.08))'
+Rth th y {U1_ROUT}
+Cy y 0 5p
+Rser y din {LED_SERIES}
+Cdin din 0 {DIN_C}
+.ic v(a1)=0 v(y)=0 v(din)=0
+.end
