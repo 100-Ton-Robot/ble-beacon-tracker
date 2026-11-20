@@ -113,6 +113,12 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Added (2026-11-20): option page for a unified power + LED board (templates page 8; the design
+  formulas are now page 9): one stripboard on the pipe in place of the bus board and the LED power
+  board, which both stay. XIAOs fed from the splitter rail (no VBUS wire), one-time 2 A fuse on the
+  strip feed, a 74HCT125 level shifter on the LED data with a 10 kohm pull-down on its input,
+  all through-hole, on a BusBoard ST1 stripboard. Group `uni` in
+  `parameters.csv`, layout table `UNI_*` in `make_templates.py`.
 - Added (2026-11-16): option page for an LED direction ring (templates page 7, after the wiring
   diagram; the design formulas are now page 8): a second 4x4 pad board between the PoE
   splitter and the ESP32 that feeds a WS2812B strip from a fused row, with its parts list.

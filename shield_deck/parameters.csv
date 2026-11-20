@@ -154,3 +154,7 @@ LED_SERIES_OHM,330,ohm,design,led,"R, in the data wire"
 LED_PIXEL_MA,60 1,mA,spec,led,"WS2812B current per pixel: full white, dark (typical datasheet values)"
 LED_SUPPLY_A,2.4 0.3,A,estimated,led,"PoE splitter's 5 V rating, and what the gateway and three radios draw (not measured)"
 LED_PAGE,108.0 185.0 16.0,mm,drawing,led,"LED option page: board centre x and y on the page, pad pitch as drawn"
+UNI_PAGE,22.0 236.0 5.2,mm,drawing,uni,"Unified power + LED board page: top-left hole (strip A, row 0) x and y on the page, hole pitch as drawn (not to scale)"
+UNI_PITCH,2.54,mm,spec,uni,stripboard hole pitch (0.1 in)
+UNI_SIZE,10 23,count,design,uni,"Unified board: strips (A-J) x holes per strip (rows 0-22); rows 0 and 22 are left empty for the two pipe ties (2026-11-20)"
+UNI_PULLDOWN_OHM,10000,ohm,design,uni,"R2, pull-down on U1 1A (GPIO1 side) to GND so the strip stays dark while the ESP32 boots and GPIO1 floats (user, 2026-11-20)"

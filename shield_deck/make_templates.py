@@ -1,6 +1,7 @@
 """1:1 printable PDF templates: shield deck drill template, electronics plate (both discs drawn the same way
 round, plate 12 o'clock up), the plate wiring diagram, the pipe plate and its stack views, the no-pipe (alt) split plate, then the back panel
-(reflector face). After the wiring diagram: the LED direction ring option (its power board and strip wiring).
+(reflector face). After the wiring diagram: the LED direction ring option (its power board and strip wiring), then
+the unified power + LED stripboard option (pipe build).
 
 Uses the same geometry as make_shield_deck.py. Run:  python make_templates.py
 Print at 100% / "Actual size" and check the 100 mm scale bar with a ruler.
@@ -1046,6 +1047,293 @@ def led_page(c):
         y -= 4.6
 
 
+# Option: unified power + LED board (2026-11-20, user). One stripboard in place of the bus board (page 6) and the LED
+# power board (page 7), for the pipe build: it hangs on the pipe at the 11 o'clock corner (BUS_CLOCK), beside the
+# PoE splitter and the ESP32. The two separate boards stay as they are. The XIAOs take 5 V from the splitter rail,
+# not from the ESP32's VBUS (user), the fuse is one-time (user), the parts are through-hole (stripboard), and a
+# 74HCT125 lifts the ESP32's 3.3 V data to 5 V for the WS2812B (user). Drawn from the component side, strips
+# vertical (along the pipe), row 0 toward the deck. Layout is a table so the drawing and the text can't disagree.
+UNI_PARTS = {           # ref: part number, what it is (user's picks 2026-11-20; C1 is the LED board's can)
+    "PCB": ("BusBoard ST1 (Mouser 854-ST1)", "StripBoard-1, FR4, single-sided, 50 x 80 mm, strips along the 80 mm;"
+                                            " one makes one board"),
+    "U1": ("TI CD74HCT125E", "quad buffer, 3-state, HCT (TTL inputs, VIH 2 V at 5 V), PDIP-14, -55 to +125 C"),
+    "F": ("Littelfuse 0251002.MXL", "2 A very fast, axial, 125 V AC/DC, one-time, -55 to +125 C"),
+    "C1": (LED_CAP_CAN_PART, f"{LED_CAP_UF:g} uF 16 V aluminium polymer, radial, -55 to +105 C"),
+    "C2": ("KEMET C320C104K5R5TA", "0.1 uF 50 V X7R, radial, 2.54 mm leads (strip supply)"),
+    "C3": ("KEMET C320C104K5R5TA", "0.1 uF 50 V X7R, radial, 2.54 mm leads (U1 supply, beside pins 6/7)"),
+    "R": ("Yageo CFR-25JB-52-330R", f"{LED_SERIES_OHM:g} ohm 1/4 W carbon film, axial, in the data line after U1"),
+    "R2": ("Yageo CFR-25JB-52-10K", f"{UNI_PULLDOWN_OHM / 1000:g} kohm 1/4 W carbon film, axial, standing: pull-down on"
+                                    " U1 1A so the strip stays dark while the ESP32 boots"),
+}
+UNI_STRIPS = (("A", "5V"), ("B", "GND"), ("C", "1OE|VCC"), ("D", "1A|VCC"), ("E", "DIN|1Y|VCC"),
+              ("F", "VCC"), ("G", "VCC"), ("H", "VCC"), ("I", "GND"), ("J", "TX"))
+UNI_CUTS = (("A", 5), ("E", 5), ("C", 10), ("D", 10), ("E", 10))     # strip, row: copper cut at that hole
+UNI_DIP = ("C", 9, 12)          # U1: pin 1 at strip C row 9, pins 1-7 on C-I row 9, pins 14-8 on C-I row 12
+UNI_AXIAL = (("F", "A", 3, 7), ("R", "E", 3, 7))                     # lie flat along the strip, across its cut
+UNI_STANDING = (("R2", "C", "D", 4),)   # axial stood on end: body over the first hole, lead bent over to the second
+UNI_RADIAL = (("C2", "A", "B", 2, ""), ("C1", "A", "B", 8, "+"), ("C3", "H", "I", 7, ""))
+UNI_LINKS = ((("B", 7), ("C", 7), "bare"), (("C", 13), ("H", 13), "bare"),     # 1OE to GND; VCC bar C-H
+             (("A", 14), ("C", 14), "insulated"), (("I", 15), ("B", 15), "insulated"))  # 5V in -> VCC; U1 GND -> GND
+UNI_WIRES = (           # tag, strip, row, colour, where it goes
+    (1, "A", 1, "red", "LED strip 5V (fused)"),
+    (2, "B", 1, "black", "LED strip GND"),
+    (3, "E", 1, "green", "LED strip DIN"),
+    (4, "D", 6, "green", f"ESP32 GPIO{LED_DATA_GPIO} (LED data out, 3.3 V)"),
+    (5, "A", 16, "red", "S0 XIAO 5V (JST 1)"), (6, "B", 16, "black", "S0 GND (JST 2)"),
+    (7, "J", 16, "green", "S0 D7 RX (JST 4)"),
+    (8, "A", 17, "red", "S1 XIAO 5V"), (9, "B", 17, "black", "S1 GND"), (10, "J", 17, "green", "S1 D7 RX"),
+    (11, "A", 18, "red", "S2 XIAO 5V"), (12, "B", 18, "black", "S2 GND"), (13, "J", 18, "green", "S2 D7 RX"),
+    (14, "B", 19, "black", "ESP32 GND (header pin 38)"),
+    (15, "J", 19, "green", "ESP32 GPIO21 TX (header pin 35)"),
+    (16, "A", 20, "red", "USB-C socket pigtail + (PoE splitter in)"),
+    (17, "B", 20, "black", "USB-C socket pigtail -"),
+    (18, "A", 21, "red", "USB-C plug pigtail + (to ESP32 USB-C)"),
+    (19, "B", 21, "black", "USB-C plug pigtail -"),
+)
+
+
+def uni_page(c):
+    x0, y0, p = UNI_PAGE
+    nstrips, nrows = UNI_SIZE
+    letters = [s for s, _ in UNI_STRIPS]
+    top = PAGE_H / mm
+
+    def at(strip, row):
+        return x0 + letters.index(strip) * p, y0 - row * p
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (top - 15) * mm, "Option: unified power + LED board (pipe build)")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (top - 21) * mm,
+                 "One stripboard instead of the bus board (page 6) and the LED power board (page 7). Not to scale: "
+                 "component side, strips vertical.")
+    c.drawString(15 * mm, (top - 25.5) * mm,
+                 f"Cut {nstrips} strips x {nrows} holes ({nstrips * UNI_PITCH:.1f} x {nrows * UNI_PITCH:.1f} mm). "
+                 "Hangs on the pipe at 11 o'clock, row 0 up (toward the deck), copper side to the pipe.")
+
+    # board, strips (copper is underneath: drawn faint), holes, labels
+    c.setStrokeGray(0.4)
+    c.setLineWidth(0.6)
+    c.rect((x0 - p * 0.7) * mm, (y0 - (nrows - 1) * p - p * 0.7) * mm,
+           ((nstrips - 1) * p + 1.4 * p) * mm, ((nrows - 1) * p + 1.4 * p) * mm)
+    c.setStrokeColorRGB(0.93, 0.8, 0.65)
+    c.setLineWidth(p * 0.75 * mm)
+    for k in range(nstrips):
+        c.line((x0 + k * p) * mm, y0 * mm, (x0 + k * p) * mm, (y0 - (nrows - 1) * p) * mm)
+    c.setStrokeGray(0.55)
+    c.setLineWidth(0.3)
+    c.setFillGray(1)
+    for k in range(nstrips):
+        for r in range(nrows):
+            c.circle((x0 + k * p) * mm, (y0 - r * p) * mm, 0.45 * mm, fill=1)
+    c.setFillGray(0)
+    c.setFont("Helvetica-Bold", 8)
+    for k, (s, net) in enumerate(UNI_STRIPS):
+        c.drawCentredString((x0 + k * p) * mm, (y0 + p * 0.9) * mm, s)
+    c.setFont("Helvetica", 5.5)
+    for r in range(nrows):
+        c.drawRightString((x0 - p * 0.9) * mm, (y0 - r * p - 0.7) * mm, str(r))
+    c.setFont("Helvetica-Oblique", 6)
+    c.drawString((x0 - p * 0.7) * mm, (y0 + p * 1.9) * mm, "toward the deck")
+
+    # links: bare grey, insulated blue
+    for (s1, r1), (s2, r2), kind in UNI_LINKS:
+        (xa, ya), (xb, yb) = at(s1, r1), at(s2, r2)
+        if kind == "bare":
+            c.setStrokeGray(0.35)
+            c.setLineWidth(1.6)
+            c.line(xa * mm, ya * mm, xb * mm, yb * mm)
+        else:
+            c.setStrokeColorRGB(0.1, 0.35, 0.8)
+            c.setLineWidth(1.6)
+            path = c.beginPath()
+            path.moveTo(xa * mm, ya * mm)
+            path.curveTo(xa * mm, (ya - p * 0.6) * mm, xb * mm, (yb - p * 0.6) * mm, xb * mm, yb * mm)
+            c.drawPath(path)
+        c.setFillGray(0.2)
+        for x, y in ((xa, ya), (xb, yb)):
+            c.circle(x * mm, y * mm, 0.6 * mm, fill=1, stroke=0)
+
+    # U1
+    s, r1, r2 = UNI_DIP
+    (xa, ya), (xb, yb) = at(s, r1), at(letters[letters.index(s) + 6], r2)
+    c.setStrokeGray(0)
+    c.setLineWidth(0.8)
+    c.setFillGray(0.25)
+    c.rect((xa - p * 0.45) * mm, (yb + p * 0.35) * mm, (xb - xa + p * 0.9) * mm, (ya - yb - p * 0.7) * mm, fill=1)
+    c.setFillGray(1)
+    c.circle((xa - p * 0.45) * mm, ((ya + yb) / 2) * mm, p * 0.3 * mm, fill=1, stroke=0)   # pin-1 end notch
+    c.setFont("Helvetica-Bold", 7)
+    c.drawCentredString(((xa + xb) / 2) * mm, ((ya + yb) / 2 - 1) * mm, "U1  74HCT125")
+    c.setFillGray(0)
+    c.setFont("Helvetica", 4.8)
+    names = ("1OE", "1A", "1Y", "2OE", "2A", "2Y", "GND", "3Y", "3A", "3OE", "4Y", "4A", "4OE", "VCC")
+    for k in range(7):
+        x = xa + k * p
+        c.setFillGray(0)
+        c.circle(x * mm, ya * mm, 0.55 * mm, fill=1, stroke=0)
+        c.circle(x * mm, yb * mm, 0.55 * mm, fill=1, stroke=0)
+        for yy, n, up in ((ya, k + 1, True), (yb, 14 - k, False)):
+            c.saveState()
+            c.translate(x * mm, (yy + (1.0 if up else -1.0)) * mm)
+            c.rotate(90)
+            (c.drawString if up else c.drawRightString)(0, 1.6, f"{n} {names[n - 1]}")
+            c.restoreState()
+
+    # axial parts along their strip, across the cut
+    for ref, s, r1, r2 in UNI_AXIAL:
+        (x, ya), (_, yb) = at(s, r1), at(s, r2)
+        c.setStrokeGray(0)
+        c.setLineWidth(0.7)
+        c.line(x * mm, ya * mm, x * mm, yb * mm)
+        c.setFillColorRGB(0.95, 0.9, 0.75) if ref == "F" else c.setFillColorRGB(0.8, 0.88, 0.98)
+        c.roundRect((x - p * 0.33) * mm, (yb + p * 0.8) * mm, p * 0.66 * mm, (ya - yb - p * 1.6) * mm, 0.8 * mm, fill=1)
+        c.setFillGray(0)
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawString((x + p * 0.42) * mm, ((ya + yb) / 2 - 1) * mm, ref)
+
+    # radial parts across two neighbouring strips
+    for ref, s1, s2, r, pol in UNI_RADIAL:
+        (xa, y), (xb, _) = at(s1, r), at(s2, r)
+        c.setStrokeGray(0)
+        c.setLineWidth(0.7)
+        big = ref == "C1"
+        c.setFillColorRGB(0.85, 0.85, 0.85) if big else c.setFillColorRGB(1, 0.92, 0.6)
+        if big:
+            c.circle(((xa + xb) / 2) * mm, (y + p * 0.15) * mm, p * 0.7 * mm, fill=1)
+        else:
+            c.roundRect((xa - p * 0.15) * mm, (y - p * 0.3) * mm, (xb - xa + p * 0.3) * mm, p * 0.6 * mm, 1 * mm, fill=1)
+        c.setFillGray(0)
+        c.circle(xa * mm, y * mm, 0.5 * mm, fill=1, stroke=0)
+        c.circle(xb * mm, y * mm, 0.5 * mm, fill=1, stroke=0)
+        c.setFont("Helvetica-Bold", 6)
+        if big:
+            c.drawRightString((xa - p * 0.75) * mm, (y + p * 0.3) * mm, ref)
+        else:
+            c.drawCentredString(((xa + xb) / 2) * mm, (y + p * 0.42) * mm, ref)
+        if pol:
+            c.setFont("Helvetica-Bold", 7)
+            c.drawCentredString((xa - p * 0.75) * mm, (y - 2.2) * mm, pol)
+
+    # standing axial parts: body over the first hole, bent lead to the second
+    for ref, s1, s2, r in UNI_STANDING:
+        (xa, y), (xb, _) = at(s1, r), at(s2, r)
+        c.setStrokeGray(0)
+        c.setLineWidth(0.7)
+        c.line(xa * mm, y * mm, xb * mm, y * mm)
+        c.setFillColorRGB(0.8, 0.88, 0.98)
+        c.circle(xa * mm, y * mm, p * 0.38 * mm, fill=1)
+        c.setFillGray(0)
+        c.circle(xb * mm, y * mm, 0.5 * mm, fill=1, stroke=0)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(((xa + xb) / 2) * mm, (y + p * 0.5) * mm, ref)
+
+    # off-board wires: coloured ring + tag at the hole
+    cols = {"red": RED, "black": BLACK, "green": GREEN}
+    for tag, s, r, colour, _ in UNI_WIRES:
+        x, y = at(s, r)
+        c.setStrokeColorRGB(*cols[colour])
+        c.setLineWidth(1.3)
+        c.setFillGray(1)
+        c.circle(x * mm, y * mm, p * 0.36 * mm, fill=1)
+        c.setFillColorRGB(*cols[colour])
+        c.setFont("Helvetica-Bold", 5.2)
+        c.drawCentredString(x * mm, (y - 0.9) * mm, str(tag))
+    c.setFillGray(0)
+    c.setStrokeGray(0)
+
+    # cuts, on top of the parts that hide them (copper side)
+    c.setStrokeColorRGB(0.8, 0, 0)
+    c.setLineWidth(1.5)
+    for s, r in UNI_CUTS:
+        x, y = at(s, r)
+        d = p * 0.32
+        c.line((x - d) * mm, (y - d) * mm, (x + d) * mm, (y + d) * mm)
+        c.line((x - d) * mm, (y + d) * mm, (x + d) * mm, (y - d) * mm)
+
+    c.setStrokeGray(0)
+
+    # strip nets and wire tags, right of the board
+    lx = x0 + (nstrips - 1) * p + 12
+    y = y0 + 2
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(lx * mm, y * mm, "Nets")
+    y -= 4.4
+    c.setFont("Helvetica", 7.2)
+    for line in (
+            "A  5V. Rows 0-4: fused 5 V to the strip (after F). Rows 6-22: 5 V in from the splitter,",
+            "     which also feeds the ESP32 (plug pigtail) and the three XIAOs. Cut at A5.",
+            "B  GND.   J  TX bus: ESP32 GPIO21 to every XIAO's D7.",
+            "C-I  U1. Rows 0-9 above the chip, 12-22 below; C, D and E cut at row 10 under U1.",
+            "     C top: 1OE, linked to B (row 7): gate 1 always on (also R2's GND end).",
+            "     D top: 1A, from GPIO1; R2 (standing, C4-D4) pulls it to GND.",
+            "     E: 1Y (rows 6-9), R across the cut at E5, DIN (rows 0-4).",
+            "     C, D, E below U1 and F, G, H: VCC, joined by the bare bar on row 13 and fed",
+            "     from A by the insulated link on row 14. I: U1 GND, to B by the insulated link on row 15.",
+            "Gates 2-4 are off: their OE pins and inputs sit on VCC, outputs on VCC or GND (3-state).",
+    ):
+        c.drawString(lx * mm, y * mm, line)
+        y -= 3.6
+    y -= 2
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(lx * mm, y * mm, "Wires (numbered rings)")
+    y -= 4.4
+    c.setFont("Helvetica", 7.2)
+    for tag, s, r, colour, what in UNI_WIRES:
+        c.setFillColorRGB(*cols[colour])
+        c.drawString(lx * mm, y * mm, f"{tag:>2}")
+        c.setFillGray(0)
+        c.drawString((lx + 5) * mm, y * mm, f"{s}{r}  {colour:<5}  {what}")
+        y -= 3.4
+    y -= 1.5
+    c.setFont("Helvetica-Oblique", 6.8)
+    for line in ("Each XIAO's yellow D8 TX does not touch this board: it still runs to its sector's ESP32",
+                 "RX pin (page 6). The ESP32 VBUS (pin 40) wire is not used: the XIAOs are on the splitter rail."):
+        c.drawString(lx * mm, y * mm, line)
+        y -= 3.3
+
+    # legend
+    y -= 2
+    c.setFont("Helvetica", 6.8)
+    c.setStrokeColorRGB(0.8, 0, 0)
+    c.setLineWidth(1)
+    c.line(lx * mm, (y + 0.6) * mm, (lx + 2.2) * mm, (y + 2.8) * mm)
+    c.line(lx * mm, (y + 2.8) * mm, (lx + 2.2) * mm, (y + 0.6) * mm)
+    c.drawString((lx + 4) * mm, y * mm, "track cut (5)")
+    c.setStrokeGray(0.35)
+    c.setLineWidth(1.6)
+    c.line((lx + 24) * mm, (y + 1.7) * mm, (lx + 29) * mm, (y + 1.7) * mm)
+    c.drawString((lx + 31) * mm, y * mm, "bare link")
+    c.setStrokeColorRGB(0.1, 0.35, 0.8)
+    c.line((lx + 46) * mm, (y + 1.7) * mm, (lx + 51) * mm, (y + 1.7) * mm)
+    c.drawString((lx + 53) * mm, y * mm, "insulated link")
+    c.setStrokeGray(0)
+
+    # parts and notes, under the board
+    yb = y0 - (nrows - 1) * p - 9
+    text = [("B", "Parts (through-hole)")]
+    for ref, (part, what) in UNI_PARTS.items():
+        text.append(("", f"{ref:<4} {part}: {what}."))
+    text += [
+        ("", "Also: a USB-C socket pigtail and a USB-C plug pigtail (2-wire), bare tinned wire for the links"),
+        ("", "and the strip reinforcement, insulated wire for the two long links, 2 x 150 mm ties and a thin insulating spacer."),
+        ("", ""),
+        ("B", "Notes"),
+        ("", "Cut the five tracks and check each with a meter before fitting parts. Fit U1 last, or in a socket."),
+        ("", "Solder bare tinned wire along A6-A22 and B0-B22: they carry the strip's current (up to ~1.5 A). Use 22-24 AWG"),
+        ("", "for the pigtails and the strip's 5V and GND; the harness wire is fine for the XIAOs and data."),
+        ("", "Before fitting U1, plug the splitter into the socket pigtail and meter A to B: +5 V; C, D, E (below U1) and F-H"),
+        ("", "should read 5 V too. Then fit U1 and check: GPIO1 wire unplugged -> E1 low (R2); GPIO1 low -> E1 low;"),
+        ("", "GPIO1 high -> E1 at about 5 V."),
+        ("", "Insulating spacer between the copper and the pipe (needed on EMT). The separate boards on pages 6 and 7 still work."),
+    ]
+    y = yb
+    for style, s in text:
+        c.setFont("Helvetica-Bold" if style == "B" else "Helvetica", 8)
+        c.drawString(15 * mm, y * mm, s)
+        y -= 4.1
+
+
 # Alternative split plate (2026-10-31; faces swapped 2026-11-10, user): no pigtail hole. The three XIAOs sit on the
 # TOP face, each IPEX4 end on a flat run to an adhesive HS-100 tie mount (12.5 mm square) that clamps the pigtail
 # before it goes down its own antenna hole to its deck jack. ESP32 and bus board hang on the UNDERSIDE (deck side,
@@ -1953,6 +2241,7 @@ BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-
     stack_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
     wiring_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
     led_page: ("OPTION", "LED direction ring; pipe and no pipe", (0.55, 0.35, 0.05)),
+    uni_page: ("OPTION", "unified power + LED board; pipe build", (0.55, 0.35, 0.05)),
     formulas_page: ("REFERENCE", "both builds; no need to print", (0.3, 0.3, 0.3)),
 }
 
@@ -1963,7 +2252,7 @@ def build_tag(c, page, n):
     head, sub, rgb = BUILD_TAGS[page]
     sets = "Pipe: pages 1, 2, 4, 5, 6   No pipe: pages 1, 3, 4, 6"
     x1 = PAGE_W - 12 * mm
-    y1 = PAGE_H - (6.5 if page in (wiring_page, led_page) else 27.5) * mm
+    y1 = PAGE_H - (6.5 if page in (wiring_page, led_page, uni_page) else 27.5) * mm
     w = max(c.stringWidth(head, "Helvetica-Bold", 8.5), c.stringWidth(sub, "Helvetica", 6),
             c.stringWidth(sets, "Helvetica", 6)) + 4 * mm
     h = 10 * mm
@@ -1988,9 +2277,11 @@ def main():
     c = canvas.Canvas(out, pagesize=letter)
     c.setTitle("Shield deck, back panel, electronics plate templates and plate wiring")
     # drill templates first (deck, plates, back panel), then the stack view and wiring diagram (user, 2026-11-09),
-    # the LED direction ring option after the wiring it adds to (2026-11-16), design formulas at the very end as a
+    # the LED direction ring option after the wiring it adds to (2026-11-16), then the unified power + LED board
+    # option that can replace the bus and LED boards (2026-11-20), design formulas at the very end as a
     # reference page (2026-11-12)
-    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, formulas_page)
+    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, uni_page,
+             formulas_page)
     for n, page in enumerate(pages, 1):
         page(c)
         build_tag(c, page, n)

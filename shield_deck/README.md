@@ -1,6 +1,6 @@
 # Shield deck and plate templates
 
-Printable 1:1 drill templates for the electronics plates and back panel, stack views, the wiring diagram, the LED direction ring option, and the Gerbers for the copper shield deck PCB. Everything is already built and in this folder: you only need the scripts to change something.
+Printable 1:1 drill templates for the electronics plates and back panel, stack views, the wiring diagram, the LED direction ring option, a unified power + LED board option, and the Gerbers for the copper shield deck PCB. Everything is already built and in this folder: you only need the scripts to change something.
 
 ## Quick start (files in the repo, no software)
 
@@ -15,7 +15,8 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 | 5 | Pipe stack views (not to scale) | yes | - |
 | 6 | Wiring diagram | yes | yes |
 | 7 | Option: LED direction ring, its power board and strip wiring | option | option |
-| 8 | Design formulas: monopole spacing, triangle, baseplate (reference, no need to print) | - | - |
+| 8 | Option: unified power + LED board (one stripboard instead of the bus board and the LED power board) | option | - |
+| 9 | Design formulas: monopole spacing, triangle, baseplate (reference, no need to print) | - | - |
 
 - **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; the deck centre is opened with a 2-1/4" hole saw.
 - **No pipe:** pages 1, 3, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
@@ -43,7 +44,15 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 - **Bulk capacitor, surface-mount option:** a 330 uF 10 V polymer tantalum chip in the 7343 (2917) case, in place of the leaded can: KEMET T591X337M010ATE025, T545Y337M010ATE035 or T525Y337M010ATE035. Others that match: [Mouser search](https://www.mouser.com/en/c/passive-components/capacitors/tantalum-capacitors/tantalum-capacitors-polymer/?capacitance=330%20uF&case%20code%20-%20in=2917&termination%20style=SMD%2FSMT&voltage%20rating%20dc=10%20VDC~~16%20VDC&instock=y&rp=passive-components%2Fcapacitors%2Ftantalum-capacitors%2Ftantalum-capacitors-polymer%7C~Voltage%20Rating%20DC&sort=pricing&qty=1). Polymer only, not solid (manganese dioxide) tantalum.
 - **Status:** wiring only. The gateway firmware does not drive the strip yet, and the ring's effect on reception has not been measured.
 
-Page 8 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.
+**Option: unified power + LED board** (page 8, pipe build, 2026-11-20). One 0.1 in stripboard (10 strips x 23 holes, 25.4 x 58.4 mm) in place of the bus board (page 6) and the LED power board (page 7), which both stay as they are. It hangs on the pipe at the 11 o'clock corner beside the splitter and the ESP32:
+
+- **Power:** the splitter's USB-C plug goes into a socket pigtail on the board; a plug pigtail feeds the ESP32. The three XIAOs take 5 V from the same splitter rail, not from the ESP32's VBUS (pin 40), so that wire goes. The strip is fused (one-time, 2 A); the ESP32 and XIAO feed is not.
+- **Data:** a 74HCT125 buffer (U1, gate 1; gates 2-4 tied off) lifts the ESP32's 3.3 V GPIO1 to 5 V for the WS2812B, then the 330 ohm series resistor. A 10 kohm pull-down (R2) on the buffer's input keeps the strip dark while the ESP32 boots and GPIO1 floats. The TX bus (GPIO21 to every D7) is a strip of its own.
+- **Board:** BusBoard ST1 StripBoard-1 (Mouser 854-ST1), FR4, 50 x 80 mm with the strips along the 80 mm; one makes one board.
+- **Parts, all through-hole:** TI CD74HCT125E, Littelfuse 0251002.MXL, KEMET A750EM337M1CAAE015 (C1), 2 x KEMET C320C104K5R5TA (C2, C3), Yageo CFR-25JB-52-330R, Yageo CFR-25JB-52-10K (R2). Five track cuts, two bare links and two insulated links; the page has the strip map, the wire list and the checks.
+- **Status:** drawn only, not built. The layout is a table in `make_templates.py` (`UNI_*`), sizes in `parameters.csv` (group `uni`).
+
+Page 9 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.
 
 ### Drill sizes and zip ties
 
@@ -99,7 +108,7 @@ Everything here is generated from one file of numbers, [`parameters.csv`](parame
 | `parameters.csv` | Every measurement, size, placement and clearance rule | You (or `read_plate_svg.py`) |
 | `params.py` | Loads the CSV for the other scripts | - |
 | `shield_deck_gerbers.zip`, `shield_deck_preview.svg`, `hole_table.csv` | Deck PCB Gerbers (any fab), a picture of it, hole coordinates | `make_shield_deck.py` |
-| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, design formulas | `make_templates.py` |
+| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, unified board option, design formulas | `make_templates.py` |
 | `plate_layout.svg`, `pipe_plate_layout.svg` | No-pipe (alt) and pipe plates for laying out in Inkscape | `make_plate_svg.py` |
 
 ### Print the templates
@@ -117,7 +126,8 @@ The pages, in order (pick one build type, pipe or no pipe, and print only its pa
 5. Pipe stack views, not to scale (pipe only)
 6. Wiring diagram (both)
 7. Option: LED direction ring (both, only if you add the ring)
-8. Design formulas (reference, not to size)
+8. Option: unified power + LED board (pipe, only if you use it instead of the bus and LED boards)
+9. Design formulas (reference, not to size)
 
 ### Change a measurement or size
 
