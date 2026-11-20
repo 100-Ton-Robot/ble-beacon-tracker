@@ -15,4 +15,6 @@ in Home Assistant. See `README.md` and each folder's README.
   not in the scripts. Regenerate Gerbers and templates from `make_shield_deck.py` and
   `make_templates.py` (needs `reportlab`) rather than hand-editing outputs. Plate layouts round-trip
   through Inkscape: `make_plate_svg.py` -> edit -> `read_plate_svg.py` (writes the CSV, checks rules).
+- `NEXT_STEPS.md` is the shared to-do list across sessions: read it after pulling, update your
+  lines with the work, move finished items to `CHANGELOG.md`.
 - Never commit `secrets.yaml`, signing keys or personal notes (`*.local.md` is ignored).

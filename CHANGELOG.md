@@ -138,6 +138,9 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Docs
 
+- Added (2026-11-20): `NEXT_STEPS.md`, the shared to-do list (0.8.0 rollout order, gateway,
+  LED ring decisions, housekeeping); `CLAUDE.md` points to it.
+
 - Added `SECURITY.md` (2026-11-11): how to report a vulnerability, and the gaps from the input-validation review that
   are accepted as they are (MCUboot downgrade, unauthenticated D7 commands, MQTT commands
   authorised by the broker login), why, and what would reopen them.
