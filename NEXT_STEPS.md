@@ -9,7 +9,7 @@ Owners: **Aaron** (hands-on: wiring, flashing over USB, buying parts, decisions)
 
 ## Scanner firmware 0.8.0 rollout
 
-Order matters: the gateway goes last, or 0.7.0 radios raise `FIRMWARE_OUTDATED` every 10 min.
+Aaron solders the harness on 2026-11-21. Order matters: the gateway goes last, or 0.7.0 radios raise `FIRMWARE_OUTDATED` every 10 min.
 
 - [ ] **Aaron**: move each XIAO's harness wire from D6 to D8 (gateway end unchanged). A 0.8.0 board
   sends nothing on D6. Doc: `shield_deck/shield_deck_templates.pdf` page 6.
@@ -34,10 +34,12 @@ Hardware drawn (templates page 7); no firmware yet. Open decisions, all **Aaron*
 - [ ] What the calibration matrix holds and how it reaches the mast.
 - [ ] Bearing only, or range / position too.
 - [ ] Which signals (beacons) the ring points at.
+- [ ] Power layout: separate bus board + LED power board (pages 6-7) or the unified power + LED
+  board (page 8, 74HCT125 level shifter, one-time 2 A fuse).
 - [ ] Confirm the pixel count (24 = 127 mm at 60/m) and data pin (GPIO1); both were the gateway
   session's picks, not decisions.
 
-Doc: `shield_deck/README.md`, `shield_deck/shield_deck_templates.pdf` page 7.
+Doc: `shield_deck/README.md`, `shield_deck/shield_deck_templates.pdf` pages 7-8.
 
 ## Repo housekeeping
 
