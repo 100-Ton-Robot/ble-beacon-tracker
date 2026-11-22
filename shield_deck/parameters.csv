@@ -181,3 +181,5 @@ FACE_TABS,-17.0 0.0 17.0,mm,design,face,"tab centres along each face's bottom ed
 TAB_W,8.0,mm,design,face,tab width along the face edge; tab length = deck thickness (1.6) so it ends flush with the deck top
 SLOT_W,2.0,mm,design,face,"deck slot width for a 1.6 mm face (FR-4 is +-10 %, so up to 1.76 mm)"
 SLOT_L,10.4,mm,design,face,deck slot length: tab + 1.2 mm each end so the mill's round corners clear the tab
+MOUNT_GAP,1.0,mm,rule,pcb,"tie-mount squares stay this far from slots, the opening, holes, pads and courtyards, and inside the rim ring (checked by place_mount in make_pcbs.py; KiCad DRC can't see them)"
+TAB_RELIEF,2.2 1.2,mm,design,face,"relief notch beside each tab root: width (>= a 2 mm router bit) and depth into the face, so the bit's inside-corner radius doesn't sit where the face seats on the deck"

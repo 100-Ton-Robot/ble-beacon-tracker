@@ -37,11 +37,11 @@ The ESP32 stays on the pipe and is fed 5 V through J1, so its USB-C power pigtai
 - **LED strip (J3):** DIN, 5V, GND pads. The 74HCT125 (U1) lifts GPIO1 to 5 V, R1 330 ohm in series, R2 10 k pull-down keeps the strip dark while the ESP32 boots. F1 (2 A, one-time) feeds only the strip; the accepted-risk note in `../README.md` (a strip short reboots the mast) still applies.
 - **5 V links, JP1-JP4 and D1-D4:** each module (XIAO S0-S2, ESP32) gets its 5 V through a solder jumper with an SMA Schottky footprint beside it. **Default: bridge each JP with solder, leave D empty.** For diodes: leave JP open and fit D (SS34 or similar 3 A SMA Schottky, about 0.3-0.4 V drop). Either can be changed later.
 - **R3:** a 0 ohm 1206 jumper carrying CMD to S1 over the S0 track. Fit it.
-- **Tie mounts:** six 12.5 mm squares (TIE 5V IN, TIE LED, TIE J1, TIE Sn COAX) for 1/2 in HS-100 adhesive tie mounts. Mask only underneath, nothing to catch the adhesive.
+- **Tie mounts:** six 12.5 mm squares (TIE 5V IN, TIE LED, TIE J1, TIE Sn COAX) for 1/2 in HS-100 adhesive tie mounts. Mask only underneath, nothing to catch the adhesive. The generator places each one at the clear spot nearest its preferred position, `MOUNT_GAP` (1 mm) clear of the slots, the opening, holes, pads, courtyards and silkscreen text, inside the rim ring (KiCad's DRC can't check silkscreen-only footprints).
 
 ## Face
 
-Solid GND both sides, one 6.5 mm plated RP-SMA hole at the centre with a 12 mm exposed nut pad, 3 mm of exposed copper along both side edges and the bottom edge (seams to the other faces and to the deck), stitching vias. Three 8 mm tabs on the bottom edge (centre and 17 mm either side), 1.6 mm long so they end flush with the deck's top, copper exposed for soldering into the slots. Silkscreen: centre line, "OUTSIDE - DIPOLE SIDE" / "INSIDE - CORE SIDE", and the deck-edge mark. No M2 posts and no other antenna holes.
+Solid GND both sides, one 6.5 mm plated RP-SMA hole at the centre with a 12 mm exposed nut pad, 3 mm of exposed copper along both side edges and the bottom edge (seams to the other faces and to the deck), stitching vias. Three 8 mm tabs on the bottom edge (centre and 17 mm either side), 1.6 mm long so they end flush with the deck's top, copper exposed for soldering into the slots. A router can't cut a sharp inside corner, so each tab root has a 2.2 x 1.2 mm relief notch on both sides: the bit's corner radius lands in the notch, and the edge that seats on the deck stays straight up to the tab. The deck slots allow 1.2 mm per end for their own rounded ends. Silkscreen: centre line, "OUTSIDE - DIPOLE SIDE" / "INSIDE - CORE SIDE", and the deck-edge mark. No M2 posts and no other antenna holes.
 
 ## BOM (one mast)
 
@@ -80,7 +80,7 @@ Same as the old deck ([../PCBWAY.md](../PCBWAY.md)) except:
 python3 make_pcbs.py
 ```
 
-Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path; on Debian / Ubuntu `apt install kicad kicad-footprints`. Sizes and rules come from `../parameters.csv` (groups `pcb`, `face`, plus `deck` for the antenna hole geometry and `plate` for the XIAO size). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
+Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path (on Debian / Ubuntu `apt install kicad kicad-footprints`), plus `pip install shapely pypdf` (tie-mount clearance check, merged print PDF). Sizes and rules come from `../parameters.csv` (groups `pcb`, `face`, plus `deck` for the antenna hole geometry and `plate` for the XIAO size). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
 
 Output in `out/`: `*.kicad_pcb` (open in KiCad 7+; KiCad 8 / 10 will upgrade the file on save), `*_gerbers.zip`, `*_drc.rpt`. The DRC report should show **0 errors**; the remaining warnings are silkscreen clipped by the exposed copper and "library not in configuration" for the generated footprints.
 

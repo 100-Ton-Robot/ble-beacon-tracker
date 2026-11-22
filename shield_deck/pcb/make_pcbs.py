@@ -145,6 +145,67 @@ def mount_fp(bd, ref, theta, u, v, label):
     return fp
 
 
+def slot_polys(gap=0.0):
+    from shapely.geometry import Polygon
+    out = []
+    rv = INRADIUS - FACE_THICK / 2
+    for s in SECTORS:
+        for t in FACE_TABS:
+            out.append(Polygon([loc(s, t + du, rv + dv) for du, dv in (
+                (-SLOT_L / 2 - gap, -SLOT_W / 2 - gap), (SLOT_L / 2 + gap, -SLOT_W / 2 - gap),
+                (SLOT_L / 2 + gap, SLOT_W / 2 + gap), (-SLOT_L / 2 - gap, SLOT_W / 2 + gap))]))
+    return out
+
+
+def mount_obstacles(bd):
+    """Everything a tie-mount square must stay clear of: slots, the opening, every footprint's courtyard
+    (or pads when it has none), and the squares already placed."""
+    from shapely.geometry import Point, Polygon, box
+    from shapely.ops import unary_union
+    geoms = slot_polys() + [Point(K.CX, K.CY).buffer(PCB_OPENING / 2, 64)]
+    for fp in bd.b.GetFootprints():
+        fp.BuildCourtyardCaches()
+        cy = fp.GetCourtyard(pcbnew.F_CrtYd)
+        if cy.OutlineCount():
+            for i in range(cy.OutlineCount()):
+                ol = cy.Outline(i)
+                pts = [(pcbnew.ToMM(ol.CPoint(k).x), pcbnew.ToMM(ol.CPoint(k).y)) for k in range(ol.PointCount())]
+                if len(pts) >= 3:
+                    geoms.append(Polygon(pts).buffer(0))
+        for p in fp.Pads():
+            bb = p.GetBoundingBox()
+            geoms.append(box(pcbnew.ToMM(bb.GetLeft()), pcbnew.ToMM(bb.GetTop()),
+                             pcbnew.ToMM(bb.GetRight()), pcbnew.ToMM(bb.GetBottom())))
+    for d in bd.b.GetDrawings():   # silkscreen text (legends, labels)
+        if isinstance(d, pcbnew.PCB_TEXT) and d.GetLayer() == pcbnew.F_SilkS:
+            bb = d.GetBoundingBox()
+            geoms.append(box(pcbnew.ToMM(bb.GetLeft()), pcbnew.ToMM(bb.GetTop()),
+                             pcbnew.ToMM(bb.GetRight()), pcbnew.ToMM(bb.GetBottom())))
+    return unary_union(geoms)
+
+
+def place_mount(bd, ref, theta, u0, v0, label):
+    """Put a tie-mount square at the clear spot nearest (u0, v0) in frame theta: MOUNT_GAP clear of every
+    obstacle, inside the rim ring. KiCad's DRC can't see silkscreen-only footprints, so this is the check."""
+    from shapely.geometry import Point, Polygon
+    obst = mount_obstacles(bd)
+    rim = Point(K.CX, K.CY).buffer(R - RIM_MASK_WIDTH - MOUNT_GAP, 128)
+    h = MOUNT_SQ / 2
+    best = None
+    for i in range(-70, 71):
+        for j in range(-60, 61):
+            u, v = u0 + i * 0.5, v0 + j * 0.5
+            d = math.hypot(u - u0, v - v0)
+            if best and d >= best[0]:
+                continue
+            sq = Polygon([loc(theta, u + du, v + dv) for du, dv in ((-h, -h), (h, -h), (h, h), (-h, h))])
+            if rim.contains(sq) and not sq.buffer(MOUNT_GAP).intersects(obst):
+                best = (d, u, v)
+    if best is None:
+        raise RuntimeError(f"{ref}: no clear spot for the tie mount")
+    return mount_fp(bd, ref, theta, best[1], best[2], label)
+
+
 def build_deck():
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=EDGE_CLEAR)
@@ -297,11 +358,6 @@ def build_deck():
     bd.via(loc(t1, 17.0, 50.8), "GND", VIA_D, VIA_DRILL)
 
     # tie mounts
-    mount_fp(bd, "TM1", t1, -17.0, 33.0, "TIE 5V IN")
-    mount_fp(bd, "TM2", t2, -15.0, 34.0, "TIE LED")
-    mount_fp(bd, "TM3", t0, -15.0, 34.0, "TIE J1")
-    for k, th in enumerate(VERTICES):
-        mount_fp(bd, f"TM{4 + k}", th, -20.0, 47.5, f"TIE S{k} COAX")
 
     # ---- zones: bottom GND (shield), top +5V pour, top GND rim ring
     circ = lambda r, n=180: [pol(r, 360 * i / n) for i in range(n)]  # noqa: E731
@@ -345,6 +401,16 @@ def build_deck():
     scale_bars(bd, K.CX - 50, K.CY - 50, K.CX + R + 8, K.CY + R + 6)
     bd.text(FS, "POWER FROM PoE OR USB\nNEVER BOTH", loc(t2, 9.0, 52.0), 1.1, angle=-t2)
     bd.text(FS, "JP1-4 bridged = no diode\nJP open + D fitted = diode", loc(t2, 9.5, 36.5), 0.8, angle=-t2)
+    # tie mounts last, so they clear the parts and the silkscreen text
+    for k, th in enumerate(VERTICES):
+        place_mount(bd, f"TM{4 + k}", th, -20.0, 47.5, f"TIE S{k} COAX")
+    place_mount(bd, "TM1", t1, -17.0, 33.0, "TIE 5V IN")
+    place_mount(bd, "TM2", t2, -15.0, 34.0, "TIE LED")
+    place_mount(bd, "TM3", t0, -15.0, 34.0, "TIE J1")
+    for fp in bd.b.GetFootprints():   # report where they went
+        if fp.GetReference().startswith("TM"):
+            q = fp.GetPosition()
+            print(f"  {fp.GetReference()} at r {math.hypot(pcbnew.ToMM(q.x) - K.CX, pcbnew.ToMM(q.y) - K.CY):.1f}")
     return bd
 
 
@@ -357,9 +423,12 @@ def build_face():
     x1, y1 = x0 + w, y0 + h
     th = FACE_THICK
     outline = [(x0, y0), (x1, y0), (x1, y1)]
-    for t in sorted(FACE_TABS, reverse=True):
+    rw, rd = TAB_RELIEF   # relief notch each side of a tab root, so the router's inside-corner radius lands
+    for t in sorted(FACE_TABS, reverse=True):   # in the notch, not on the edge that seats on the deck
         cx = K.CX + t
-        outline += [(cx + TAB_W / 2, y1), (cx + TAB_W / 2, y1 + th), (cx - TAB_W / 2, y1 + th), (cx - TAB_W / 2, y1)]
+        a, c = cx + TAB_W / 2, cx - TAB_W / 2
+        outline += [(a + rw, y1), (a + rw, y1 - rd), (a, y1 - rd), (a, y1 + th),
+                    (c, y1 + th), (c, y1 - rd), (c - rw, y1 - rd), (c - rw, y1)]
     outline += [(x0, y1)]
     bd.poly(pcbnew.Edge_Cuts, outline, 0.1)
     fp = K.custom_fp(bd, "H1", "RP-SMA")
