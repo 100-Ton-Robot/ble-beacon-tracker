@@ -249,6 +249,7 @@ def th_pad(fp, name, x, y, dia, drill, net=None, board=None, plated=True):
     ls.AddLayer(pcbnew.B_Mask)
     p.SetLayerSet(ls)
     p.SetNumber(name)
+    p.SetPos0(V(x, y)) if hasattr(p, "SetPos0") else None
     p.SetPosition(V(x, y))
     if net and board:
         p.SetNet(board.net(net))
@@ -287,3 +288,4 @@ def fp_circle(fp, layer, c, r, width=0.12):
         s.SetEnd0(V(c[0] + r, c[1]))
     fp.Add(s)
     return s
+

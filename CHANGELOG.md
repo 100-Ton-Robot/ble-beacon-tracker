@@ -122,6 +122,18 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Changed (2026-11-22): `shield_deck/pcb/` revision 2 (KiCad 7, DRC 0 errors on all three boards, not
+  yet ordered or built). New optional 144 mm end plate PCB across the far end of the triangle: bare GND
+  both sides, the nine face slots and seam copper, a centre RP-SMA hole in a mouse-bite knockout that breaks
+  out to pass the 1/2 in PVC adapter thread (clamped by a faucet lock nut), and a hole for a panel-mount
+  service switch. Faces: tabs, relief notches and exposed seam copper on both ends, power warning on the
+  outside. Deck: D1-D4 / JP1-JP4 removed (every 5V pin straight to the rail); service switch loop SW1 in
+  series with 5V IN, shipped bridged, cut when a switch is wired in; warning now "SET SERVICE BEFORE USB";
+  assembly steps in silkscreen; 62 mm opening with three bayonet lugs and the collar M3s at r 41 mm; J1 out
+  to 48 mm; C1 one footprint for an 8 mm SMD or radial can, leads inside the core; J4 1 x 3 2.54 mm header
+  beside the J3 pads (both 5V / DIN / GND); U1 on channel 3; slots 9.4 mm long (was 10.4); F1 Littelfuse
+  0466002.NR. New `endplate` group in `parameters.csv`; `out/deck_part_clearance.csv` lists each part's
+  distance to the seam strip; the 1:1 print PDF has five pages.
 - Added (2026-11-21): `shield_deck/pcb/`, a parts-on-the-deck build generated with KiCad 7
   (`make_pcbs.py`, DRC 0 errors, not yet ordered or built). A 170 mm deck PCB (max 171.5 mm,
   the case interior) with the three XIAOs (castellated, hand-solder pads, USB-C at the rim), the
