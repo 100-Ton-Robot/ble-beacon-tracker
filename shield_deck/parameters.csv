@@ -158,3 +158,26 @@ UNI_PAGE,22.0 236.0 5.2,mm,drawing,uni,"Unified power + LED board page: top-left
 UNI_PITCH,2.54,mm,spec,uni,stripboard hole pitch (0.1 in)
 UNI_SIZE,10 23,count,design,uni,"Unified board: strips (A-J) x holes per strip (rows 0-22); rows 0 and 22 are left empty for the two pipe ties (2026-11-20)"
 UNI_PULLDOWN_OHM,10000,ohm,design,uni,"R2, pull-down on U1 1A (GPIO1 side) to GND so the strip stays dark while the ESP32 boots and GPIO1 floats (user, 2026-11-20)"
+PCB_DIAMETER,170.0,mm,design,pcb,"deck PCB (KiCad, pcb/make_pcbs.py): round board, replaces DISC_DIAMETER for the parts-on-deck build (2026-11-21)"
+PCB_DIAMETER_MAX,171.5,mm,measured,pcb,"largest deck the case takes: case interior from its STL (user, 2026-11-21; 54 cm circumference). Check at the deck's height if the wall tapers"
+PCB_OPENING,57.0,mm,design,pcb,"centre opening: pipe + ESP32/PoE bundle (72 x 28 x 20 mm, passes end-on, ~34 mm diagonal) + the three dipole coaxes; up to ~61 before the seam strip"
+COLLAR_HOLE,3.4,mm,design,pcb,"three M3 holes round the opening for a printed collar / saddle to the pipe, one per core corner"
+COLLAR_RADIUS,31.5,mm,design,pcb,collar hole centres from the deck centre
+PCB_STITCH_RADIUS,83.0,mm,design,pcb,"stitching vias in the exposed rim ring (moved out from STITCH_RADIUS so the XIAOs sit clear)"
+XIAO_RADIUS,70.0,mm,design,pcb,"XIAO centres from the deck centre, on the core corners (60 / 180 / 300 deg), USB-C end out to the rim"
+XIAO_PAD,3.4 1.6,mm,design,pcb,"castellation pad for hand soldering: length (out from the board edge 1.7 mm) x width"
+XIAO_PIN_ROW,7.62,mm,spec,pcb,"castellated pin rows +- this from the XIAO centre line (0.6 in rows), 2.54 mm pitch, 7 per side"
+J1_V,44.0,mm,design,pcb,"J1 (JST B7B-PH-K-S, vertical through-hole) pin row this far out along the 60 deg corner, inside the core"
+BAND_R,55.6 56.6 57.6,mm,design,pcb,"signal arcs round the deck between the antenna holes: inner, middle, outer"
+CORE_MARGIN,1.0,mm,rule,pcb,"bottom copper may carry tracks / vias only inside the core, this far clear of the seam strip"
+TRACK,0.25,mm,design,pcb,signal track width
+TRACK_5V,0.8,mm,design,pcb,"5 V links to the modules and the LED feed"
+CLEARANCE,0.2,mm,rule,pcb,copper clearance (PCBWay standard is 0.15 at 1 oz)
+VIA,0.8 0.4,mm,design,pcb,via pad and drill
+MOUNT_SQ,12.5,mm,spec,pcb,"1/2 in HS-100 adhesive tie mount footprint (silkscreen square, mask only underneath): 5V IN, LED strip, J1 harness, one per XIAO coax"
+FACE_W,120.0,mm,design,face,"face PCB width (= FACE_WIDTH); height FACE_H. Solid copper both sides, one RP-SMA hole at the centre"
+FACE_EDGE_EXPOSE,3.0,mm,design,face,"exposed copper along the two side edges and the bottom edge (seams to the other faces and the deck), both sides"
+FACE_TABS,-17.0 0.0 17.0,mm,design,face,"tab centres along each face's bottom edge, from the face centre (user 2026-11-21: tabs and slots to key the faces to the deck)"
+TAB_W,8.0,mm,design,face,tab width along the face edge; tab length = deck thickness (1.6) so it ends flush with the deck top
+SLOT_W,2.0,mm,design,face,"deck slot width for a 1.6 mm face (FR-4 is +-10 %, so up to 1.76 mm)"
+SLOT_L,10.4,mm,design,face,deck slot length: tab + 1.2 mm each end so the mill's round corners clear the tab

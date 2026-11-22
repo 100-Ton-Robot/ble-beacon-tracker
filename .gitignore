@@ -20,3 +20,9 @@ experiments/*/out/
 
 # Simulation output (regenerate with sim/run_sim.sh)
 sim/out/
+
+# Generated PCB intermediates (zips, boards, DRC reports and previews are kept)
+shield_deck/pcb/out/*_gerbers/
+shield_deck/pcb/out/*.svg
+shield_deck/pcb/out/*.png
+shield_deck/pcb/out/*-backups/

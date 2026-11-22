@@ -122,6 +122,18 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Added (2026-11-21): `shield_deck/pcb/`, a parts-on-the-deck build generated with KiCad 7
+  (`make_pcbs.py`, DRC 0 errors, not yet ordered or built). A 170 mm deck PCB (max 171.5 mm,
+  the case interior) with the three XIAOs (castellated, hand-solder pads, USB-C at the rim), the
+  power + LED circuit in SMD (74HCT125, 2 A one-time fuse, polymer tantalum), J1 (JST
+  B7B-PH-K-S, through-hole, inside the core) to the ESP32 on the pipe, 5V IN and LED strip pads,
+  per-module 5 V solder jumpers with optional SMA Schottky footprints, a 57 mm centre opening with
+  three M3 collar holes, and nine slots that key the faces. Kept the D, P, P2 holes; dropped the C,
+  core and M4 holes. Plus a 120 x 120 mm face PCB: one centre RP-SMA hole, three tabs, exposed
+  seam edges. Replaces the acrylic plate, the bus / unified stripboard and the hand-cut faces for
+  this build; the older files stay. Groups `pcb` and `face` in `parameters.csv`; 1:1 print check
+  `pcb/out/pcb_print_1to1.pdf`. Power from PoE or USB, never both (warning on the board and in
+  `pcb/README.md`).
 - Added (2026-11-20): option page for a unified power + LED board (templates page 8; the design
   formulas are now page 9): one stripboard on the pipe in place of the bus board and the LED power
   board, which both stay. XIAOs fed from the splitter rail (no VBUS wire), one-time 2 A fuse on the
