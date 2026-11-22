@@ -138,6 +138,9 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Docs
 
+- Changed (2026-11-21): docs that still said the scanner's TX is D6 now say D8 (pin 9, JST 3):
+  `gateway/README.md` wiring table (now with the XIAO and JST pin numbers) and sectors section,
+  the gateway package's pin comments, `scanner_fw/prj.conf`, and the status in `README.md`.
 - Changed (2026-11-20): gateway examples and self-test use made-up chip IDs and addresses;
   self-test regenerated (still 26 commands, 23 messages). `CLAUDE.md`: the repo is public, no
   private or home context.

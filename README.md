@@ -28,9 +28,10 @@ MCUboot was built with the same signing key, so build your own from source with 
 ## Status
 
 Work in progress:
-- Scanner firmware 0.4.0 (protocol 3) runs on three boards, checked over the USB console. Its
-  D6 output and BLE update path haven't been tested on this version yet.
-- The gateway (protocol 3, needs scanner firmware 0.4.0 or later) passes its boot self-test on
+- Scanner firmware 0.7.0 (protocol 3) runs on three boards, checked over the USB console.
+  0.8.0 (gateway TX moved from D6 to D8, so all four harness wires leave the XIAO from one pin
+  row) is built but not flashed yet. Its D8 output and BLE update path haven't been tested.
+- The gateway (protocol 3, needs scanner firmware 0.5.0 or later) passes its boot self-test on
   a board, but hasn't received scanner data on real wiring yet.
 - The Home Assistant tracker isn't written yet.
 

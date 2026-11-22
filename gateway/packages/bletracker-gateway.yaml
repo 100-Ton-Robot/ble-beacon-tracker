@@ -21,9 +21,9 @@ substitutions:
   eth_cs: GPIO14
   eth_int: GPIO10
   eth_rst: GPIO9
-  s0_rx: GPIO17   # header pin 34 <- sector 0 XIAO D6 (TX)
-  s1_rx: GPIO16   # header pin 32 <- sector 1 XIAO D6
-  s2_rx: GPIO18   # header pin 31 <- sector 2 XIAO D6
+  s0_rx: GPIO17   # header pin 34 <- sector 0 XIAO D8 (TX, pin 9)
+  s1_rx: GPIO16   # header pin 32 <- sector 1 XIAO D8
+  s2_rx: GPIO18   # header pin 31 <- sector 2 XIAO D8
   cmd_tx: GPIO21  # header pin 35 -> bus TX row -> every XIAO's D7 (RX)
 
 esphome:

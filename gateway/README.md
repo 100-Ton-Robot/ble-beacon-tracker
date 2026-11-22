@@ -69,16 +69,19 @@ first check once it does.
 ## Wiring
 
 All gateway wiring is on header pins 31-40 (pin numbers as printed on Waveshare's pinout).
-Each scanner's D6 has its own gateway RX pin, and that pin is its sector. The gateway has one
+Each scanner's D8 (TX) has its own gateway RX pin, and that pin is its sector. The gateway has one
 TX that goes to every scanner's D7 through the bus board's TX row; commands carry the target
-scanner's chip ID, so only that scanner acts on them.
+scanner's chip ID, so only that scanner acts on them. All four wires leave the XIAO from the
+one pin row on its D7-5V edge (scanner firmware 0.8.0 and later; before that TX was D6, pin 7).
 
-| XIAO | Sector 0 | Sector 1 | Sector 2 |
-| --- | --- | --- | --- |
-| D6 (TX) → gateway RX | GPIO17 (34) | GPIO16 (32) | GPIO18 (31) |
-| D7 (RX) ← bus TX row ← gateway TX | GPIO21 (35) | GPIO21 (35) | GPIO21 (35) |
-| 5V ← bus 5V row | VBUS (40) | VBUS (40) | VBUS (40) |
-| GND ← bus GND row | GND (38) | GND (38) | GND (38) |
+| XIAO (pin) | JST | Sector 0 | Sector 1 | Sector 2 |
+| --- | --- | --- | --- | --- |
+| D8 TX (9) → gateway RX | 3 | GPIO17 (34) | GPIO16 (32) | GPIO18 (31) |
+| D7 RX (8) ← bus TX row ← gateway TX | 4 | GPIO21 (35) | GPIO21 (35) | GPIO21 (35) |
+| 5V (14) ← bus 5V row | 1 | VBUS (40) | VBUS (40) | VBUS (40) |
+| GND (13) ← bus GND row | 2 | GND (38) | GND (38) | GND (38) |
+
+JST = pin of the per-sector inline 4-wire connector (drawing: `../shield_deck/shield_deck_templates.pdf`, wiring page).
 
 VBUS is the USB-C 5 V, which is where the PoE splitter feeds the board. Kept clear: GPIO 4-7
 (TF card), 9-14 (W5500), 0/3/45/46 (strapping), 19/20 (USB), 33-37 (octal PSRAM), 43/44.
@@ -87,7 +90,7 @@ used by the scanners).
 
 ## Sectors
 
-A scanner doesn't know its sector: the sector is the gateway RX pin its D6 is wired to, so
+A scanner doesn't know its sector: the sector is the gateway RX pin its D8 is wired to, so
 wiring is the only source of truth. (Scanners before 0.5.0 also sent a saved sector claim; the
 gateway ignores it.) What the gateway checks is the scanner's chip ID, sent in every bucket:
 
