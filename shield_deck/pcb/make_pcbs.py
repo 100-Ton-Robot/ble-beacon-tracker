@@ -549,10 +549,11 @@ def build_deck(spacing):
         bd.text(FS, "P", loc(s, -8.5, a + PATCH_OFFSET), 1.5, angle=-s)
         bd.text(FS, "P2", loc(s, p2_u, a + PATCH_OFFSET + 8.3), 1.5, angle=-s)
     for th, lab in ((t0, "U2 HEAD"), (t1, "U3 -> HEAD D0"), (t2, "U4 -> HEAD D1")):
-        bd.text(FS, lab, loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 3.2), 1.0, angle=-th)
+        bd.text(FS, lab, loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 12.5), 1.0, angle=-th)
         # USB-C plug path (13 x 25 mm past the USB-C end), for the print check
-        bd.text(FS, USB_WARNING, loc(th, -10.6, 53.0), 0.9, angle=-th + 90)   # beside the USB-C plug path
-        warn_icon(bd, FS, USB_WARNING, loc(th, -10.6, 53.0), 0.9, -th + 90, "after", 3.5)
+        uw = loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 3.6)   # right in front of the USB-C plug, across its path
+        bd.text(FS, USB_WARNING, uw, 0.9, angle=-th)
+        warn_icon(bd, FS, USB_WARNING, uw, 0.9, -th, "above", 3.2)
         x = [(-6.5, 45.0), (6.5, 45.0), (6.5, 70.0), (-6.5, 70.0)]
         bd.poly(pcbnew.Dwgs_User, [loc(th, u, v) for u, v in x], 0.15)
     bd.text(FS, "TOP - ELECTRONICS SIDE", band(0, 19.5, a + 19.5), 1.3, angle=0)
