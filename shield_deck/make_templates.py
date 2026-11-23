@@ -13,6 +13,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
+import layout
 import make_shield_deck as g
 import params
 
@@ -21,6 +22,7 @@ import params
 globals().update(params.load(exclude=["deck"]))
 
 PAGE_W, PAGE_H = letter
+FACE_WIDTH, HOLE_RPSMA, PATCH_OFFSET = (layout.P[k] for k in ("FACE_WIDTH", "HOLE_RPSMA", "PATCH_OFFSET"))
 # Printed-dipole panel board (measured 60 x 50 mm) taken out of its housing and turned 90 deg,
 # long bar vertical, centred across the face. Its own coax and stalk plug into the deck's P2 jack,
 # which is on the right seen from the front, so the coax notch faces right.
@@ -60,226 +62,6 @@ def scale_bar(c, x, y):
 def crosshair(c, x, y, r):
     c.line((x - r - 2) * mm, y * mm, (x + r + 2) * mm, y * mm)
     c.line(x * mm, (y - r - 2) * mm, x * mm, (y + r + 2) * mm)
-
-
-def deck_page(c):
-    ox = PAGE_W / mm / 2 - g.CX          # page offset so the disc is centred
-    oy = 140 - g.CY
-    turn = math.radians(PLATE_TURN)      # drawn turned like the plate page: plate 12 o'clock up, S0 arrow clockwise
-
-    def P(p):
-        dx, dy = p[0] - g.CX, p[1] - g.CY
-        return (g.CX + dx * math.cos(turn) + dy * math.sin(turn) + ox,
-                g.CY - dx * math.sin(turn) + dy * math.cos(turn) + oy)
-
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Shield deck drill template - 146 mm disc - PRINT AT 100% (Actual size)")
-    c.setFont("Helvetica", 9)
-    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                 "Viewed from the TOP (electronics side). Tape to the board, centre-punch each crosshair, then drill.")
-    scale_bar(c, 15, PAGE_H / mm - 32)
-
-    cx, cy = P((g.CX, g.CY))
-    c.setLineWidth(0.8)
-    c.circle(cx * mm, cy * mm, g.R * mm)                     # cut line
-    c.setLineWidth(0.3)
-    crosshair(c, cx, cy, 4)
-
-    # reflector faces (copper side on this line, facing out)
-    c.setDash(3, 2)
-    tri = [P(g.pol(g.CIRCUMRADIUS, v)) for v in g.VERTICES]
-    path = c.beginPath()
-    path.moveTo(tri[0][0] * mm, tri[0][1] * mm)
-    for x, y in tri[1:]:
-        path.lineTo(x * mm, y * mm)
-    path.close()
-    c.drawPath(path)
-    # M4 nuts under the deck, flush in the core corners (two flats on the faces' inner sides)
-    hr = g.NUT_AF / math.sqrt(3)
-    for d, x, y, lab in g.holes:
-        if lab == "M4 mount":
-            hexa = [P((x + hr * math.sin(math.radians(a)), y + hr * math.cos(math.radians(a))))
-                    for a in range(30, 390, 60)]
-            path = c.beginPath()
-            path.moveTo(hexa[0][0] * mm, hexa[0][1] * mm)
-            for hx, hy in hexa[1:]:
-                path.lineTo(hx * mm, hy * mm)
-            path.close()
-            c.drawPath(path)
-    c.setDash()
-
-    letters ={"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
-    for d, x, y, lab in g.holes:
-        if lab == "via":
-            continue
-        px, py = P((x, y))
-        c.setLineWidth(0.5)
-        c.circle(px * mm, py * mm, d / 2 * mm)
-        c.setLineWidth(0.2)
-        crosshair(c, px, py, d / 2)
-        if lab == "core feed":     # centre hole: the disc's centre crosshair marks it
-            c.setFont("Helvetica-Bold", 7)
-            c.drawString((px + d / 2 + 2) * mm, (py + 2) * mm, f"core {d:g}")
-            continue
-        tag = "M4" if lab == "M4 mount" else letters[lab.split(" ", 1)[1]]
-        # label just below each hole; patch holes sit close to the face line, so label them on the outer side
-        c.setFont("Helvetica-Bold", 7)
-        if tag == "P2":            # along the face toward the centre P hole, clear of the rim
-            s = g.SECTORS[int(lab[1])]
-            lx, ly = P(g.face_pt(s, g.PATCH_OFFSET, g.FACE_WIDTH / 2 - g.PATCH_END_INSET - 10))
-            c.drawCentredString(lx * mm, (ly - 1) * mm, f"{tag} {d:g}")
-        elif tag == "P" and px < cx - 1:
-            c.drawRightString((px - d / 2 - 3) * mm, (py - 1) * mm, f"{tag} {d:g}")
-        elif tag == "P":
-            c.drawString((px + d / 2 + 3) * mm, (py - 1) * mm, f"{tag} {d:g}")
-        elif py < cy - g.R + 20:   # near the bottom of the disc: beside the hole, clear of the rim
-            c.drawRightString((px - d / 2 - 3) * mm, (py - 1) * mm, f"{tag} {d:g}")
-        else:
-            c.drawCentredString(px * mm, (py - d / 2 - 5) * mm, f"{tag} {d:g}")
-
-    # pipe layout only: 2-1/4" hole saw at the centre for the pipe and its adapter (removes the C holes)
-    c.saveState()
-    c.setStrokeColorRGB(0.0, 0.35, 0.8)
-    c.setFillColorRGB(0.0, 0.35, 0.8)
-    c.setLineWidth(0.6)
-    c.setDash(4, 2)
-    c.circle(cx * mm, cy * mm, PIPE_SAW / 2 * mm)
-    c.setDash()
-    c.setFont("Helvetica-Bold", 6.5)
-    c.drawCentredString(cx * mm, (cy + PIPE_SAW / 2 + 2) * mm, "PIPE LAYOUT ONLY: 2-1/4\" hole saw")
-    c.restoreState()
-
-    for i, s in enumerate(g.SECTORS):
-        lx, ly = P(g.pol(57, s + 20))
-        c.setFont("Helvetica-Bold", 11)
-        c.drawCentredString(lx * mm, ly * mm, f"S{i}")
-    arrow = [P((g.CX + dx, g.CY + 52 + dy)) for dx, dy in ((-3, -3), (0, 3), (3, -3))]   # S0 arrow, turned
-    c.setLineWidth(0.6)
-    for (x0, y0), (x1, y1) in zip(arrow, arrow[1:]):
-        c.line(x0 * mm, y0 * mm, x1 * mm, y1 * mm)
-
-    c.setFont("Helvetica", 8.5)
-    lines = [
-        "Solid circle = cut line (146 mm).  Dashed triangle = where the 120 mm back panels stand, copper side out.",
-        f"D 6.5 mm = rubber duck / monopole / dipole whip ({g.DUCK_SPACING:g} mm in front of face)    "
-        f"P / P2 6.5 mm = patch ({g.PATCH_OFFSET:g} mm in front of face; P2 {g.FACE_WIDTH / 2 - g.PATCH_END_INSET:g} mm off centre)",
-        f"C 10 mm = dipole coax pass-through (inside core)    M4 {g.HOLE_M4:g} mm = bolts to the plate, nut flush in each core corner",
-        "Core 10 mm at the centre = antenna coax into the core; open it up with a hole saw (centre mark) if needed.",
-        f"Blue dashed {PIPE_SAW:.1f} mm (2-1/4\" hole saw) = pipe layout only (page 2): the pipe passes into the core;",
-        "it removes the C holes. Other layouts keep the 10 mm core hole. EU: a 57 mm hole saw is the same size.",
-        "Arrow points to Sector 0. Holes are symmetric, so the template also works flipped (labels read mirrored).",
-        f"Drawn the same way round as the plates: plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it.",
-    ]
-    for n, t in enumerate(lines):
-        c.drawString(15 * mm, (62 - n * 4.4) * mm, t)
-
-
-def face_page(c):
-    x0 = PAGE_W / mm / 2 - g.FACE_WIDTH / 2
-    top = PAGE_H / mm - 45
-    xc = x0 + g.FACE_WIDTH / 2
-
-    def Y(d):                      # mm below the top (deck) edge -> page y
-        return top - d
-
-    c.setFont("Helvetica-Bold", 13)
-    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, f"Back panel (reflector face) template - {g.FACE_WIDTH:g} x {FACE_H:g} mm - PRINT AT 100%")
-    c.setFont("Helvetica", 9)
-    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                 "Make 3. Viewed from the FRONT (copper side, facing the antenna). Top edge goes against the shield deck.")
-    scale_bar(c, 15, PAGE_H / mm - 32)
-
-    c.setLineWidth(0.8)
-    c.rect(x0 * mm, Y(FACE_H) * mm, g.FACE_WIDTH * mm, FACE_H * mm)   # cut line
-    c.setLineWidth(0.2)
-    c.setDash(1, 2)
-    c.line(xc * mm, Y(0) * mm, xc * mm, Y(FACE_H) * mm)               # centre line
-    c.setDash()
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(xc * mm, (Y(0) + 2) * mm, "TOP - against shield deck")
-
-    # dipole feed hole at the face centre
-    c.setLineWidth(0.5)
-    c.circle(xc * mm, Y(FACE_H / 2) * mm, DIPOLE_HOLE / 2 * mm)
-    crosshair(c, xc, Y(FACE_H / 2), DIPOLE_HOLE / 2)
-    c.setFont("Helvetica", 7)
-
-    # where the deck's patch jacks sit, 7 mm in front of this face: P over the centre, P2 to the right
-    c.setLineWidth(0.4)
-    c.setFont("Helvetica", 6.5)
-    for jx, name in ((0, "P"), (g.FACE_WIDTH / 2 - g.PATCH_END_INSET, "P2")):
-        c.line((xc + jx) * mm, Y(0) * mm, (xc + jx) * mm, Y(4) * mm)
-        c.drawString((xc + jx + 1) * mm, Y(4) * mm, f"{name} jack above")
-
-    # printed-dipole panel board, centred across the face, at test positions A (bar vertical, notch right)
-    # and C (bar horizontal, notch up), with their post holes
-    c.setLineWidth(0.3)
-    c.setDash(3, 2)
-    c.rect((xc - BOARD_W / 2) * mm, Y(BOARD_CY + BOARD_H / 2) * mm, BOARD_W * mm, BOARD_H * mm)
-    c.setDash()
-    holes = {(xc - POST_SHIFT + sx, BOARD_CY + sy) for sx in (-POST_X / 2, POST_X / 2)
-             for sy in (-POST_Y / 2, POST_Y / 2)}
-    yc = BOARD_CY_C
-    c.setLineWidth(0.3)
-    c.setStrokeGray(0.55)
-    c.rect((xc - BOARD_H / 2) * mm, Y(yc + BOARD_W / 2) * mm, BOARD_H * mm, BOARD_W * mm)
-    c.setStrokeGray(0)
-    holes.update((xc + sx, yc + POST_SHIFT + sy) for sx in (-POST_Y / 2, POST_Y / 2)
-                 for sy in (-POST_X / 2, POST_X / 2))
-    c.setLineWidth(0.5)
-    for hx, hy in holes:
-        c.circle(hx * mm, Y(hy) * mm, POST_HOLE / 2 * mm)
-        crosshair(c, hx, Y(hy), POST_HOLE / 2)
-    c.drawCentredString(xc * mm, (Y(BOARD_CY - BOARD_H / 2) + 5.5) * mm,
-                        f"{len(holes)} x {POST_HOLE:g} mm post holes - check against your board first.")
-    c.drawCentredString(xc * mm, (Y(BOARD_CY - BOARD_H / 2) + 2) * mm,
-                        "Holes under 10 mm don't affect the reflector.")
-
-    def callout(tx, ty, lines, px, py, right=True):
-        """Note at (tx, ty) page mm, top line first, with a leader to the point (px, py)."""
-        c.setFont("Helvetica", 7)
-        for n, t in enumerate(lines):
-            (c.drawString if right else c.drawRightString)(tx * mm, (ty - n * 3.4) * mm, t)
-        c.setLineWidth(0.25)
-        c.line(((tx - 1) if right else (tx + 1)) * mm, (ty + 1) * mm, px * mm, py * mm)
-        c.circle(px * mm, py * mm, 0.5 * mm, fill=1)
-
-    xr = x0 + g.FACE_WIDTH + 4                 # right of the face
-    xl = x0 - 4                                # left of the face
-    callout(xr, Y(BOARD_CY - BOARD_H / 2 + 4), [
-        f"A (dashed): panel board {BOARD_W:g} x {BOARD_H:g} mm,",
-        "bar vertical, notch right,",
-        f"{BOARD_CY - BOARD_H / 2:g}-{BOARD_CY + BOARD_H / 2:g} mm down.",
-        "Its stalk reaches the P2 deck jack."], xc + BOARD_W / 2, Y(BOARD_CY - BOARD_H / 2 + 4))
-    callout(xr, Y(76), [
-        "C (grey): same board turned,",
-        "bar horizontal, notch up,",
-        f"{yc - BOARD_W / 2:g}-{yc + BOARD_W / 2:g} mm down.",
-        "Its coax reaches P2 too."], xc + BOARD_H / 2, Y(76))
-    callout(xr, Y(101), [
-        f"Either way the board stands",
-        f"{BOARD_GAP:g} mm off this face: M2 nylon",
-        "screws + standoffs in the posts."], xc + POST_Y / 2, Y(yc + POST_SHIFT + POST_X / 2))
-    callout(xl, Y(FACE_H / 2) + 14, [
-        f"Centre {DIPOLE_HOLE:g} mm hole:",
-        "DIY dipole",
-        "RP-SMA only."], xc - DIPOLE_HOLE / 2, Y(FACE_H / 2), right=False)
-    callout(xl, Y(8), [
-        "Side edges: each",
-        "meets the next panel",
-        "at 120 deg to form",
-        "the triangle; solder",
-        "or tape the seam."], x0, Y(14), right=False)
-
-    # dimensions
-    c.setFont("Helvetica", 8)
-    c.drawCentredString(xc * mm, (Y(FACE_H) - 6) * mm, f"{g.FACE_WIDTH:g} mm")
-    c.drawString((x0 + g.FACE_WIDTH + 4) * mm, (Y(FACE_H) + 2) * mm, f"{FACE_H:g} mm tall, centre at {FACE_H / 2:g} mm")
-
-    c.setFont("Helvetica", 8.5)                 # only notes about things not drawn on this page
-    c.drawString(15 * mm, (Y(FACE_H) - 16) * mm,
-                 "Whips (rubber duck / monopole / dipole) don't mount on this face: they hang on the deck's D holes,")
-    c.drawString(15 * mm, (Y(FACE_H) - 20.5) * mm, f"{g.DUCK_SPACING:g} mm in front of it (page 1).")
 
 
 def pigtail_x():
@@ -2046,20 +1828,208 @@ DIM_INK = (0.1, 0.35, 0.7)
 COPPER_INK = (0.72, 0.42, 0.15)
 
 
+def _poly(c, pts, close=True):
+    path = c.beginPath()
+    path.moveTo(pts[0][0] * mm, pts[0][1] * mm)
+    for x, y in pts[1:]:
+        path.lineTo(x * mm, y * mm)
+    if close:
+        path.close()
+    c.drawPath(path)
+
+
+def deck_page_for(spacing):
+    """Deck drill template for one duck spacing, from layout.py: the same holes and outline as the PCB deck of
+    that spacing (pcb/out/deck_d<spacing>), plus where the parts go if the electronics sit on the deck."""
+    L = layout.Layout(spacing)
+
+    def page(c):
+        cx, cy = PAGE_W / mm / 2, 140.0               # deck centre on the page
+
+        def Q(x, y):
+            return cx + x, cy + y
+
+        def F(t, u, v):                                # corner / sector frame -> page
+            return Q(*layout.xy(t, u, v))
+
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
+                     f"Deck drill template - {spacing:g} mm ducks - {L.deck_d:g} mm disc - PRINT AT 100% (Actual size)")
+        c.setFont("Helvetica", 9)
+        c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                     "Viewed from the TOP (electronics side), S0 up. Tape to the board, centre-punch each crosshair, "
+                     "then drill. Same layout as the PCB deck.")
+        scale_bar(c, 15, PAGE_H / mm - 32)
+
+        c.setLineWidth(0.8)
+        c.circle(cx * mm, cy * mm, L.deck_r * mm)                       # cut line
+        c.setLineWidth(0.5)
+        c.circle(cx * mm, cy * mm, L.pipe_d / 2 * mm)                   # pipe hole
+        c.setLineWidth(0.2)
+        crosshair(c, cx, cy, L.pipe_d / 2)
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawCentredString(cx * mm, (cy - L.pipe_d / 2 - 3.5) * mm, f"pipe {L.pipe_d:g} (7/8 in)")
+
+        # faces: copper side out on this line (butt joints, solder or copper tape along it)
+        c.saveState()
+        c.setStrokeColorRGB(*COPPER_INK)
+        c.setLineWidth(1.0)
+        _poly(c, [Q(*layout.pol(L.r_c, v)) for v in layout.VERTICES])
+        # core limit: on-deck parts and wiring stay inside it (1 mm clear of the seam)
+        c.setLineWidth(0.3)
+        c.setDash(1, 1.5)
+        _poly(c, [Q(*layout.pol(2 * L.core_lim, v)) for v in layout.VERTICES])
+        c.restoreState()
+
+        # antenna holes
+        for kind, i, x, y in L.holes():
+            px, py = Q(x, y)
+            c.setLineWidth(0.5)
+            c.circle(px * mm, py * mm, HOLE_RPSMA / 2 * mm)
+            c.setLineWidth(0.2)
+            crosshair(c, px, py, HOLE_RPSMA / 2)
+            c.setFont("Helvetica-Bold", 7)
+            s = layout.SECTORS[i]
+            lx, ly = F(s, -9.0 if kind != "P2" else 0.0, (L.r_D if kind == "D" else L.r_P) + (9.0 if kind == "P2" else 0))
+            c.drawCentredString(lx * mm, (ly - 1) * mm, kind)
+        for i, s in enumerate(layout.SECTORS):
+            lx, ly = F(s, 10.5, L.r_P)
+            c.setFont("Helvetica-Bold", 11)
+            c.drawCentredString(lx * mm, (ly - 1.5) * mm, f"S{i}")
+        # M3 registration holes, washer keep-out dashed
+        for x, y in L.m3():
+            px, py = Q(x, y)
+            c.setLineWidth(0.5)
+            c.circle(px * mm, py * mm, COLLAR_HOLE / 2 * mm)
+            c.setLineWidth(0.2)
+            crosshair(c, px, py, COLLAR_HOLE / 2)
+            c.setDash(1.5, 1.5)
+            c.circle(px * mm, py * mm, M3_KEEPOUT / 2 * mm)
+            c.setDash()
+            c.setFont("Helvetica-Bold", 6)
+            c.drawCentredString(px * mm, (py + M3_KEEPOUT / 2 + 1) * mm, f"M3 {COLLAR_HOLE:g}")
+
+        # on-deck electronics (grey, not drilled): XIAOs, USB-C plug paths, tie squares, J1 / J2
+        c.saveState()
+        c.setStrokeGray(0.45)
+        c.setFillGray(0.45)
+        c.setLineWidth(0.3)
+        hl, hw = XIAO_L / 2, XIAO_W / 2
+        for k, t in enumerate(layout.VERTICES):
+            _poly(c, [F(t, u, v) for u, v in ((-hw, L.xiao_v - hl), (hw, L.xiao_v - hl), (hw, L.xiao_v + hl),
+                                                 (-hw, L.xiao_v + hl))])
+            c.setDash(2, 1.5)
+            _poly(c, [F(t, u, v) for u, v in ((-6.5, L.xiao_v + hl), (6.5, L.xiao_v + hl), (6.5, 70.0),
+                                                 (-6.5, 70.0))])
+            c.setDash()
+            ip = F(t, *L.ipex)
+            c.circle(ip[0] * mm, ip[1] * mm, 1.3 * mm)
+            _, tc, _, sq = L.tie(t)
+            _poly(c, [F(t, *q) for q in sq])
+            tx, ty = F(t, *tc)
+            c.setFont("Helvetica", 5)
+            c.drawCentredString(tx * mm, (ty - 0.8) * mm, "TIE")
+            lx, ly = F(t, 0, L.xiao_v)
+            c.setFont("Helvetica-Bold", 6)
+            c.drawCentredString(lx * mm, (ly - 1) * mm, ("U2 HEAD", "U3", "U4")[k])
+        for (r, a), lab in ((L.j1, "J1"), (L.j2, "J2")):
+            n = 4 if lab == "J1" else 2
+            w = 2 * (n - 1) + 3.9
+            _poly(c, [F(a, u, v) for u, v in ((-w / 2, r - 1.7), (w / 2, r - 1.7), (w / 2, r + 2.8), (-w / 2, r + 2.8))])
+            lx, ly = F(a, 0, r + 4.8)
+            c.setFont("Helvetica-Bold", 5.5)
+            c.drawCentredString(lx * mm, (ly - 0.8) * mm, lab)
+        c.restoreState()
+        arrow = [Q(dx, L.r_D + 9.5 + dy) for dx, dy in ((-3, -3), (0, 3), (3, -3))]
+        c.setLineWidth(0.6)
+        for (x0, y0), (x1, y1) in zip(arrow, arrow[1:]):
+            c.line(x0 * mm, y0 * mm, x1 * mm, y1 * mm)
+
+        c.setFont("Helvetica", 8.5)
+        lines = [
+            f"Solid circle = cut line ({L.deck_d:g} mm). Copper triangle = the faces' outer (copper) surface: stand each "
+            f"{FACE_WIDTH:g} x {FACE_H:g} mm face",
+            "on its line, copper out, butt the corners together and solder or copper-tape the seams.",
+            f"D / P / P2 {HOLE_RPSMA:g} mm = RP-SMA antenna jacks, one antenna per sector: D = duck {spacing:g} mm in "
+            f"front of the face, P / P2 = patch",
+            f"{PATCH_OFFSET:g} mm in front (P2 {L.s_P2:g} mm along the face).  Centre {L.pipe_d:g} mm = the pipe "
+            f"(1/2 in PVC adapter).",
+            f"M3 {COLLAR_HOLE:g} mm x3 = registration to the collar (dashed: {M3_KEEPOUT:g} mm washer keep-out); with "
+            "the acrylic plate, its spacers go here.",
+            "Grey = where the parts go with the electronics ON the deck (as on the PCB): XIAOs on the corner axes, "
+            "USB-C out (dashed",
+            "= plug path), antenna strain relief tie squares, J1 / J2. Insulate the deck under them (Kapton). Dotted "
+            "triangle = keep parts",
+            "and wiring inside it (1 mm clear of the seams). Every number: layout.py / parameters.csv (formulas page).",
+        ]
+        for n, t in enumerate(lines):
+            c.drawString(15 * mm, (54 - n * 4.4) * mm, t)
+
+    page.__name__ = f"deck_d{spacing:g}_page"
+    return page
+
+
+DECK_PAGES = [deck_page_for(s) for s in layout.VARIANTS]
+
+
+def face_page(c):
+    L0 = layout.Layout(layout.VARIANTS[0])
+    x0 = PAGE_W / mm / 2 - FACE_WIDTH / 2
+    top = PAGE_H / mm - 45
+    xc = x0 + FACE_WIDTH / 2
+
+    def Y(d):                      # mm below the top (deck) edge -> page y
+        return top - d
+
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
+                 f"Face (reflector) template - {FACE_WIDTH:g} x {FACE_H:g} mm - PRINT AT 100%")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                 "Make 3 from copper-clad board. Viewed from the FRONT (copper side, facing the antenna). "
+                 "No holes. Top edge goes against the deck.")
+    scale_bar(c, 15, PAGE_H / mm - 32)
+
+    c.setLineWidth(0.8)
+    c.rect(x0 * mm, Y(FACE_H) * mm, FACE_WIDTH * mm, FACE_H * mm)   # cut line
+    c.setLineWidth(0.2)
+    c.setDash(1, 2)
+    c.line(xc * mm, Y(0) * mm, xc * mm, Y(FACE_H) * mm)               # centre line
+    c.setDash()
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(xc * mm, (Y(0) + 2) * mm, "TOP - against the deck")
+    # where the deck's antenna jacks sit in front of this face: P (and D) over the centre, P2 toward one end
+    c.setLineWidth(0.4)
+    c.setFont("Helvetica", 6.5)
+    for jx, name in ((0, "D / P jacks above"), (L0.s_P2, "P2 jack above")):
+        c.line((xc + jx) * mm, Y(0) * mm, (xc + jx) * mm, Y(4) * mm)
+        c.drawString((xc + jx + 1) * mm, Y(4) * mm, name)
+    c.setFont("Helvetica", 8)
+    c.drawCentredString(xc * mm, (Y(FACE_H) - 6) * mm, f"{FACE_WIDTH:g} mm")
+    c.drawString((x0 + FACE_WIDTH + 4) * mm, (Y(FACE_H / 2)) * mm, f"{FACE_H:g} mm")
+
+    c.setFont("Helvetica", 8.5)
+    lines = [
+        "Plain butt joints: the three faces stand on the deck's copper triangle, corners touching, and are soldered or",
+        "copper-taped along each seam (inside, outside or both; tack-solder tape every 10-15 mm). The PCB faces have",
+        "tabs; this cut-by-hand face doesn't need them, the finished triangle is the same.",
+        f"Whips hang on the deck's D holes in front of the face (page 1 / 2); P / P2 hold a patch {PATCH_OFFSET:g} mm "
+        "in front of it.",
+        "Holes in the face are not needed: the face-centre dipole was dropped (2026-11-23).",
+    ]
+    for n, t in enumerate(lines):
+        c.drawString(15 * mm, (Y(FACE_H) - 16 - n * 4.4) * mm, t)
+
+
 def formulas_page(c):
-    """Reference page: how the monopole (D) holes, the triangle core and the baseplate (shield deck) are sized.
-    Every number is worked out from parameters.csv, so the page follows any change there."""
+    """Reference page: every derived dimension, printed from layout.py (the code the PCBs and templates use), for
+    each duck spacing, plus a top view with the main ones dimensioned."""
+    Ls = [layout.Layout(s) for s in layout.VARIANTS]
+    L = Ls[0]
     k = FORMULA_SCALE
     lam = LIGHT_MM_PER_NS / (RF_FREQ / 1000)
-    a, rin, rc, R = g.FACE_WIDTH, g.INRADIUS, g.CIRCUMRADIUS, g.R
-    d, p, t = g.DUCK_SPACING, g.PATCH_OFFSET, g.FACE_THICK
-    rD, rP = rin + d, rin + p
-    s2 = a / 2 - g.PATCH_END_INSET
-    rP2, aP2 = math.hypot(rP, s2), math.degrees(math.atan2(s2, rP))
-    rM = g.MOUNT_RADIUS
 
     def dim(p0, p1, text, dx=0.0, dy=0.0, anchor="c", size=6.5):
-        """Dimension line between two page points (pt), end ticks, label at the middle shifted by (dx, dy) mm."""
         c.saveState()
         c.setStrokeColorRGB(*DIM_INK)
         c.setFillColorRGB(*DIM_INK)
@@ -2075,48 +2045,36 @@ def formulas_page(c):
         {"c": c.drawCentredString, "l": c.drawString, "r": c.drawRightString}[anchor](mx, my, text)
         c.restoreState()
 
-    def table(x, y, title, items, w=88):
-        """Rows of (formula, result[, note]): formula left, result right at x + w, note in grey below."""
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(x * mm, y * mm, title)
-        y -= 5
-        for it in items:
-            c.setFont("Helvetica", 7.5)
-            c.drawString(x * mm, y * mm, it[0])
-            c.setFont("Helvetica-Bold", 7.5)
-            c.drawRightString((x + w) * mm, y * mm, it[1])
-            y -= 3.4
-            if len(it) > 2:
-                c.setFont("Helvetica", 6.3)
-                c.setFillGray(0.4)
-                for line in it[2].split("\n"):
-                    c.drawString((x + 3) * mm, y * mm, line)
-                    y -= 3.0
-                c.setFillGray(0)
-            y -= 0.9
-        return y
-
     c.setFont("Helvetica-Bold", 13)
-    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Design formulas - monopoles, triangle, baseplate (NOT a template, not to size)")
-    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Design formulas (NOT a template, not to size)")
+    c.setFont("Helvetica", 8.5)
     c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                 "Worked from parameters.csv: change a value there and re-run make_templates.py, and every number here follows.")
+                 "Printed from shield_deck/layout.py, the same code that places the PCB deck and these templates: each "
+                 "value is computed once, next to its formula.")
+    c.drawString(15 * mm, (PAGE_H / mm - 25.5) * mm,
+                 "Change parameters.csv, re-run make_templates.py and pcb/make_pcbs.py, and both builds follow. "
+                 "Names in capitals are parameters.csv rows.")
 
-    # ---- top view of the baseplate (shield deck) and the triangle core, deck frame: S0 up ----
-    tx, ty = 62.0, 180.0
+    # ---- top view, first variant, S0 up
+    tx, ty = 52.0, 195.0
 
     def T(r, deg):
         q = math.radians(deg)
         return (tx + r * k * math.sin(q)) * mm, (ty + r * k * math.cos(q)) * mm
 
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(tx * mm, (ty + R * k + 5) * mm, f"TOP VIEW: baseplate (shield deck) + triangle core, S0 up, scale {k:g}")
-    c.setLineWidth(0.8)
-    c.circle(tx * mm, ty * mm, R * k * mm)
+    def TF(t, u, v):
+        x, y = layout.xy(t, u, v)
+        return (tx + x * k) * mm, (ty + y * k) * mm
+
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawCentredString(tx * mm, (ty + L.deck_r * k + 4) * mm, f"TOP VIEW, {L.spacing:g} mm ducks, S0 up, scale {k:g}")
+    c.setLineWidth(0.6)
+    c.circle(tx * mm, ty * mm, L.deck_r * k * mm)
+    c.circle(tx * mm, ty * mm, L.pipe_d / 2 * k * mm)
     c.saveState()
     c.setStrokeColorRGB(*COPPER_INK)
-    c.setLineWidth(1.2)
-    tri = [T(rc, v) for v in g.VERTICES]
+    c.setLineWidth(1.0)
+    tri = [T(L.r_c, v) for v in layout.VERTICES]
     path = c.beginPath()
     path.moveTo(*tri[0])
     for q in tri[1:]:
@@ -2125,119 +2083,121 @@ def formulas_page(c):
     c.drawPath(path)
     c.restoreState()
     c.setLineWidth(0.4)
-    for hd, x, y, lab in g.holes:
-        if lab != "via":
-            c.circle((tx + (x - g.CX) * k) * mm, (ty + (y - g.CY) * k) * mm, hd / 2 * k * mm)
+    for kind, i, x, y in L.holes():
+        c.circle((tx + x * k) * mm, (ty + y * k) * mm, HOLE_RPSMA / 2 * k * mm)
+    for x, y in L.m3():
+        c.circle((tx + x * k) * mm, (ty + y * k) * mm, COLLAR_HOLE / 2 * k * mm)
+    hl, hw = XIAO_L / 2, XIAO_W / 2
+    c.setStrokeGray(0.45)
+    for t in layout.VERTICES:
+        pts = [TF(t, u, v) for u, v in ((-hw, L.xiao_v - hl), (hw, L.xiao_v - hl), (hw, L.xiao_v + hl),
+                                         (-hw, L.xiao_v + hl))]
+        path = c.beginPath()
+        path.moveTo(*pts[0])
+        for q in pts[1:]:
+            path.lineTo(*q)
+        path.close()
+        c.drawPath(path)
+        _, tc, _, sq = L.tie(t)
+        pts = [TF(t, *q) for q in sq]
+        path = c.beginPath()
+        path.moveTo(*pts[0])
+        for q in pts[1:]:
+            path.lineTo(*q)
+        path.close()
+        c.drawPath(path)
+    c.setStrokeGray(0)
+    dim(T(0, 0), T(L.r_in, 0), "r_in", dx=-1.2, anchor="r")
+    dim(T(L.r_in, 0), T(L.r_D, 0), "d", dx=-1.2, anchor="r")
+    dim(T(0, 60), T(L.r_c, 60), "R_c", dx=1.2, dy=-2.5, anchor="l")
+    dim(T(0, 270), T(L.deck_r, 270), "R", dy=1.2)
+    dim(T(0, 120), T(L.r_P, 120), "r_P", dx=3.0, dy=-2.5, anchor="l")
+    dim(T(0, L.m3_angles[0]), T(L.m3_r, L.m3_angles[0]), "r_M3", dx=-1.0, dy=1.0, anchor="r")
+    dim(T(0, 180), TF(180, 0, L.xiao_v), "v_X", dx=1.2, anchor="l")
+    dim(T(L.r_P, 0), T(L.r_P2, -L.a_P2), "s", dy=1.5)
     c.setFont("Helvetica", 6)
-    for i, s in enumerate(g.SECTORS):
-        c.drawCentredString(*(v - 1.0 * mm for v in T(rD + 10, s)), f"D S{i}")
-    c.drawString(*(v + 1.5 * mm for v in T(rP2, -aP2)), "P2")
-
-    dim(T(0, 0), T(rin, 0), "r_in", dx=-1.2, anchor="r")                       # centre -> S0 face
-    dim(T(rin, 0), T(rD, 0), "d", dx=-1.2, anchor="r")                          # face -> D hole
-    dim(T(0, 60), T(rc, 60), "R_c", dx=1.0, dy=1.0, anchor="l")                 # centre -> corner
-    dim(T(0, 270), T(R, 270), "R", dy=1.2)                                      # centre -> rim
-    dim(T(0, 180), T(rM, 180), "r_M4", dx=1.2, anchor="l")                      # centre -> M4 (corner)
-    dim(T(0, 120), T(rP, 120), "r_P", dx=3.0, dy=-2.5, anchor="l")              # centre -> P hole
-    dim(T(0, 240), T(g.COAX_PASS_RADIUS, 240), "r_C", dx=-3.5, dy=-3.0, anchor="r")
-    dim(T(rin, 0), T(math.hypot(rin, s2), -math.degrees(math.atan2(s2, rin))), "s", dy=1.5)   # along the face to P2
-    c.setFont("Helvetica", 6.3)
     c.setFillGray(0.35)
-    c.drawCentredString(tx * mm, (ty - R * k - 5) * mm,
-                        "Copper line = the triangle's outer (copper) faces.  Circles = deck holes.  Blue = the dimensions below.")
+    c.drawCentredString(tx * mm, (ty - L.deck_r * k - 5) * mm,
+                        "Copper = the faces' outer surface. Grey = XIAOs and tie squares. Blue = dimensions in the table.")
     c.setFillGray(0)
 
-    # ---- triangle + baseplate formulas, right column ----
-    x = 120
-    y = table(x, PAGE_H / mm - 42, "TRIANGLE CORE (3 back panels)", [
-        ("a = FACE_WIDTH (side of the triangle)", f"{a:g} mm"),
-        ("r_in = a / (2 x sqrt 3)", f"{rin:.2f} mm", "centre -> face (inradius)"),
-        ("R_c = a / sqrt 3 = 2 x r_in", f"{rc:.2f} mm", "centre -> corner (circumradius)"),
-        ("height of the triangle = a x sqrt 3 / 2 = 3 x r_in", f"{3 * rin:.1f} mm"),
-        ("back panel = a x h  (h = FACE_H), make 3", f"{a:g} x {FACE_H:g} mm", "panels meet at 60 deg inside / 120 deg between faces"),
-        ("inner face = r_in - t  (t = FACE_THICK)", f"{rin - t:.2f} mm"),
-        ("corner clearance = R - R_c", f"{R - rc:.1f} mm", "must stay > 0: the corners sit inside the deck rim"),
-        ("a / lambda (reflector width per sector)", f"{a / lam:.2f}", "about one wavelength wide"),
-    ])
-    y = table(x, y - 3, "BASEPLATE (shield deck)", [
-        ("R = DISC_DIAMETER / 2", f"{R:g} mm"),
-        ("D hole: r_D = r_in + d  at 0 / 120 / 240 deg", f"{rD:.2f} mm"),
-        ("D rim margin = R - r_D - HOLE_RPSMA / 2", f"{R - rD - g.HOLE_RPSMA / 2:.1f} mm"),
-        ("P hole: r_P = r_in + p  (p = PATCH_OFFSET)", f"{rP:.2f} mm"),
-        ("P2: s = a / 2 - PATCH_END_INSET (along the face)", f"{s2:g} mm"),
-        ("P2: r = sqrt(r_P^2 + s^2), turned atan(s / r_P) CCW", f"{rP2:.2f} mm, {aP2:.1f} deg"),
-        ("C hole: r_C = COAX_PASS_RADIUS (inside the core)", f"{g.COAX_PASS_RADIUS:g} mm"),
-        ("M4: r_M4 = 2 x (r_in - t - NUT_AF / 2 - NUT_GAP)", f"{rM:.2f} mm",
-         "at the corners (60 / 180 / 300 deg): a hex nut in a 60 deg corner sits\n"
-         "twice its flat-to-face distance from the corner, two flats on the faces"),
-        ("stitch vias: STITCH_COUNT on STITCH_RADIUS", f"{g.STITCH_COUNT} on {g.STITCH_RADIUS:g} mm"),
-    ])
-
-    # ---- side view through the S0 axis: the monopole on its D hole in front of the S0 face ----
-    sx, sy = 62.0, 108.0                                     # page mm of the deck centre, underside
-    k = FORMULA_SCALE * 0.8                                  # side view drawn smaller to fit the page
-    L = lam / 4
-    base = 6.0                                               # drawn RP-SMA body below the deck (drawing only)
-
-    def S(xx, z):
-        return (sx + xx * k) * mm, (sy + z * k) * mm
-
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(sx * mm, (sy + 6) * mm, f"SIDE VIEW: cut through the S0 axis, deck on top, scale {k:g}")
-    c.setFillGray(0.6)
-    c.rect(*S(-R, 0), 2 * R * k * mm, max(t * k, 0.8) * mm, fill=1, stroke=0)
-    c.setFillGray(0)
-    c.saveState()
-    c.setStrokeColorRGB(*COPPER_INK)
-    c.setLineWidth(1.4)
-    c.line(*S(rin, 0), *S(rin, -FACE_H))                    # S0 face, copper side out
-    c.setLineWidth(0.5)
-    c.setDash(2, 1.5)
-    c.line(*S(-rc, 0), *S(-rc, -FACE_H))                    # back corner where S1 and S2 meet
-    c.line(*S(-rc, -FACE_H), *S(rin, -FACE_H))
-    c.restoreState()
-    c.setLineWidth(0.4)
-    c.rect(*S(rD - g.HOLE_RPSMA / 2, -base), g.HOLE_RPSMA * k * mm, base * k * mm)
-    c.setLineWidth(1.2)
-    c.line(*S(rD, -base), *S(rD, -base - L))                # quarter-wave radiator
-    c.setLineWidth(0.3)
-    c.setDash(1, 1.5)
-    c.line(*S(rD, -base - L), *S(rD, -base - L - 10))
-    c.setDash()
-    c.setFont("Helvetica", 6)
-    c.drawRightString(*S(rD - g.HOLE_RPSMA / 2 - 1.5, -base + 1), "RP-SMA")
-    c.drawCentredString(*S((rin - rc) / 2, -FACE_H / 2), "inside the core")
-    c.drawCentredString(*S((rin - rc) / 2, -FACE_H / 2 - 5), "(S1 / S2 faces meet at the back)")
-    dim(S(rin, -base - L - 10), S(rD, -base - L - 10), "d", dy=-3)
-    dim(S(rD + 6, -base), S(rD + 6, -base - L), "L", dx=1.0, anchor="l")
-    dim(S(rin - 6, 0), S(rin - 6, -FACE_H), "h", dx=-1.0, anchor="r")
-    dim(S(-rc, -FACE_H - 8), S(rin, -FACE_H - 8), "R_c + r_in", dy=-3)
-    c.setFont("Helvetica", 6.3)
+    # ---- table: formula, value per variant
+    x, y = 104.0, PAGE_H / mm - 44
+    cols = [x + 86 + 16 * j for j in range(len(Ls))]
+    c.setFont("Helvetica-Bold", 7)
+    for j, Lv in enumerate(Ls):
+        c.drawRightString(cols[j] * mm, y * mm, f"{Lv.spacing:g} mm")
+    y -= 4
+    section = None
+    for n, row in enumerate(L.rows):
+        sec, sym, formula, _, unit, note = row
+        vals = [Lv.rows[n][3] for Lv in Ls]
+        if sec != section:
+            section = sec
+            y -= 1.5
+            c.setFont("Helvetica-Bold", 8.5)
+            c.drawString(x * mm, y * mm, sec)
+            y -= 4
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(x * mm, y * mm, sym)
+        c.setFont("Helvetica", 7)
+        words, lines_, cur = ("= " + formula).split(" "), [], ""
+        for w_ in words:                       # wrap the formula to the column left of the values
+            if c.stringWidth(cur + " " + w_, "Helvetica", 7) > (cols[0] - 16 - x - 14) * mm and cur:
+                lines_.append(cur)
+                cur = "  " + w_
+            else:
+                cur = (cur + " " + w_).strip(" ") if cur else w_
+        lines_.append(cur)
+        c.setFont("Helvetica-Bold", 7)
+        for j, v in enumerate(vals):
+            c.drawRightString(cols[j] * mm, y * mm, f"{v:.2f}".rstrip("0").rstrip("."))
+        c.setFont("Helvetica", 7)
+        for line in lines_:
+            c.drawString((x + 14) * mm, y * mm, line)
+            y -= 3.1
+        y -= 0.2
+        if note:
+            c.setFont("Helvetica", 6)
+            c.setFillGray(0.4)
+            for line in note.split("\n"):
+                c.drawString((x + 16) * mm, y * mm, line)
+                y -= 2.9
+            c.setFillGray(0)
+        y -= 0.6
+    # ---- RF: spacing in wavelengths
+    y = min(y, 120) - 4
+    rows = [("f", "RF_FREQ (BLE band centre)", f"{RF_FREQ:g} MHz"),
+            ("lambda", "c / f", f"{lam:.1f} mm")]
+    rows += [("d / lambda", f"{Lv.spacing:g} mm ducks", f"{Lv.spacing / lam:.3f}") for Lv in Ls]
+    c.setFont("Helvetica-Bold", 8.5)
+    c.drawString(15 * mm, 112 * mm, "RF")
+    yy = 107
+    for sym, formula, val in rows:
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(15 * mm, yy * mm, sym)
+        c.setFont("Helvetica", 7)
+        c.drawString(33 * mm, yy * mm, "= " + formula)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawRightString(95 * mm, yy * mm, val)
+        yy -= 3.6
+    c.setFont("Helvetica", 6.5)
     c.setFillGray(0.35)
-    c.drawCentredString(sx * mm, (sy - (FACE_H + 8) * k - 9) * mm,
-                        "Whip drawn as a bare quarter-wave monopole; the deck is its ground plane, the face its reflector.")
+    for n, t in enumerate([
+            "The duck spacings come from simulation (rf_model/),",
+            "not from a quarter-wave rule: 15 mm gives the narrower",
+            "beam and the better bearing with the H50327 ducks;",
+            "31 mm (about lambda / 4) is the older spacing, kept as",
+            "the second deck size. Numbers: rf_model/README.md."]):
+        c.drawString(15 * mm, (yy - 2 - n * 3) * mm, t)
     c.setFillGray(0)
-
-    table(x, 118, "MONOPOLES (D holes)", [
-        ("f = RF_FREQ (BLE band centre)", f"{RF_FREQ:g} MHz"),
-        ("lambda = c / f", f"{lam:.1f} mm"),
-        ("d = lambda / 4  (whip -> copper face)", f"{lam / 4:.1f} mm",
-         f"DUCK_SPACING = {d:g} mm (d / lambda = {d / lam:.3f})"),
-        ("why: out and back 2d = lambda / 2 (180) + copper flip (180)", "360 deg",
-         "the reflected wave comes back in phase and adds to the forward wave"),
-        ("L = lambda / 4 (bare monopole over the deck)", f"{L:.1f} mm"),
-        ("rubber duck: lambda / 2 sleeve dipole element", f"~{lam / 2:.0f} mm"),
-        ("backed length = h = FACE_H below the deck", f"{FACE_H:g} mm",
-         "a whip longer than h hangs past the copper and loses some backing"),
-        ("D hole to the far corner = R_c + r_in + d", f"{rc + rD:.1f} mm"),
-    ])
     c.setFont("Helvetica", 7.5)
     c.drawString(15 * mm, 14 * mm,
-                 "Units: mm and degrees, clockwise from S0 (top view) unless marked CCW. Names in capitals are parameters.csv rows.")
+                 "Units: mm and degrees, clockwise from S0 (top view) unless marked. Values rounded to 0.01 mm.")
 
 
 BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-10): builders pick one, alt or pipe
-    deck_page: ("BOTH BUILDS", "pipe and no pipe (the 2-1/4\" hole-saw circle is pipe only)", (0.3, 0.3, 0.3)),
+    **{p: ("BOTH BUILDS", "pick the deck for your duck spacing", (0.3, 0.3, 0.3)) for p in DECK_PAGES},
     alt_plate_page: ("NO PIPE", "pick one: pipe or no pipe", (0.1, 0.35, 0.7)),
     fl_plate_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
     face_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
@@ -2283,7 +2243,7 @@ def main():
     # the LED direction ring option after the wiring it adds to (2026-11-16), then the unified power + LED board
     # option that can replace the bus and LED boards (2026-11-20), design formulas at the very end as a
     # reference page (2026-11-12)
-    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, uni_page,
+    pages = (*DECK_PAGES, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, uni_page,
              formulas_page)
     for n, page in enumerate(pages, 1):
         page(c)
