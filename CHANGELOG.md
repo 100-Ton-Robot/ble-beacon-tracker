@@ -124,6 +124,12 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 - Added (2026-11-12): `sector_model.py --spacing` and a D-hole spacing sweep (15-34 mm,
   `rf_model/out/h50327_c65_s*`, `out/bearing_spacing`): 31 mm is within 1 deg of the best;
   keep it.
+- Added (2026-11-23): mast size study. `sector_model.py` gains `--sectors N` (any N-sided core; every run
+  writes `meta.json`, which `bearing_sim.py` reads), `--set NAME=VALUE` (override any `parameters.csv` value
+  for one run) and `--fine`; the dipole feed depth defaults to the new `RF_FEED_DEPTH`. New `size_sweep.py`
+  sweeps sectors, face size, spacing, element and end plate with every dimension from `parameters.csv` (new
+  rows `RF_SECTORS`, `RF_FEED_DEPTH`, `DUCK_FEED_DEPTH`, `CHIP_STANDIN_LENGTH`; group `rf`). Results in
+  `rf_model/out/size*/` and `rf_model/README.md`.
 
 ### Shield deck
 

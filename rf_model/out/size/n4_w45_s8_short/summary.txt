@@ -1,0 +1,25 @@
+command: python3 sector_model.py --antenna dipole --sectors 4 --spacing 8 --centre 22.5 --length 20 --set FACE_WIDTH=45 --set FACE_H=45 --set DISC_DIAMETER=76 --out out/size/n4_w45_s8_short
+date: 2026-11-23 19:20 UTC
+deck: 76 mm disc, solid core
+4 sectors, faces 45 x 45 mm, overrides: FACE_WIDTH=45, FACE_H=45, DISC_DIAMETER=76
+antenna: dipole, element 20.0 mm, 8 mm in front of the face, feed 22 mm below the deck, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [49, 49, 34] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11   -0.0 dB  Zin    1.3 -521.2j ohm
+  2440 MHz  S11   -0.0 dB  Zin    1.4 -510.5j ohm
+  2480 MHz  S11   -0.0 dB  Zin    1.5 -499.5j ohm
+
+peak 5.1 dBi at az 0, el -10 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         5.0       0      115 deg       13.0 dB
+   -15         5.1       0      125 deg       14.7 dB
+   -30         4.5       0      145 deg       11.7 dB
+   -45         3.6       0      185 deg        8.3 dB
+   -60         2.5       0      225 deg        5.9 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -78.2 dB
+  S2: -82.7 dB
+  S3: -78.2 dB

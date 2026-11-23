@@ -37,10 +37,18 @@ On Linux with openEMS installed, `python3 sector_model.py ...` runs it directly.
 
 - `--antenna monopole`: a quarter-wave whip straight down from the D jack, the deck as its ground plane.
 - `--antenna dipole`: a rubber duck as a vertical half-wave dipole; `--centre` sets its feed point's depth below
-  the deck (default 45 mm).
+  the deck (default `RF_FEED_DEPTH`, 45 mm; the H50327 runs use `DUCK_FEED_DEPTH`, 65 mm).
 - `--spacing` moves the antennas in or out from the faces (default `DUCK_SPACING`, 31 mm: the D hole).
 - `--length` sets the element length (default 0.95 x a quarter or half wavelength at `RF_FREQ`).
-- `--single` leaves out the other two sectors' antennas.
+- `--single` leaves out the other sectors' antennas.
+- `--sectors N` builds an N-sided core with N sectors 360/N apart (default `RF_SECTORS`, 3).
+- `--set NAME=VALUE` overrides any `shield_deck/parameters.csv` value for this run only (repeatable), e.g.
+  `--set FACE_WIDTH=80 --set DISC_DIAMETER=125`. Every dimension the model uses comes from that file; the
+  logged command carries the overrides, so it reproduces the run.
+- `--end-plate` adds the end plate (`ENDPLATE_DIAMETER`) across the far end of the core.
+- `--fine` uses a finer mesh (0.5 mm at the antenna, lambda/32 elsewhere) for convergence checks.
+- Each run also writes `meta.json` (sectors, face size, deck and end plate, spacing, feed, overrides);
+  `bearing_sim.py` takes the sector count from it.
 - `--coarse` uses a coarser mesh for a quick check. On a 12-core PC the coarse run takes about 10 s and the full
   one about 20 s of solver time; the two agreed within about 0.5 dB on the monopole.
 
@@ -204,6 +212,73 @@ moved in and out with `--spacing`; 34 mm is as far out as a 6.5 mm hole fits on 
 - So keep the D hole at 31 mm for the first tests. If the deck is redone, 20-25 mm is a reasonable step in, after
   checking the real match there (NanoVNA or the RSSI walk). The reflector's shape (wider faces, wings) is still the
   bigger lever.
+
+## Mast size, sector count and end plate (2026-11-23)
+
+How small can the mast get, and do a fourth sector or an end plate help? `size_sweep.py` runs one
+`sector_model.py` per geometry with `--set` overrides (face size, deck, end plate), then scores it with the bearing
+simulation (default noise) and the back-level measure from `spec_sweep.py`. Each sweep writes `summary.txt` and
+`summary.csv` in its `out/size*/` folder.
+
+Every dimension comes from `shield_deck/parameters.csv`:
+
+- Deck: the rev 3 rule (`shield_deck/pcb/deck_size.py`) scaled to the core: the larger of the D hole's exposed
+  pad + `DECK_EDGE_MARGIN`, and the core's corners + the margin `DECK_MIN_DIAMETER` leaves past today's corners
+  (2.7 mm).
+- End plate: the core's corners + the margin `ENDPLATE_DIAMETER` leaves past today's corners (2.7 mm).
+- Elements: `h50327`, the reference duck fed `DUCK_FEED_DEPTH` (65 mm) below the deck; `short`, a
+  `CHIP_STANDIN_LENGTH` (20 mm) dipole at mid face height, a pattern stand-in for a chip antenna (its match and
+  carrier ground are not modelled); `dipole`, a half-wave dipole at mid face height.
+
+Checks: the ported model reproduces the PCB branch's patterns within 0.01 dB. The end-plate reference
+(`out/ep_ref_0`, `out/ep_ref_140`: duck, 170 mm deck, no plate / 140 mm plate; `out/bearing_ep_ref`) gives
+median bearing error 20 -> 16 deg and 90% 64 -> 46 deg. The fine mesh agrees with the default within 1 deg
+(`out/size_ep_fine/`, `out/size_h50327_ep_fine/`). The coarse mesh is not good enough for size work.
+
+**Ducks (H50327), faces 120 mm tall, with end plate** (`out/size_h50327_ep/`):
+
+| Sectors | Face width | Spacing | Deck | End plate | Median | 90% | Right sector |
+|---|---|---|---|---|---|---|---|
+| 3 | 120 mm | 31 mm | 146 mm | 144 mm | 16 deg | 42 deg | 81% |
+| 3 | 120 | 15 | 144 | 144 | 15 | 39 | 84% |
+| 3 | 100 | 15 | 121 | 121 | 15 | 39 | 83% |
+| 3 | 80 | 15 | 98 | 98 | 15 | 42 | 82% |
+| 3 | 60 | 15 | 80 | 75 | 16 | 46 | 80% |
+| 4 | 60 | 15 | 105 | 90 | 15 | 45 | 68% |
+| 4 | 80 | 15 | 125 | 119 | 13 | 36 | 71% |
+| 4 | 100 | 15 | 147 | 147 | 12 | 33 | 73% |
+| 4 | 120 | 15 | 175 | 175 | 11 | 31 | 75% |
+
+**Short element (chip stand-in), square faces, with end plate** (`out/size_ep/`):
+
+| Sectors | Face | Spacing | Deck | Median | 90% |
+|---|---|---|---|---|---|
+| 3 | 120 mm | 15 mm | 144 mm | 14 deg | 37 deg |
+| 3 | 100 | 15 | 121 | 16 | 45 |
+| 3 | 80 | 15 | 98 | 19 | 59 |
+| 3 | 60 | 15 | 80 | 23 | 75 |
+| 4 | 60 | 8 | 91 | 16 | 54 |
+| 4 | 80 | 8 | 119 | 13 | 42 |
+| 4 | 100 | 15 | 147 | 11 | 33 |
+
+Without the end plate (`out/size/`, `out/size_h50327/`): the duck masts are 4-7 deg worse at the median and their
+90% tail passes 100 deg once the faces narrow (e.g. 60 x 120 mm at 15 mm: 20 deg, 90% 115 deg); ducks on faces
+shorter than they hang (80 x 80 mm) fail (48-101 deg). The chip stand-in on square faces changes little either way:
+3 sectors at 60 mm / 15 mm is 20 deg without the plate and 23 deg with it, 80 mm is 20 vs 19 deg.
+
+What it shows:
+
+- For the ducks, the end plate is the biggest gain after spacing; for the chip stand-in on short square faces it
+  barely matters.
+- 15 mm spacing beats 31 mm at every size. 8 mm adds little and drops the feed resistance to about 13-20 ohm (a
+  hard match).
+- With the end plate, the duck mast can narrow to 60-80 mm wide x 120 mm tall faces (80-98 mm across) at
+  15-16 deg, as good as the 144 mm version.
+- Face height matters as much as width: ducks on 60 x 120 mm faces (16 deg) beat the chip stand-in on 60 x 60 mm
+  faces (23 deg) at the same diameter.
+- A fourth sector gains 2-4 deg at the same face width, for one more radio and 25-30% more diameter.
+- 45 mm faces are about 30 deg either way.
+- No geometry reaches 20 dB back rejection at el -55 (best about 12 dB).
 
 ## Every simulation run
 

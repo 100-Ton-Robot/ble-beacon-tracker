@@ -1,4 +1,4 @@
-"""Bearing and range accuracy of the three-sector mast, from a sector pattern (sector_model.py's pattern.csv).
+"""Bearing and range accuracy of the N-sector mast (3 today; N from the pattern's meta.json or --sectors), from a sector pattern (sector_model.py's pattern.csv).
 
 A beacon is placed at many bearings and distances round the mast. Each second, each sector hears it with
     RSSI = tx_1m - 10 n log10(d) + gain(sector, az, el) + room(sector, place) + fading(advert)
@@ -23,6 +23,7 @@ at 1 m); distances 1-15 m along the floor. Elevation seen from the mast is then 
 """
 import argparse
 import csv
+import json
 import math
 import os
 
@@ -31,7 +32,20 @@ import numpy as np
 import runlog
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SECTORS = (0.0, 120.0, 240.0)
+
+
+def sector_count(folder, override=None):
+    """N from --sectors, else the pattern folder's meta.json (sector_model.py writes it), else 3."""
+    if override:
+        return override
+    try:
+        return int(json.load(open(os.path.join(folder, "meta.json")))["sectors"])
+    except (OSError, KeyError, ValueError):
+        return 3
+
+
+def sector_angles(n):
+    return tuple(360.0 * k / n for k in range(n))
 
 
 def load_pattern(folder):
@@ -59,9 +73,9 @@ def gain(els, pat, az, el):
     return pat[k, a] * (1 - t) + pat[k + 1, a] * t
 
 
-def sector_gains(els, pat, az, el):
-    """[..., 3]: gain of each sector toward (az, el). Sector s is sector 0 turned by s degrees clockwise."""
-    return np.stack([gain(els, pat, np.asarray(az) - s, el) for s in SECTORS], axis=-1)
+def sector_gains(els, pat, az, el, sectors):
+    """[..., N]: gain of each sector toward (az, el). Sector s is sector 0 turned by s degrees clockwise."""
+    return np.stack([gain(els, pat, np.asarray(az) - s, el) for s in sectors], axis=-1)
 
 
 def ang_err(a, b):
@@ -70,26 +84,28 @@ def ang_err(a, b):
 
 def simulate(folder, a, rng):
     els, pat = load_pattern(folder)
+    sectors = sector_angles(sector_count(folder, getattr(a, "sectors", None)))
+    n = len(sectors)
     # tracker's lookup table: every whole bearing, elevations 0..-80 in 2 deg steps
     t_az = np.arange(360.0)
     t_el = np.arange(0.0, -81.0, -2.0)
     AZ, EL = np.meshgrid(t_az, t_el)
-    table = sector_gains(els, pat, AZ, EL)                       # [el, az, 3]
+    table = sector_gains(els, pat, AZ, EL, sectors)              # [el, az, N]
     table_c = table - table.mean(axis=-1, keepdims=True)
 
     true_az = rng.uniform(0, 360, a.trials)
     dist = np.exp(rng.uniform(math.log(1.0), math.log(15.0), a.trials))
     true_el = -np.degrees(np.arctan2(a.height, dist))
     slant = np.hypot(dist, a.height)
-    g = sector_gains(els, pat, true_az, true_el)                 # [trial, 3]
-    room = rng.normal(0, a.room, (a.trials, 3))
+    g = sector_gains(els, pat, true_az, true_el, sectors)        # [trial, N]
+    room = rng.normal(0, a.room, (a.trials, n))
     shadow = rng.normal(0, a.shadow, (a.trials, 1))
     base = a.tx1m - 10 * a.n * np.log10(slant)[:, None] + g + room + shadow
     secs = []
     for _ in range(a.window):
-        fad = rng.normal(0, a.fading, (a.trials, 3, a.adverts))
+        fad = rng.normal(0, a.fading, (a.trials, n, a.adverts))
         secs.append(np.median(base[:, :, None] + fad, axis=-1))
-    rssi = np.mean(secs, axis=0)                                 # [trial, 3]
+    rssi = np.mean(secs, axis=0)                                 # [trial, N]
 
     meas_c = rssi - rssi.mean(axis=-1, keepdims=True)
     est_az = np.empty(a.trials)
@@ -104,8 +120,8 @@ def simulate(folder, a, rng):
     est_slant = 10 ** ((a.tx1m - (best - est_g)) / (10 * a.n))
     est_dist = np.sqrt(np.maximum(est_slant ** 2 - a.height ** 2, 0.0))
     err = ang_err(est_az, true_az)
-    sector_ok = np.argmax(sector_gains(els, pat, true_az, true_el), -1) == np.argmax(rssi, -1)
-    return dict(true_az=true_az, dist=dist, err=err, est_dist=est_dist, sector_ok=sector_ok)
+    sector_ok = np.argmax(sector_gains(els, pat, true_az, true_el, sectors), -1) == np.argmax(rssi, -1)
+    return dict(true_az=true_az, dist=dist, err=err, est_dist=est_dist, sector_ok=sector_ok, sectors=sectors)
 
 
 def stats(r):
@@ -132,6 +148,7 @@ def main():
     ap.add_argument("--tx1m", type=float, default=-59.0, help="dBm at 1 m (iBeacon's usual measured power)")
     ap.add_argument("--trials", type=int, default=4000)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--sectors", type=int, help="override the sector count (default: each pattern's meta.json, else 3)")
     ap.add_argument("--out", default=os.path.join(HERE, "out", "bearing"))
     a = ap.parse_args()
     a.out = os.path.abspath(a.out)
@@ -181,9 +198,10 @@ def main():
         k = np.digitize(r["true_az"], bins) - 1
         med = [np.median(np.abs(r["err"][k == i])) for i in range(len(bins) - 1)]
         ax.plot(bins[:-1] + 5, med, marker="o", ms=3, label=name)
-    for s in SECTORS:
+    first = next(iter(results.values()))["sectors"]
+    for s in first:
         ax.axvline(s, color="0.6", lw=0.8)
-        ax.axvline(s + 60, color="0.6", lw=0.8, ls="--")
+        ax.axvline(s + 180.0 / len(first), color="0.6", lw=0.8, ls="--")
     ax.set_xlabel("true bearing, deg (solid: sector facings, dashed: edges between sectors)")
     ax.set_ylabel("median |bearing error|, deg")
     ax.set_xlim(0, 360)

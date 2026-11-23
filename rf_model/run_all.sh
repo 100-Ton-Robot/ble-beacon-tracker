@@ -42,3 +42,23 @@ python3 bearing_sim.py out/rev3_d15_outline out/rev3_d15_copper out/rev3_d15_cop
 
 # antenna specs (spec_sweep.py)
 python3 spec_sweep.py out/monopole out/dipole --out out/spec_sweep
+
+# end plate reference: H50327, 170 mm deck, no plate / 140 mm plate
+python3 sector_model.py --antenna dipole --centre 65 --set DISC_DIAMETER=170 --out out/ep_ref_0
+python3 sector_model.py --antenna dipole --centre 65 --set DISC_DIAMETER=170 --end-plate --set ENDPLATE_DIAMETER=140 \
+    --out out/ep_ref_140
+python3 bearing_sim.py out/ep_ref_0 out/ep_ref_140 --out out/bearing_ep_ref
+
+# mast size, sector count and end plate (size_sweep.py: each geometry is a sector_model.py run with --set overrides,
+# then scored; each sweep writes its own summary.txt)
+python3 size_sweep.py --sectors 3 4 --widths 120 100 80 60 --heights 120 --spacings 31 15 --elements h50327 \
+    --end-plate --out out/size_h50327_ep
+python3 size_sweep.py --sectors 3 4 --widths 120 100 80 60 45 --spacings 31 15 8 --elements short --end-plate \
+    --out out/size_ep
+python3 size_sweep.py --sectors 3 4 --widths 120 100 80 60 --heights 0 120 --spacings 31 15 --elements h50327 \
+    --out out/size_h50327
+python3 size_sweep.py --sectors 3 4 --widths 120 100 80 60 45 --spacings 31 15 8 --elements short --out out/size
+# fine-mesh checks
+python3 size_sweep.py --fine --end-plate --sectors 3 --widths 45 60 --spacings 15 --elements short --out out/size_ep_fine
+python3 size_sweep.py --fine --end-plate --sectors 3 --widths 60 --heights 120 --spacings 15 --elements h50327 \
+    --out out/size_h50327_ep_fine

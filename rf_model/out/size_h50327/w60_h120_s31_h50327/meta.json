@@ -1,0 +1,16 @@
+{
+ "sectors": 3,
+ "face_width": 60,
+ "face_h": 120,
+ "deck_diameter": 111.7,
+ "end_plate": null,
+ "spacing": 31.0,
+ "antenna": "dipole",
+ "length": 58.36,
+ "feed_depth": 65.0,
+ "overrides": {
+  "FACE_WIDTH": 60,
+  "FACE_H": 120,
+  "DISC_DIAMETER": 111.7
+ }
+}
