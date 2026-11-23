@@ -2,11 +2,11 @@
 
 > This page is the older 146 mm deck without parts. For the deck with the parts on it (144 / 146.3 mm), and the face PCBs, see [pcb/README.md](pcb/README.md).
 
-The deck is a round 146 mm two-layer PCB. These steps and settings are for PCBWay, the fab used so far; the Gerbers are standard RS-274X, so any PCB fab can make it with the same settings. Back to the [shield deck README](README.md).
+The deck is a round 146 mm two-layer PCB. These steps and settings are for PCBWay, the fab used so far; the Gerbers are standard RS-274X, so any PCB fab can make it with the same settings. Back to the [hand build doc](HAND_BUILD.md). Superseded 2026-11-23 by the deck templates (same layout as the PCB decks) and the PCB decks in `pcb/`; kept for the older 146 mm build.
 
 ## Order
 
-1. Use `shield_deck_gerbers.zip` from this folder as it is. Rebuild it with `python make_shield_deck.py` only after changing a `deck` row in `parameters.csv` ([Using the scripts](README.md#using-the-scripts)).
+1. Use `shield_deck_gerbers.zip` from this folder as it is. Rebuild it with `python make_shield_deck.py` only after changing a `deck` row in `parameters.csv` ([Using the scripts](HAND_BUILD.md#using-the-scripts)).
 2. Upload the zip to PCBWay's quick-order PCB page with the [order settings](#order-settings) below.
 3. Check it in PCBWay's online Gerber viewer before paying.
 

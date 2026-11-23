@@ -1,5 +1,7 @@
 # Deck, face and end plate PCBs (parts on the deck)
 
+The PCB build. The hand build of the same mast is in [`../HAND_BUILD.md`](../HAND_BUILD.md); both share [`../parameters.csv`](../parameters.csv) and [`../layout.py`](../layout.py).
+
 Four boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](make_pcbs.py). The deck comes in two sizes, one per duck spacing (the D hole's distance in front of each face); order the one that matches your antennas:
 
 | Board | File to upload | Qty per mast | Order |

@@ -127,6 +127,12 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Changed (2026-11-23): two build docs for the same mast: the PCB build (`shield_deck/pcb/README.md`) and the
+  hand build (`shield_deck/HAND_BUILD.md`, was `shield_deck/README.md`, which is now an index). Shared geometry
+  in `shield_deck/layout.py`. Hand-build templates part way through an update to it: deck drill templates per
+  duck spacing (with the acrylic plate's M4 corner holes and the on-deck parts' positions), a plain
+  butt-jointed face and a formulas page printed from `layout.py`; the plate, stack, wiring, LED and unified
+  board pages still show the older layout and D8 wiring (marked in `HAND_BUILD.md`).
 - Removed (2026-11-23): the face PCB's centre RP-SMA hole (face-centre dipole option); the face is now solid
   GND both sides. USB warning with a caution sign right in front of each XIAO USB-C plug and beside J2; caution
   signs on every power warning.

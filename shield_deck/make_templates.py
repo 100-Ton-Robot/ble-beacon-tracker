@@ -1909,6 +1909,22 @@ def deck_page_for(spacing):
             c.setFont("Helvetica-Bold", 6)
             c.drawCentredString(px * mm, (py + M3_KEEPOUT / 2 + 1) * mm, f"M3 {COLLAR_HOLE:g}")
 
+        # acrylic plate option: M4 bolts in the core corners hold the plate's spacers (nut flush in the corner,
+        # dashed hex); they sit in the on-deck XIAOs' USB-C plug path, so drill them only for the plate option
+        hr = g.NUT_AF / math.sqrt(3)
+        for t in layout.VERTICES:
+            px, py = Q(*layout.pol(g.MOUNT_RADIUS, t))
+            c.setLineWidth(0.5)
+            c.circle(px * mm, py * mm, g.HOLE_M4 / 2 * mm)
+            c.setLineWidth(0.2)
+            crosshair(c, px, py, g.HOLE_M4 / 2)
+            c.setDash(1.5, 1.5)
+            _poly(c, [(px + hr * math.sin(math.radians(a)), py + hr * math.cos(math.radians(a)))
+                      for a in range(30, 390, 60)])
+            c.setDash()
+            lx, ly = F(t, 7.0, g.MOUNT_RADIUS)
+            c.setFont("Helvetica-Bold", 6)
+            c.drawCentredString(lx * mm, (ly - 1) * mm, f"M4 {g.HOLE_M4:g}")
         # on-deck electronics (grey, not drilled): XIAOs, USB-C plug paths, tie squares, J1 / J2
         c.saveState()
         c.setStrokeGray(0.45)
@@ -1954,16 +1970,20 @@ def deck_page_for(spacing):
             f"front of the face, P / P2 = patch",
             f"{PATCH_OFFSET:g} mm in front (P2 {L.s_P2:g} mm along the face).  Centre {L.pipe_d:g} mm = the pipe "
             f"(1/2 in PVC adapter).",
-            f"M3 {COLLAR_HOLE:g} mm x3 = registration to the collar (dashed: {M3_KEEPOUT:g} mm washer keep-out); with "
-            "the acrylic plate, its spacers go here.",
+            f"M3 {COLLAR_HOLE:g} mm x3 = registration to the collar (dashed: {M3_KEEPOUT:g} mm washer keep-out), "
+            "as on the PCB deck.",
             "Grey = where the parts go with the electronics ON the deck (as on the PCB): XIAOs on the corner axes, "
             "USB-C out (dashed",
             "= plug path), antenna strain relief tie squares, J1 / J2. Insulate the deck under them (Kapton). Dotted "
             "triangle = keep parts",
             "and wiring inside it (1 mm clear of the seams). Every number: layout.py / parameters.csv (formulas page).",
+            f"M4 {g.HOLE_M4:g} mm x3 in the corners = ACRYLIC PLATE OPTION ONLY: bolts + spacers hold the plate (radios "
+            "near the deck), nut flush in the corner",
+            "(dashed hex). They sit in the on-deck XIAOs' USB-C plug path: drill them OR use the grey on-deck layout, "
+            "not both.",
         ]
         for n, t in enumerate(lines):
-            c.drawString(15 * mm, (54 - n * 4.4) * mm, t)
+            c.drawString(15 * mm, (58 - n * 4.4) * mm, t)
 
     page.__name__ = f"deck_d{spacing:g}_page"
     return page
