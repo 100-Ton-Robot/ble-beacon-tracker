@@ -1,52 +1,52 @@
 ** Drc report for /home/claude/ble-beacon-tracker/shield_deck/pcb/out/endplate_pcb.kicad_pcb **
-** Created on 2026-11-23 08:33:10 **
+** Created on 2026-11-23 08:36:20 **
 
 ** Found 15 DRC violations **
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(91.7976 mm, 107.1418 mm): Footprint MB9
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(108.2024 mm, 107.1418 mm): Footprint MB4
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.8582 mm, 91.7976 mm): Footprint MB12
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(108.2024 mm, 92.8582 mm): Footprint MB3
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.6721 mm, 92.3279 mm): Footprint MB2
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.6721 mm, 107.6721 mm): Footprint MB5
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.1418 mm, 108.2024 mm): Footprint MB6
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.3279 mm, 92.3279 mm): Footprint MB11
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.1418 mm, 91.7976 mm): Footprint MB1
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.3279 mm, 107.6721 mm): Footprint MB8
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(91.7976 mm, 92.8582 mm): Footprint MB10
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
     @(92.8582 mm, 108.2024 mm): Footprint MB7
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(100.0000 mm, 100.0000 mm): Footprint H1
-[isolated_copper]: Isolated copper fill
+    @(92.8582 mm, 91.7976 mm): Footprint MB12
+[lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(100.0000 mm, 27.0000 mm): Zone [GND] on F.Cu
+    @(107.1418 mm, 91.7976 mm): Footprint MB1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(107.1418 mm, 108.2024 mm): Footprint MB6
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(107.6721 mm, 107.6721 mm): Footprint MB5
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(92.3279 mm, 107.6721 mm): Footprint MB8
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(91.7976 mm, 107.1418 mm): Footprint MB9
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(108.2024 mm, 92.8582 mm): Footprint MB3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(92.3279 mm, 92.3279 mm): Footprint MB11
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 100.0000 mm): Footprint H1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(107.6721 mm, 92.3279 mm): Footprint MB2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(91.7976 mm, 92.8582 mm): Footprint MB10
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(108.2024 mm, 107.1418 mm): Footprint MB4
 [isolated_copper]: Isolated copper fill
     Local override; Severity: warning
     @(100.0000 mm, 27.0000 mm): Zone [GND] on B.Cu
+[isolated_copper]: Isolated copper fill
+    Local override; Severity: warning
+    @(100.0000 mm, 27.0000 mm): Zone [GND] on F.Cu
 
 ** Found 0 unconnected pads **
 

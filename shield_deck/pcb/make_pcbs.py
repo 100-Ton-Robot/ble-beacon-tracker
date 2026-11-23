@@ -365,6 +365,28 @@ def knockout(bd, ref):
     return ro, ri
 
 
+def warn_icon(bd, layer, text, pos, size, angle, side="before", height=4.0):
+    """ISO 7010 W001-style caution sign (triangle with !) drawn in silkscreen lines beside a warning text: before
+    its first character (side "before"), after its end ("after") or above it ("above"), upright with the text.
+    The text's extent is estimated from its line lengths (KiCad's stroke font is ~0.9 x size per character)."""
+    lines = text.split("\n")
+    half_l = max(len(s) for s in lines) * size * 0.9 / 2
+    half_h = len(lines) * size * 1.6 / 2
+    A = math.radians(angle)
+    b = (math.cos(A), -math.sin(A))      # baseline direction on the board (KiCad y down, angles counter-clockwise)
+    up = (-math.sin(A), -math.cos(A))
+    gap = height * 0.6 + 1.0
+    k = {"before": (-(half_l + gap), 0.0), "after": (half_l + gap, 0.0), "above": (0.0, half_h + gap)}[side]
+    c = (pos[0] + k[0] * b[0] + k[1] * up[0], pos[1] + k[0] * b[1] + k[1] * up[1])
+    P = lambda x, y: (c[0] + x * b[0] + y * up[0], c[1] + x * b[1] + y * up[1])  # noqa: E731   local: x along, y up
+    h = height
+    s = h * 2 / math.sqrt(3)
+    tri = [P(0, 2 * h / 3), P(s / 2, -h / 3), P(-s / 2, -h / 3)]
+    bd.poly(layer, tri, 0.25)
+    bd.line(layer, P(0, 0.32 * h), P(0, -0.05 * h), 0.35)
+    bd.line(layer, P(0, -0.18 * h), P(0, -0.2 * h), 0.4)
+
+
 def url_text(bd, layer, pos, angle=0.0, mirror=False, size=0.9, one_line=False):
     sep = "" if one_line else "\n"
     bd.text(layer, REPO_URL.replace("Robot/", "Robot/" + sep), pos, size, angle=angle, mirror=mirror)
@@ -530,15 +552,19 @@ def build_deck(spacing):
         bd.text(FS, lab, loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 3.2), 1.0, angle=-th)
         # USB-C plug path (13 x 25 mm past the USB-C end), for the print check
         bd.text(FS, USB_WARNING, loc(th, -10.6, 53.0), 0.9, angle=-th + 90)   # beside the USB-C plug path
+        warn_icon(bd, FS, USB_WARNING, loc(th, -10.6, 53.0), 0.9, -th + 90, "after", 3.5)
         x = [(-6.5, 45.0), (6.5, 45.0), (6.5, 70.0), (-6.5, 70.0)]
         bd.poly(pcbnew.Dwgs_User, [loc(th, u, v) for u, v in x], 0.15)
     bd.text(FS, "TOP - ELECTRONICS SIDE", band(0, 19.5, a + 19.5), 1.3, angle=0)
     bd.text(FS, "J1 TO ESP32: 1 5V  2 GND\n3 DATA (HEAD D10)  4 CMD\nJ2 5V IN: 1 +  2 GND", band(0, 19.5, a + 14.5), 0.8,
             angle=0)
     bd.text(FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, angle=-120)
+    warn_icon(bd, FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, -120, "after")
     bd.text(FS, ASSEMBLY_STEPS, band(240, 18.5, a + 15.0), 0.8, angle=-240)
     for lay, mir in ((FS, False), (BS, True)):   # beside J2 (5V in from PoE), both sides like its outline
-        bd.text(lay, USB_WARNING, loc(J2_POS[1], -7.8, J2_POS[0] + 1.0), 0.8, angle=-J2_POS[1], mirror=mir)
+        jw = loc(J2_POS[1], -7.0, J2_POS[0] - 1.5)   # counter-clockwise of J2, below U4's antenna end
+        bd.text(lay, USB_WARNING, jw, 0.8, angle=-J2_POS[1], mirror=mir)
+        warn_icon(bd, lay, USB_WARNING, jw, 0.8, -J2_POS[1], "before", 2.8)
     bd.text(FS, "AS END PLATE:\nTHIS SIDE OUT, NO PARTS", band(0, 19.5, a + 23.5), 0.9, angle=0)
     url_text(bd, FS, band(120, 19.5, a + 21.5), angle=-120)
     bd.text(FS, "KNOCKOUT", pol(7.6, 0), 0.8)
@@ -619,6 +645,7 @@ def build_face():
     bd.text(FS, "OUTSIDE - DIPOLE SIDE", (K.CX - 28, y0 + 16), 2.0)
     bd.text(BS, "INSIDE - CORE SIDE", (K.CX + 28, y0 + 16), 2.0, mirror=True)
     bd.text(FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1)
+    warn_icon(bd, FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1, 0, "above", 5.0)
     url_text(bd, FS, (K.CX + 28, K.CY + 20), size=1.2, one_line=True)
     url_text(bd, BS, (K.CX - 28, K.CY + 20), mirror=True, size=1.2, one_line=True)
     return bd
@@ -664,6 +691,7 @@ def build_endplate():
     bd.text(FS, "RP-SMA", pol(7.6, 0), 0.9)
     # silkscreen, outside (bottom), read from below
     bd.text(BS, POWER_WARNING, pol(50, 240), 1.1, angle=-240, mirror=True)
+    warn_icon(bd, BS, POWER_WARNING, pol(50, 240), 1.1, -240, "above", 5.0)
     bd.text(BS, "END PLATE - OUTSIDE", pol(45, 60), 1.5, angle=-60 + 90, mirror=True)
     bd.text(BS, "KNOCKOUT: BREAK OUT FOR\n1/2 IN PVC ADAPTER", pol(16, 0), 1.0, mirror=True)
     for lay, mir in ((FS, False), (BS, True)):
