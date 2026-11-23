@@ -233,6 +233,39 @@ only on the command line. Re-running all of them on 2026-11-12 reproduced the ea
 
 ## Limits
 
+## Rev 3 PCBs: outline vs real copper (2026-11-23, full mesh)
+
+The rev 3 boards (`shield_deck/pcb`) at two levels of detail, H50327 with its feed 65 mm down, end plate fitted:
+`--deck d15|d31 --end-plate` (outline: deck disc of the variant's diameter with the 22.2 mm pipe hole, solid core,
+144 mm end plate disc) and the same with `--copper` (both deck layers 1.6 mm apart joined by every plated hole and
+via, every hole, slot and track gap, the end plate's copper including the knockout ring, and a hollow core of three
+1.6 mm face-board slabs with their tabs through the slots; from `shield_deck/pcb/out/*_copper.json`, written by
+`make_pcbs.py`). Antennas at each deck's D holes (15 / 31 mm).
+
+| Run | S11 at 2440 | Peak | -3 dB width el 0 / -30 | F/B el 0 / -30 | Isolation | Median bearing error | 90% | Right sector |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| d15 outline | -2.8 dB | 8.8 dBi | 85 / 105 deg | 29.4 / 19.9 dB | -49.3 dB | 15 deg | 39 deg | 84.4% |
+| d15 copper | -2.7 dB | 8.7 dBi | 85 / 100 deg | 29.5 / 20.3 dB | -49.4 dB | 14 deg | 37 deg | 83.8% |
+| d31 outline | -5.1 dB | 8.0 dBi | 105 / 125 deg | 25.0 / 20.5 dB | -48.6 dB | 16 deg | 42 deg | 80.9% |
+| d31 copper | -5.0 dB | 8.1 dBi | 100 / 130 deg | 30.2 / 21.0 dB | -52.1 / -49.4 dB | 14 deg | 39 deg | 81.0% |
+
+(`out/rev3_*`, bearing at default noise in `out/bearing_rev3`.)
+
+- **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
+  median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,
+  the hollow core, the layer-to-layer vias) doesn't change the result: the outline model is enough for size and
+  spacing questions. Single-angle front-to-back figures differ more where a null lands near az 180 (d31 at el -45:
+  42.7 vs 16.9 dB); read those as "a null is near", not as a real difference.
+- **d15 vs d31:** 15 mm gives the narrower beam (85 vs 100-105 deg at el 0), the higher peak (8.7-8.8 vs 8.0-8.1
+  dBi) and a slightly better bearing (14-15 vs 14-16 deg median, 37-39 vs 39-42 deg at 90%, 84 vs 81% right
+  sector). The duck's match is worse close to the face (-2.8 vs -5.1 dB S11), as in the spacing sweep; for a
+  receiver that costs little.
+- **Not comparable** with the older runs above (146 mm disc, no end plate, no pipe hole): both the deck size and
+  the end plate changed at once.
+- **Model limits (`--copper`):** tracks and gaps narrower than the 1 mm mesh are only roughly resolved, the faces
+  at 120 / 240 deg are staircased, the face board is solid metal through its thickness, and the XIAOs, coax and
+  pipe are not in the model.
+
 Not modelled: the enclosure, the electronics plate and its parts, the coax runs, the bolts and spacers, the
 printed-dipole panels and the DIY dipoles. The core is a solid copper prism (only its outside affects the pattern),
 and the whips are thin wires. Treat the results as how the deck and core shape the beam, not as exact gains, and

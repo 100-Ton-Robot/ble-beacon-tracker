@@ -8,6 +8,11 @@ when the image was built, where known.
 
 ### Simulation
 
+- Added (2026-11-23): `rf_model/sector_model.py --deck d15|d31 [--end-plate] [--copper]` models the rev 3
+  PCBs, as outlines (deck disc + pipe hole, solid core, end plate disc) or as their real copper
+  (`shield_deck/pcb/out/*_copper.json`, now written by `make_pcbs.py`; hollow core of face boards).
+  Four runs and their bearing comparison in `rf_model/README.md`: outline and copper agree within 0.3 dB and
+  1-2 deg; the 15 mm deck gives the narrower beam and 14-15 deg median bearing error vs 14-16 at 31 mm.
 - New `sim/` (2026-11-20): ngspice models of the unified power + LED board and a model of the LED
   direction ring, run by `sim/run_sim.sh`. All checks pass; a short on the strip is flagged: the
   splitter current-limits before the 2 A fuse can open, and the 5 V rail collapses.

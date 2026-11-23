@@ -24,6 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import params  # noqa: E402
 import kicad_lib as K  # noqa: E402
+import deck_size  # noqa: E402
 from kicad_lib import loc, pol  # noqa: E402
 
 P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate"])
@@ -41,9 +42,9 @@ CORE_LIM = INRADIUS - SEAM_STRIP / 2 - CORE_MARGIN
 
 
 def deck_diameter(spacing):
-    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN, rounded up to 0.1 mm."""
-    d = 2 * (INRADIUS + spacing + PAD_EXPOSE / 2 + DECK_EDGE_MARGIN)
-    return max(DECK_MIN_DIAMETER, math.ceil(d * 10 - 1e-9) / 10)
+    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN (deck_size.py, shared with the RF
+    model)."""
+    return deck_size.deck_diameter(P, spacing)
 
 
 def core_ok(u, v, pad=0.0):
@@ -693,6 +694,77 @@ def finish(bd, name):
     return txt
 
 
+def export_copper(path, name):
+    """<name>_copper.json for the RF model (rf_model/sector_model.py --copper): each copper layer as polygons with
+    holes (filled zones, tracks, pads and vias merged, drill holes cut out), the plated barrels joining the layers,
+    and the board outline. Model coordinates: mm, board centre at the origin, x = KiCad x - 100, y = 100 - KiCad y
+    (deck and end plate: +y = S0's face normal, top view; face: x along the face, y = -60 at the deck edge and
+    +60 at the end plate edge, tabs past both)."""
+    import json
+    from shapely.geometry import LineString, Point, Polygon
+    from shapely.ops import unary_union
+    b = pcbnew.LoadBoard(path)
+    to = lambda p: (round(pcbnew.ToMM(p.x) - K.CX, 4), round(K.CY - pcbnew.ToMM(p.y), 4))  # noqa: E731
+
+    def polys(ps):
+        out = []
+        for i in range(ps.OutlineCount()):
+            ol = ps.Outline(i)
+            outer = [to(ol.CPoint(k)) for k in range(ol.PointCount())]
+            holes = []
+            for h in range(ps.HoleCount(i)):
+                hl = ps.Hole(i, h)
+                holes.append([to(hl.CPoint(k)) for k in range(hl.PointCount())])
+            if len(outer) >= 3:
+                out.append(Polygon(outer, [hh for hh in holes if len(hh) >= 3]).buffer(0))
+        return out
+
+    layers = {}
+    drills = []
+    barrels = []
+    for fp in b.GetFootprints():
+        for p in fp.Pads():
+            if p.GetDrillSize().x > 0:   # round drills only on these boards
+                assert p.GetDrillSize().x == p.GetDrillSize().y, f"{fp.GetReference()} oval drill"
+                drills.append(Point(to(p.GetPosition())).buffer(pcbnew.ToMM(p.GetDrillSize().x) / 2, 32))
+                if p.GetAttribute() == pcbnew.PAD_ATTRIB_PTH:
+                    q = to(p.GetPosition())
+                    barrels.append([q[0], q[1], round(pcbnew.ToMM(p.GetDrillSize().x), 3)])
+    for t in b.GetTracks():
+        if isinstance(t, pcbnew.PCB_VIA):
+            q = to(t.GetPosition())
+            barrels.append([q[0], q[1], round(pcbnew.ToMM(t.GetDrillValue()), 3)])
+    for lay, lname in ((F, "F.Cu"), (B, "B.Cu")):
+        geoms = []
+        for z in b.Zones():
+            if not z.GetIsRuleArea() and z.IsOnLayer(lay) and z.HasFilledPolysForLayer(lay):
+                geoms += polys(z.GetFilledPolysList(lay))
+        for t in b.GetTracks():
+            if not t.IsOnLayer(lay):
+                continue
+            if isinstance(t, pcbnew.PCB_VIA):
+                geoms.append(Point(to(t.GetPosition())).buffer(pcbnew.ToMM(t.GetWidth()) / 2, 16))
+            else:   # straight tracks only on these boards; round ends, as KiCad draws them
+                geoms.append(LineString([to(t.GetStart()), to(t.GetEnd())]).buffer(pcbnew.ToMM(t.GetWidth()) / 2, 8))
+        for fp in b.GetFootprints():
+            for p in fp.Pads():
+                if p.IsOnLayer(lay):
+                    geoms += polys(p.GetEffectivePolygon())
+            assert not any(g.GetLayer() in (F, B) for g in fp.GraphicalItems()), "footprint copper drawing"
+        cu = unary_union(geoms).difference(unary_union(drills)).simplify(0.02)
+        parts = [cu] if cu.geom_type == "Polygon" else list(cu.geoms)
+        layers[lname] = [{"outer": [list(c) for c in g.exterior.coords[:-1]],
+                          "holes": [[list(c) for c in r.coords[:-1]] for r in g.interiors]}
+                         for g in parts if g.area > 0.01]
+    bb = b.GetBoardEdgesBoundingBox()
+    data = {"board": name, "units": "mm", "thickness": FACE_THICK, "layers": layers, "barrels": barrels,
+            "bbox": [pcbnew.ToMM(bb.GetLeft()) - K.CX, K.CY - pcbnew.ToMM(bb.GetBottom()),
+                     pcbnew.ToMM(bb.GetRight()) - K.CX, K.CY - pcbnew.ToMM(bb.GetTop())]}
+    with open(os.path.join(OUT, name + "_copper.json"), "w") as f:
+        json.dump(data, f, separators=(",", ":"))
+    return {k: (len(v), sum(len(g["holes"]) for g in v)) for k, v in layers.items()}, len(barrels)
+
+
 def seam_clearance(path, name):
     """Heat margin report (best effort, no hard rule): each deck part's nearest pad edge to the bottom seam strip
     (where the faces are soldered) and to the face slots. Written to out/<name>_part_clearance.csv."""
@@ -767,6 +839,8 @@ if __name__ == "__main__":
                       f"{d_pad:.1f} mm")
         txt = finish(bd, name)
         print(name, summary(txt))
+        cu, nb = export_copper(os.path.join(OUT, name + ".kicad_pcb"), name)
+        print(f"  copper for the RF model: {cu} (polygons, holes) per layer, {nb} plated barrels")
         if name.startswith("deck"):
             print(f"  diameter {deck_diameter(dict(decks)[name]):.1f} mm")
             for ref, val, d_seam, d_slot in seam_clearance(os.path.join(OUT, name + ".kicad_pcb"), name):
