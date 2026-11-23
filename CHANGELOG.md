@@ -122,6 +122,11 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Added (2026-11-23): `shield_deck/pcb/REV3_PLAN.md` and `rev3_layout.png`, the settled spec for deck
+  PCB revision 3 (not implemented yet): radios inside the core with every net inside the shield, star
+  wiring with a 4-pin J1, strain-relief ties square to each pigtail, 22.2 mm round pipe hole with the
+  M3s for registration, no LED block, no service switch, deck 144 / ~147 mm built for both duck
+  spacings (15 and 31 mm).
 - Changed (2026-11-22): `shield_deck/pcb/` revision 2 (KiCad 7, DRC 0 errors on all three boards, not
   yet ordered or built). New optional 144 mm end plate PCB across the far end of the triangle: bare GND
   both sides, the nine face slots and seam copper, a centre RP-SMA hole in a mouse-bite knockout that breaks
