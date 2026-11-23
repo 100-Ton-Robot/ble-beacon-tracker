@@ -122,6 +122,21 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Changed (2026-11-23): `shield_deck/pcb/` revision 3, as specified in `REV3_PLAN.md` (KiCad 7, DRC 0 errors
+  on all four boards, not yet ordered or built). The three XIAOs sit inside the core on the corner axes
+  (antenna end 24 mm, USB-C out to the corners), so every net runs inside the shield, on both layers there.
+  Star wiring for relay protocol 4: the 2 o'clock XIAO is the head (D10 -> J1 DATA), the other two D10 ->
+  head D0 / D1, J1 CMD -> every D7. J1 is a 4-pin JST PH (5V / GND / DATA / CMD, as the carrier Up port),
+  J2 a 2-pin PH footprint for 5V in; both through-hole with the housing outline on both sides. +5V is
+  tracks only, with a 0.5 mm clearance DRC rule (`out/*.kicad_dru`) and the bottom pour held 2 mm back
+  from +5V pads. One tie square per pigtail, square to the cable, 13 mm from the IPEX4. Round 22.2 mm pipe
+  hole and three plated M3 registration holes (r 25.75 mm) replace the 62 mm opening and the bayonet
+  lugs. Removed: the LED block and every LED net, the service switch (deck loop, end plate hole, silk),
+  R3; warning silk now "UNPLUG POE BEFORE USB". The deck is built once per duck spacing in
+  `DECK_VARIANTS`: `out/deck_d15_*` (144 mm) and `out/deck_d31_*` (146.3 mm) replace `out/deck_pcb_*`.
+  C1 is left off (no room for the 8 mm footprint inside the core; open). New and retired values in
+  `parameters.csv` (retired rows moved to group `retired`); the 1:1 print PDF has seven pages;
+  `make_pcbs.py` also writes `pcb_preview.png`. Needs protocol 4 scanner firmware (not written yet).
 - Added (2026-11-23): `shield_deck/pcb/REV3_PLAN.md` and `rev3_layout.png`, the settled spec for deck
   PCB revision 3 (not implemented yet): radios inside the core with every net inside the shield, star
   wiring with a 4-pin J1, strain-relief ties square to each pigtail, 22.2 mm round pipe hole with the

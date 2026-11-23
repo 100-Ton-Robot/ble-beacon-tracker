@@ -1,0 +1,106 @@
+** Drc report for /home/claude/ble-beacon-tracker/shield_deck/pcb/out/deck_d15.kicad_pcb **
+** Created on 2026-11-23 07:14:54 **
+
+** Found 32 DRC violations **
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(40.1784 mm, 61.7590 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(66.8823 mm, 119.1205 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(133.1177 mm, 119.1205 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(96.7931 mm, 170.9275 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(100.0000 mm, 61.7590 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(163.0285 mm, 67.3135 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(116.1980 mm, 80.2558 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(143.5577 mm, 85.2442 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(109.0000 mm, 123.9000 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(91.0000 mm, 145.1000 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(74.8020 mm, 95.8442 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(65.4423 mm, 69.6558 mm): Line on F.Silkscreen
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(57.0096 mm, 124.8205 mm): Footprint H7
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(148.5622 mm, 99.1699 mm): Footprint H6
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(109.0988 mm, 77.7987 mm): Footprint TM1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(125.1873 mm, 105.3537 mm): Footprint M2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(63.9378 mm, 120.8205 mm): Footprint H8
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 50.3590 mm): Footprint H1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(142.9904 mm, 124.8205 mm): Footprint H4
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(82.7699 mm, 119.1360 mm): Footprint M3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(76.2237 mm, 103.2208 mm): Footprint TM3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(136.0622 mm, 120.8205 mm): Footprint H5
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(117.2208 mm, 98.7982 mm): Footprint J1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 58.3590 mm): Footprint H2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(75.0000 mm, 58.3590 mm): Footprint H3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(129.8779 mm, 82.7500 mm): Footprint U2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 134.5000 mm): Footprint U3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(92.0428 mm, 75.5103 mm): Footprint M1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(90.0139 mm, 85.5941 mm): Footprint J2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(70.1221 mm, 82.7500 mm): Footprint U4
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(114.6775 mm, 118.9805 mm): Footprint TM2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(76.4378 mm, 142.4711 mm): Footprint H9
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** End of Report **

@@ -158,41 +158,55 @@ UNI_PAGE,22.0 236.0 5.2,mm,drawing,uni,"Unified power + LED board page: top-left
 UNI_PITCH,2.54,mm,spec,uni,stripboard hole pitch (0.1 in)
 UNI_SIZE,10 23,count,design,uni,Unified board: strips (A-J) x holes per strip (rows 0-22); rows 0 and 22 are left empty for the two pipe ties (2026-11-20)
 UNI_PULLDOWN_OHM,10000,ohm,design,uni,"R2, pull-down on U1 1A (GPIO1 side) to GND so the strip stays dark while the ESP32 boots and GPIO1 floats (user, 2026-11-20)"
-PCB_DIAMETER,170.0,mm,design,pcb,"deck PCB (KiCad, pcb/make_pcbs.py): round board, replaces DISC_DIAMETER for the parts-on-deck build (2026-11-21)"
+PCB_DIAMETER,170.0,mm,design,retired,"Retired in rev 3 (2026-11-23): the deck diameter is derived from the duck spacing (DECK_MIN_DIAMETER, DECK_EDGE_MARGIN). Rev 2: 170 mm round deck PCB, replaced DISC_DIAMETER for the parts-on-deck build (2026-11-21)"
 PCB_DIAMETER_MAX,171.5,mm,measured,pcb,"largest deck the case takes: case interior from its STL (user, 2026-11-21; 54 cm circumference). Check at the deck's height if the wall tapers"
-PCB_OPENING,62.0,mm,design,pcb,"centre opening: pipe + ESP32/PoE bundle (72 x 28 x 20 mm, passes end-on, ~34 mm diagonal) + the three dipole coaxes + the end plate's service switch wires. 62 is the most the centre face slots allow (opening edge 1.8 mm from their inner edge); the collar lugs (COLLAR_LUG) leave ~56 mm clear at their tips (2026-11-22)"
-COLLAR_HOLE,3.4,mm,design,pcb,"three M3 holes for the printed bayonet collar, one per core corner, inside the triangle"
-COLLAR_RADIUS,41.0,mm,design,pcb,"collar M3 hole centres from the deck centre, on the core corners (60 / 180 / 300 deg), inside the triangle (2026-11-22; was 31.5)"
-PCB_STITCH_RADIUS,83.0,mm,design,pcb,stitching vias in the exposed rim ring (moved out from STITCH_RADIUS so the XIAOs sit clear)
-XIAO_RADIUS,70.0,mm,design,pcb,"XIAO centres from the deck centre, on the core corners (60 / 180 / 300 deg), USB-C end out to the rim"
+PCB_OPENING,62.0,mm,design,retired,Retired in rev 3 (2026-11-23): round ADAPTER_HOLE pipe hole instead; no wires pass through the deck. Rev 2: 62 mm centre opening for the pipe + ESP32/PoE bundle with bayonet lugs
+COLLAR_HOLE,3.4,mm,design,pcb,"three M3 holes (plated, GND ring) that register the deck to the collar; positions M3_POS"
+COLLAR_RADIUS,41.0,mm,design,retired,Retired in rev 3 (2026-11-23): M3 holes now at M3_POS. Rev 2: collar M3 hole centres on the core corners at r 41
+PCB_STITCH_RADIUS,83.0,mm,design,retired,Retired in rev 3 (2026-11-23): stitching vias sit in the middle of the rim ring of each deck size. Rev 2: r 83
+XIAO_RADIUS,70.0,mm,design,retired,"Retired in rev 3 (2026-11-23): XIAOs moved inside the core (XIAO_CENTRE_V). Rev 2: XIAO centres at r 70 on the core corners, USB-C out to the rim"
 XIAO_PAD,3.4 1.6,mm,design,pcb,castellation pad for hand soldering: length (out from the board edge 1.7 mm) x width
 XIAO_PIN_ROW,7.62,mm,spec,pcb,"castellated pin rows +- this from the XIAO centre line (0.6 in rows), 2.54 mm pitch, 7 per side"
-J1_V,48.0,mm,design,pcb,"J1 (JST B7B-PH-K-S, vertical through-hole) pin row this far out along the 60 deg corner, inside the core; moved out from 44 to clear the collar M3 hole (2026-11-22)"
-BAND_R,55.6 56.6 57.6,mm,design,pcb,"signal arcs round the deck between the antenna holes: inner, middle, outer"
-CORE_MARGIN,1.0,mm,rule,pcb,"bottom copper may carry tracks / vias only inside the core, this far clear of the seam strip"
+J1_V,48.0,mm,design,retired,Retired in rev 3 (2026-11-23): J1 is a 4-pin PH at J1_POS. Rev 2: 7-pin J1 pin row along the 60 deg corner
+BAND_R,55.6 56.6 57.6,mm,design,retired,Retired in rev 3 (2026-11-23): every net runs inside the core. Rev 2: signal arcs round the deck between the antenna holes
+CORE_MARGIN,1.0,mm,rule,pcb,"bottom copper (tracks, vias, through-hole parts) stays inside the core, this far clear of the seam strip. Rev 3: both layers carry signals inside the core"
 TRACK,0.25,mm,design,pcb,signal track width
-TRACK_5V,0.8,mm,design,pcb,5 V links to the modules and the LED feed
+TRACK_5V,0.8,mm,design,pcb,"+5V tracks (rev 3: +5V is tracks only, no pour)"
 CLEARANCE,0.2,mm,rule,pcb,copper clearance (PCBWay standard is 0.15 at 1 oz)
 VIA,0.8 0.4,mm,design,pcb,via pad and drill
-MOUNT_SQ,12.5,mm,spec,pcb,"1/2 in HS-100 adhesive tie mount footprint (silkscreen square, mask only underneath): 5V IN, LED strip, J1 harness, one per XIAO coax"
+MOUNT_SQ,12.5,mm,spec,pcb,"1/2 in HS-100 adhesive tie mount footprint (silkscreen square, mask only underneath): rev 3 has one per XIAO, on its pigtail, square to the cable"
+DECK_VARIANTS,15 31,mm,design,pcb,"duck spacings (DUCK_SPACING values) the generator builds, one deck per value: out/deck_d15, out/deck_d31 (owner 2026-11-23). DUCK_SPACING itself stays the old 146 mm deck's value"
+DECK_MIN_DIAMETER,144.0,mm,design,pcb,"smallest deck: face corners (r 69.3) + 2.7 mm, as the end plate. Deck diameter = max(this, 2 x (inradius + spacing + PAD_EXPOSE / 2 + DECK_EDGE_MARGIN)) (rev 3, 2026-11-23)"
+DECK_EDGE_MARGIN,1.5,mm,design,pcb,board edge past the D hole's exposed pad
+XIAO_CENTRE_V,34.5,mm,design,pcb,"rev 3: XIAO centre this far out along its core corner axis, USB-C end out (v 45), antenna end in (v 24); outer pad corners ~0 mm inside CORE_MARGIN"
+TIE_FROM_IPEX,13.0,mm,design,pcb,"tie square centre this far from the IPEX4 along the pigtail (corner frame u -14.68 v 18.98, r 24)"
+PIGTAIL_ANGLE,236.0,deg,design,pcb,"pigtail direction leaving the IPEX4, in the corner frame (clockwise from straight out): 56 deg off straight in, toward the radio's own sector. The tie square is turned square to it"
+PIGTAIL_BEND,30.0,deg,design,pcb,pigtail bend past the tie toward its sector's holes (silkscreen arrow only)
+M3_POS,25.75 342.0,mm deg,design,pcb,"rev 3 M3 registration holes: radius and first angle; the others at +120 and +240 (342 / 102 / 222), in the free ring between the radios"
+M3_KEEPOUT,10.0,mm,design,pcb,"washer keep-out round each M3 (no tracks or vias, both layers)"
+M3_PAD,7.0,mm,design,pcb,"GND copper ring round each M3 hole, both sides"
+J1_POS,17.0 76.0,mm deg,design,pcb,"J1 (JST PH 4-pin vertical TH, 5V / GND / DATA / CMD like the carrier Up port) pin-row centre: radius, angle; row tangential, next to the head XIAO"
+J2_POS,17.5 322.0,mm deg,design,pcb,"J2 (5V in from the splitter, JST PH 2-pin vertical TH footprint): pin-row centre radius, angle"
+CLEARANCE_5V,0.5,mm,rule,pcb,"+5V copper clearance to every other net (custom DRC rule, out/*.kicad_dru)"
+GND_BACKOFF_5V,2.0,mm,rule,pcb,bottom GND pour held this far back from every +5V pad
 FACE_W,120.0,mm,design,face,"face PCB width (= FACE_WIDTH); height FACE_H. Solid copper both sides, one RP-SMA hole at the centre"
 FACE_EDGE_EXPOSE,3.0,mm,design,face,"exposed copper along all four face edges, both sides (seams to the other faces, the deck and the end plate)"
 FACE_TABS,-17.0 0.0 17.0,mm,design,face,"tab centres along each face's bottom edge, from the face centre (user 2026-11-21: tabs and slots to key the faces to the deck)"
 TAB_W,8.0,mm,design,face,tab width along the face edge; tab length = plate thickness (1.6) so it ends flush with the deck top and the end plate's outside. Tabs on both ends (2026-11-22)
 SLOT_W,2.0,mm,design,face,"deck slot width for a 1.6 mm face (FR-4 is +-10 %, so up to 1.76 mm)"
 SLOT_L,9.4,mm,design,face,"deck / end plate slot length. A 2.0 mm slot has R 1.0 ends, so an 8.0 x 1.6 tab needs >= 8.8; 9.4 keeps 0.2 mm at +-0.2 fab tolerance on tab and slot and cuts slide play from +-0.8 (10.4) to +-0.3 mm (2026-11-22)"
-MOUNT_GAP,1.0,mm,rule,pcb,"tie-mount squares stay this far from slots, the opening, holes, pads and courtyards, and inside the rim ring (checked by place_mount in make_pcbs.py; KiCad DRC can't see them)"
+MOUNT_GAP,1.0,mm,rule,pcb,"tie-mount squares must stay this far from slots, the pipe hole, M3 holes and pads (checked by tie_check in make_pcbs.py; KiCad DRC can't see silkscreen-only footprints)"
 TAB_RELIEF,2.2 1.2,mm,design,face,"relief notch beside each tab root: width (>= a 2 mm router bit) and depth into the face, so the bit's inside-corner radius doesn't sit where the face seats on the deck"
-COLLAR_LUG,3.0 12.0 8.0,mm,design,pcb,"bayonet lugs into the centre opening at the three core corners: depth (tips ~56 mm apart), width at the opening edge, width at the tip. A printed collar inside the triangle on the bottom locks clockwise seen from the bottom (2026-11-22)"
-SW1_PAD,3.0 4.0,mm,design,pcb,"service switch contact pads on the deck (SW1 A / B), like J2: width x height (2026-11-22)"
-SW1_LOOP,8.0 5.0 2.5,mm,design,pcb,"SW1 U loop that ships bridged: pad pitch, arm length from the pad edge, copper width (2026-11-22)"
-SW1_NECK,1.5 2.0,mm,design,pcb,"narrow neck in the SW1 bridge for the knife cut: width x length. IPC-2221 outer layer, 1 oz: ~1.1 mm for 3 A at a 10 C rise (2026-11-22)"
-C1_CAN,8.0 3.5,mm,design,pcb,"C1 dual footprint: 8 mm can, SMD 8 x 10 pads (CP_Elec_8x10) or radial leads at this pitch, overlapping, builder chooses; radial leads inside the core (2026-11-22)"
+COLLAR_LUG,3.0 12.0 8.0,mm,design,retired,"Retired in rev 3 (2026-11-23): no bayonet lugs. Rev 2: lug depth, width at the opening edge, width at the tip"
+SW1_PAD,3.0 4.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: SW1 contact pads
+SW1_LOOP,8.0 5.0 2.5,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: SW1 U loop
+SW1_NECK,1.5 2.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: SW1 cut neck
+C1_CAN,8.0 3.5,mm,design,pcb,"Not placed on the rev 3 deck (2026-11-23): the 8 mm dual footprint (11 x 9.2 mm courtyard) has no clear spot inside the core; owner to decide (see pcb/README.md). Rev 2: C1 dual footprint, 8 mm can, SMD 8 x 10 mm pads or radial leads at this pitch, overlapping"
 ENDPLATE_DIAMETER,144.0,mm,design,endplate,"end plate PCB across the far end of the triangle, FACE_H below the deck. Outer face corners at r 69.3: 144 leaves 2.7 mm of plate past them; under ~146 so it does not reach past the ducks. Not simulated (110 / 140 / 170 were) (2026-11-22)"
 ENDPLATE_STITCH,70.5 36,mm count,design,endplate,"stitching via ring on the end plate: radius, count"
 ENDPLATE_NUT_OD,50.0,mm,estimated,endplate,"1/2 in IPS faucet lock nut, estimated to cover hex / winged / flanged nuts; keep-clear ring is this + 4 mm, both sides"
 KO_CHANNEL,2.0,mm,design,endplate,knockout: routed channel width; its outer edge is ADAPTER_HOLE (the hole once broken out)
 KO_BRIDGE,2.5 4,mm count,design,endplate,"knockout bridges: width, count"
 MOUSE_BITE,0.5 0.75,mm,design,endplate,"mouse-bite holes across each knockout bridge, on the plate side of it: drill, pitch"
-SWITCH_HOLE,6.5,mm,design,endplate,"service switch: panel-mount SPST toggle >= 3 A DC, 1/4 in bushing; same drill as the RP-SMA"
-SWITCH_R,45.0,mm,design,endplate,"service switch hole on the 180 deg corner (below the deck's J2 / SW1 corner), inside the triangle, clear of the nut ring"
+SWITCH_HOLE,6.5,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped (end plate hole removed). Rev 2: 6.5 mm toggle hole
+SWITCH_R,45.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: toggle hole radius on the end plate

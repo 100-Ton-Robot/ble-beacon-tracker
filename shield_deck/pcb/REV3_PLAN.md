@@ -1,6 +1,7 @@
-# Shield deck PCB rev 3: plan (settled 2026-11-23, not implemented yet)
+# Shield deck PCB rev 3: plan (settled 2026-11-23, implemented 2026-11-23)
 
-Rev 2 (commit 6788740) is what `make_pcbs.py` builds today. Rev 3 moves the radios inside the
+Implemented in `make_pcbs.py` on 2026-11-23 (see `README.md` for what was built and where it differs:
+C1 left off, J2 as a PH 2-pin footprint). Rev 2 was commit 6788740. Rev 3 moves the radios inside the
 core so every net runs inside the shield, drops the LED block and the service switch, and shrinks
 the deck. This file is the spec the rev 3 pass implements. Drawing (to scale, top view):
 `rev3_layout.png`.
@@ -77,7 +78,7 @@ strip inner edge minus `CORE_MARGIN` 1 mm), as `core_ok` checks now.
 
 ## Done when
 
-- [ ] `make_pcbs.py` builds deck_d15, deck_d31, face, end plate; DRC 0 errors on all
-- [ ] Gerbers and the 1:1 print PDF regenerated; part clearance table updated
-- [ ] `README.md` (build order, BOM, wiring), `CHANGELOG.md`, `pcb_preview.png` updated
-- [ ] `parameters.csv`: new rev 3 values, retired rev 2 values marked
+- [x] `make_pcbs.py` builds deck_d15, deck_d31, face, end plate; DRC 0 errors on all
+- [x] Gerbers and the 1:1 print PDF regenerated; part clearance table updated
+- [x] `README.md` (build order, BOM, wiring), `CHANGELOG.md`, `pcb_preview.png` updated
+- [x] `parameters.csv`: new rev 3 values, retired rev 2 values marked

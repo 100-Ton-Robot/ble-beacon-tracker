@@ -1,6 +1,6 @@
 # Ordering the shield deck PCB (PCBWay)
 
-> This page is the older 146 mm deck without parts. For the 170 mm deck with the parts on it, and the face PCBs, see [pcb/README.md](pcb/README.md).
+> This page is the older 146 mm deck without parts. For the deck with the parts on it (144 / 146.3 mm), and the face PCBs, see [pcb/README.md](pcb/README.md).
 
 The deck is a round 146 mm two-layer PCB. These steps and settings are for PCBWay, the fab used so far; the Gerbers are standard RS-274X, so any PCB fab can make it with the same settings. Back to the [shield deck README](README.md).
 

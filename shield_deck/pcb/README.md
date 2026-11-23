@@ -1,16 +1,19 @@
 # Deck, face and end plate PCBs (parts on the deck)
 
-Three boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](make_pcbs.py):
+Four boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](make_pcbs.py). The deck comes in two sizes, one per duck spacing (the D hole's distance in front of each face); order the one that matches your antennas:
 
 | Board | File to upload | Qty per mast | Order |
 | --- | --- | --- | --- |
-| Deck, 170 mm round: the shield plate the antennas go through, with the scanners and power on top | `out/deck_pcb_gerbers.zip` | 1 | 5 (minimum) |
+| Deck, 15 mm ducks, 144 mm round: the shield plate the antennas go through, with the three scanners on top | `out/deck_d15_gerbers.zip` | 1 (this or the next) | 5 (minimum) |
+| Deck, 31 mm ducks, 146.3 mm round: the same deck with the D holes 31 mm off the faces | `out/deck_d31_gerbers.zip` | 1 (this or the previous) | 5 (minimum) |
 | Face, 120 x 120 mm (+ tabs): one side of the triangle reflector core | `out/face_pcb_gerbers.zip` | 3 | 5 (minimum), so order 5 per mast and keep 2 spare, or 10 for 3 masts |
-| End plate, 144 mm round, optional: a second shield plate across the far end of the triangle; carries the service switch | `out/endplate_pcb_gerbers.zip` | 0 or 1 | 5 (minimum) |
+| End plate, 144 mm round, optional: a second shield plate across the far end of the triangle | `out/endplate_pcb_gerbers.zip` | 0 or 1 | 5 (minimum) |
 
-This build replaces the hand-drilled acrylic electronics plate, the bus board / unified stripboard and the hand-cut copper-clad faces. The older deck (`../shield_deck_gerbers.zip`, 146 mm, no parts) and the plate templates stay in `..` for the older build. Status: **generated and DRC-clean, not yet ordered or built** (revision 2, 2026-11-22). Preview: [`pcb_preview.png`](pcb_preview.png).
+This build replaces the hand-drilled acrylic electronics plate, the bus board / unified stripboard and the hand-cut copper-clad faces. The older deck (`../shield_deck_gerbers.zip`, 146 mm, no parts) and the plate templates stay in `..` for the older build. Status: **generated and DRC-clean, not yet ordered or built** (revision 3, 2026-11-23; spec [`REV3_PLAN.md`](REV3_PLAN.md)). Preview: [`pcb_preview.png`](pcb_preview.png).
 
-> **Set the service switch to SERVICE before plugging in USB.** All modules share one 5 V rail, with no diodes. Plugging a USB cable into a XIAO or the ESP32 while the PoE splitter is feeding the deck ties the computer's USB VBUS to the splitter's 5 V. The service switch (SW1, below) cuts the splitter's feed; without a switch, unplug PoE instead. Power from PoE OR from USB, never both. Damage to the boards, the splitter or the computer from ignoring this is not covered by anything in this repo; you build and power it at your own risk. The same warning is on the deck, on each face and on the end plate.
+> **Unplug PoE before plugging in USB.** All modules share one 5 V rail, with no diodes. Plugging a USB cable into a XIAO or the ESP32 while the PoE splitter is feeding the deck ties the computer's USB VBUS to the splitter's 5 V. Power from PoE OR from USB, never both. Damage to the boards, the splitter or the computer from ignoring this is not covered by anything in this repo; you build and power it at your own risk. The same warning is on the deck, on each face and on the end plate.
+
+> **Firmware:** this deck wires the radios for relay protocol 4 (star wiring: D10 uplink TX, D0 / D1 branch RX, D7 command RX). That firmware is not written yet; scanner firmware 0.8.0 and older (one TX per radio straight to the gateway) does not work on this deck.
 
 ## Build order
 
@@ -18,44 +21,39 @@ The deck's silkscreen carries the same list.
 
 1. Faces to the deck and the end plate first, on the bare boards: drop all three faces' tabs into the deck slots and the end plate slots together (dry fit), tack, check, then solder the seams. With both plates fitted no squareness jig is needed (see Face). Without the end plate, square the faces by eye or with a printed jig.
 2. Clean (IPA).
-3. SMD parts, then J1 and J4, then the XIAOs.
-4. C1: the SMD can or the radial can, not both.
-5. RP-SMAs, coax, tie mounts.
-6. Power lead to J2.
-7. Service switch installed: cut SW1's neck, wire the switch to SW1 A and B, then check that SERVICE gives no power on the rail.
+3. J1 and J2 (either side, see Deck), then the XIAOs.
+4. RP-SMAs, coax, tie mounts.
+5. Splitter lead to J2.
 
-To rework a seam later, remove the parts near it first: the deck's part distances to the seam strip are in `out/deck_part_clearance.csv` (several sit right over it, see Deck).
+To rework a seam later, remove the XIAOs first: their outer pad corners are 1.0 mm from the seam strip (`out/deck_d15_part_clearance.csv`).
 
 ## Deck
 
-- **Top (electronics side):** a +5 V pour, every part, all hand-solderable. **Bottom (antenna side):** solid GND, the shield. Bottom copper is broken only inside the core (behind the reflectors): the J1, J4 and C1 radial pins, one short CMD track and one short BUF track (under the collar M3 in the 180 deg corner), each through a via.
-- **Holes:** D, P, P2 RP-SMA holes as before (6.5 mm, plated, 12 mm exposed GND pads both sides), a 62 mm centre opening (pipe, ESP32 + PoE bundle end-on, the three dipole coaxes, the end plate's switch wires) with three 3 mm bayonet lugs at the core corners (tips ~56 mm apart), and three M3 holes at r 41 mm on the core corners, inside the triangle. A printed collar on the bottom, inside the triangle, takes the lugs and the M3s; it locks clockwise seen from the bottom ("LOCK" / "OPEN" arrows on the bottom silkscreen, "COLLAR LOCKS FROM BOTTOM" on top). 62 mm is the most the centre face slots allow (1.8 mm of board between the opening and their inner edge).
-- **Exposed copper:** 4 mm rim ring both sides (36 stitching vias in it), the 6 mm seam strip under the faces on the bottom, the RP-SMA pads.
-- **Face slots:** three 2.0 x 9.4 mm milled slots per face along the seam lines (at the face centre and 17 mm either side), centred on the face board. A 2.0 mm slot has R 1.0 ends, so an 8.0 x 1.6 mm tab needs at least 8.8 mm; 9.4 mm keeps 0.2 mm at +-0.2 mm fab tolerance on tab and slot and leaves +-0.3 mm of slide. The top pour is kept 1 mm clear of every slot.
-- **Bottom silkscreen:** guide lines either side of the seam strip, a tick at each face's centre ("FACE Sn CENTRE"), "SOLDER FACES BEFORE ANY PARTS", the collar arrows.
-- **XIAOs (U2-U4):** on the core corners (60 / 180 / 300 deg), castellated pads lengthened for an iron, USB-C end out to the rim, IPEX4 end inward. Only the right-hand row is wired: 5V (straight onto the +5 V pour), GND, D7 (RX, from the gateway's command TX) and D8 (TX, to the gateway). The left row is solder for strength only. To flash or read logs, take the assembly out of the housing (one nut on the post) and set the service switch first; the USB-C ports then face straight out at the rim.
-- **J1:** JST B7B-PH-K-S (2.0 mm, vertical, through-hole) inside the core at the 60 deg corner, pin row 48 mm out (clear of the collar M3); the harness plugs straight down into the board. Pin 1 is the square pad.
+Revision 3 puts the three radios inside the triangle core, so every net runs inside the shield. The two deck files differ only in the diameter and the D hole positions.
 
-| J1 pin | Net | ESP32-S3-ETH |
-| --- | --- | --- |
-| 1 | S2 TX | GPIO18 (header 31) |
-| 2 | CMD TX | GPIO21 (header 35) |
-| 3 | GND | GND |
-| 4 | 5 V (straight from the rail) | 5V |
-| 5 | LED data in | GPIO1 |
-| 6 | S0 TX | GPIO17 (header 34) |
-| 7 | S1 TX | GPIO16 (header 32) |
+- **Top (electronics side):** bare board except the parts, the +5 V tracks (0.8 mm), the signal stubs to the XIAO pads and the GND rim ring. **Bottom (antenna side):** solid GND, the shield. Inside the core (behind the reflectors, `CORE_MARGIN` 1 mm clear of the seam strip) both layers carry signals: the CMD ring and spokes, the two branch lanes along faces S0 and S2, the head's DATA track to J1, and the J1 / J2 pins. Outside the core the bottom copper is unbroken.
+- **Rules:** a custom DRC rule (`out/*.kicad_dru`, written by the generator) keeps +5 V copper at least 0.5 mm from every other net (0.2 mm elsewhere). The bottom GND pour is held 2 mm back from every +5 V pad, inside the core only, so the seam strip stays whole.
+- **Size:** diameter = larger of 144 mm (face corners at r 69.3 + 2.7 mm, as the end plate) and 2 x (inradius + duck spacing + 6 mm pad + 1.5 mm edge margin): 144 mm at 15 mm, 146.3 mm at 31 mm.
+- **Holes:** D, P, P2 RP-SMA holes (6.5 mm, plated, 12 mm exposed GND pads both sides). One antenna per sector: D, P or P2 ("ONE ANTENNA: D, P OR P2" on the bottom). At 15 mm the D and P pads overlap; they are the same GND net and merge (holes 1.5 mm apart). A round 22.2 mm (7/8 in) centre hole for the 1/2 in PVC pipe adapter (21.3 mm OD); no wires pass through the deck, Ethernet runs inside the pipe. Three M3 holes (3.4 mm, plated, 7 mm GND ring both sides) at r 25.75 mm, 342 / 102 / 222 deg, in the free ring between the radios: they register the deck to the collar, with a 10 mm washer keep-out marked on both sides (no tracks or vias in it). The 62 mm opening and the bayonet lugs are gone.
+- **Exposed copper:** 4 mm rim ring both sides (36 stitching vias in it), the 6 mm seam strip under the faces on the bottom, the RP-SMA pads, the M3 rings.
+- **Face slots:** three 2.0 x 9.4 mm milled slots per face along the seam lines (at the face centre and 17 mm either side), centred on the face board. A 2.0 mm slot has R 1.0 ends, so an 8.0 x 1.6 mm tab needs at least 8.8 mm; 9.4 mm keeps 0.2 mm at +-0.2 mm fab tolerance on tab and slot and leaves +-0.3 mm of slide. Top copper is kept 1 mm clear of every slot.
+- **XIAOs (U2-U4):** one per core corner (60 / 180 / 300 deg), on the corner axis, USB-C end out toward the corner, antenna end in: antenna end 24 mm from the centre, centre 34.5 mm, USB-C end 45 mm. All castellated pads (lengthened for an iron) are inside the core; their outer corners are 1.0 mm from the seam strip, right on the 1 mm margin. The USB-C plug path (13 x 25 mm past the USB-C end, drawn on the print) runs out over the corner, clear of every antenna pad. Each radio feeds the sector 60 deg counter-clockwise of it: U2 (2 o'clock) -> S0, U3 (6 o'clock) -> S1, U4 (10 o'clock) -> S2.
+- **Wiring (star, relay protocol 4):** U2 is the head. U2 D10 (uplink TX) -> J1 DATA. U3 D10 -> U2 D0 (Branch 1); U4 D10 -> U2 D1 (Branch 2). J1 CMD -> every D7. J1 and J2 5V -> every 5V pad. Each XIAO's GND pad goes by a via to the bottom shield. The other pads are solder for strength only.
 
-The ESP32 stays on the pipe and is fed 5 V through J1, so its USB-C power pigtail goes. A different ESP32 board only needs a new harness.
+| J1 pin | Net | Carrier Up port colour | ESP32-S3-ETH |
+| --- | --- | --- | --- |
+| 1 | 5V | red | 5V |
+| 2 | GND | black | GND |
+| 3 | DATA (head D10, uplink) | yellow | a gateway RX pin (GPIO17 = gateway pin 0) |
+| 4 | CMD (every D7) | green | GPIO21 (command TX) |
 
-- **5V IN (J2) and the service switch (SW1):** outside the signal band at the 180 deg corner, beside XIAO S1. J2 is two large pads, + and -: solder on whatever brings regulated 5 V (a female USB-C pigtail for a PoE splitter with a USB-C plug, or bare leads). J2 + feeds SW1 pad A; SW1 pad B feeds the +5 V pour. SW1 is a copper U: A and B are the contact pads at its tips, and its bridge ships **closed**, so a deck without a switch needs nothing. To fit the service switch, cut the bridge at its narrow neck (1.5 x 2 mm, between the silkscreen brackets, "CUT IF SWITCH INSTALLED") and wire the switch to A and B. The bridge is 2.5 mm copper and the neck 1.5 mm (1 oz: ~1.1 mm carries 3 A at a 10 C rise, IPC-2221 outer layer). Then check: switch on SERVICE, no power on the rail.
-- **Service mode:** with SW1 open and a USB cable plugged into one module, that cable feeds the whole rail (ESP32, the other XIAOs, the LED strip's idle current) from a port that may give only 500 mA. Not measured.
-- **LED strip (J3, J4):** J3 is three pads for a JST-SM pigtail, J4 a 1 x 3 2.54 mm male header (Dupont, through-hole, inside the core); both are 5V / DIN / GND in that order, pin 1 (5V) the square pad on J4. The 74HCT125 (U1, channel 3; the other channels tied off) lifts GPIO1 to 5 V, R1 330 ohm in series, R2 10 k pull-down keeps the strip dark while the ESP32 boots. F1 (2 A, one-time) feeds only the strip.
-- **Strip short (accepted risk):** the splitter current-limits at about 2.6 A (estimated), about 130 % of F1's rating. The 466 series opens within 5 s at 200 % and 0.2 s at 300 % but has no maximum opening time below 200 %, so a short on the strip can sit on the splitter's limit and reboot the mast until it is cleared, as accepted for the stripboard build in `../README.md`.
-- **C1:** one 8 mm can footprint, two ways: SMD (8 x 10 mm can pads) or radial (3.5 mm lead pitch), overlapping, same nets on the same side (+ marked). The radial leads come through inside the core, so clipped leads sit behind the reflectors.
-- **R3:** a 0 ohm 1206 jumper carrying CMD to S1 over the S0 track. Fit it.
-- **Tie mounts:** six 12.5 mm squares (TIE 5V IN, TIE LED, TIE J1, TIE Sn COAX) for 1/2 in HS-100 adhesive tie mounts. Mask only underneath, nothing to catch the adhesive. The generator places each one at the clear spot nearest its preferred position, `MOUNT_GAP` (1 mm) clear of the slots, the opening, holes, pads, courtyards and silkscreen text, inside the rim ring (KiCad's DRC can't check silkscreen-only footprints).
-- **Heat near the seams:** there is no hard keep-out. The XIAOs sit over the corner seams, and U1, R2, R3, C3 and J3 overlap the seam strip in plan; J1, J4, C1, R1, F1 and C2 are 1-4 mm from it (`out/deck_part_clearance.csv`, pad edge to seam strip and to slot). Soldering the faces first, on the bare boards, is what protects them.
+- **J1:** JST B4B-PH-K-S (2.0 mm, vertical, through-hole), the same pinout as the XIAO carrier board's Up port, at r 17 mm, 76 deg, next to the head; pin row tangential, pin 1 (square pad) at the clockwise end. Its housing outline is printed on both sides: fit it on whichever side faces the ESP32.
+- **J2 (5V in from the splitter):** a JST PH 2-pin footprint (B2B-PH-K-S), pin 1 = +5 V, pin 2 = GND, at r 17.5 mm, 322 deg, outline on both sides. Fit a B2B-PH-K-S and crimp the splitter lead, or solder the lead straight into the holes (0.75 mm drill, up to about 24 AWG).
+- **Tie mounts:** three 12.5 mm squares, one per XIAO pigtail, for 1/2 in HS-100 adhesive tie mounts (mask only underneath). Each pigtail leaves its IPEX4 at 236 deg in the corner frame (56 deg off straight in, toward its own sector); the square sits 13 mm along it (r 24 mm), turned so two sides are square to the cable. Clearances, checked by the generator (KiCad's DRC can't see silkscreen-only footprints): 6.6 mm from the 22.2 mm hole edge (7.0 mm from the 21.3 mm pipe), 2.7 mm from the nearest face slot, 1.1 mm from the nearest pad. Past the tie the pigtail bends about 30 deg and runs over the face line to its sector's D, P or P2 hole (dashed arrow).
+- **C1 (bulk capacitor): not on this revision.** The 8 mm dual footprint (SMD 8 x 10 or radial, 11 x 9.2 mm courtyard) has no clear spot inside the core. A search of the routed board found room for an 8 mm radial can only near the 6 o'clock XIAO (r 19.5 mm, 194 deg, about 33 mm from J2), and for a 6.3 mm can about 7 mm from J2 (r 19 mm, 300 deg). Open: owner to choose.
+- **Removed in revision 3:** the LED block (U1, R1, R2, C2, C3, F1, J3, J4) and every LED net (the LED board has its own connector to the ESP32), the service switch loop SW1 and its silkscreen, the back-feed diodes, R3, the collar arrows.
+- **Heat near the seams:** there is no hard keep-out. The XIAO pads are 1.0 mm from the seam strip and 7.0 mm from the nearest slot; J1 and J2 are 16 mm away (`out/deck_d15_part_clearance.csv`). Soldering the faces first, on the bare boards, is what protects them.
+- **Bottom silkscreen:** guide lines either side of the seam strip, a tick at each face's centre ("FACE Sn CENTRE"), "ONE ANTENNA: D, P OR P2" per sector, "SOLDER FACES BEFORE ANY PARTS", the duck spacing, the J1 / J2 outlines.
 
 ## Face
 
@@ -69,30 +67,22 @@ A second shield plate across the far end of the triangle, `FACE_H` (120 mm) belo
 - **Face slots:** the same nine 2.0 x 9.4 mm slots as the deck, with the same guide lines and face centre ticks.
 - **Centre:** a 6.5 mm plated RP-SMA hole for a downward antenna, in a knockout. The knockout is a 2 mm routed ring (outer edge 22.2 mm, 7/8 in) held by four 2.5 mm bridges with three 0.5 mm mouse-bite holes each, on the plate side. Break it out (and file the nubs) to pass the 1/2 in PVC male adapter thread (21.3 mm OD). The disc is its own copper (net GND_KO), not tied to the plate once the ring is routed; an antenna in it is grounded through its coax.
 - **Adapter:** the pipe glues into the adapter's socket from above, the adapter's shoulder sits on the plate inside the core, the thread goes down through the knockout and a 1/2 in IPS faucet mounting lock nut on the outside clamps the plate (mechanical only, no seal). A 54 mm keep-clear ring is marked on both sides (lock nut estimated at 50 mm across). Check on the dry fit that the assembly still comes out of the housing on the one post nut.
-- **Service switch:** a 6.5 mm hole at the 180 deg corner (below the deck's J2 / SW1), 45 mm from the centre, inside the triangle, for a panel-mount SPST toggle rated at least 3 A DC with a 1/4 in bushing. Body inside the core, lever below, reachable from underneath (the mast hangs from the ceiling). Mount it so the lever points at "RUN" when closed and at "SERVICE" when open. Its two wires run up the core and through the deck opening to SW1 A and B (cut SW1's bridge first). Without an end plate, a switch can go in the pigtail's + lead instead.
-- **Silkscreen:** inside: "END PLATE - INSIDE", the build-order note, the switch note; outside: "RUN" / "SERVICE", the power warning, the knockout note.
+- **Silkscreen:** inside: "END PLATE - INSIDE", the build-order note; outside: the power warning, the knockout note. Revision 3 removed the service switch hole and its "RUN" / "SERVICE" marks.
 
 ## BOM (one mast)
 
 | Ref | Part | Package | Qty |
 | --- | --- | --- | --- |
-| U1 | 74HCT125 (e.g. TI CD74HCT125M) | SOIC-14 | 1 |
 | U2-U4 | Seeed XIAO nRF54L15 | castellated | 3 |
-| J1 | JST B7B-PH-K-S; mating PHR-7 housing + SPH-002T-P0.5S crimps | 2.0 mm TH | 1 |
-| J3 | JST-SM 3-pin pigtail for the LED strip (soldered to the pads), optional | - | 0 or 1 |
-| J4 | 1 x 3 male pin header, 2.54 mm, vertical | TH | 1 |
-| C1 | 330 uF >= 10 V low-ESR aluminium (polymer or standard), 8 mm can: SMD 8 x 10 mm or radial 3.5 mm pitch; part number to pick | 8 mm can | 1 |
-| C2, C3 | 100 nF X7R | 1206 | 2 |
-| R1 | 330 ohm | 1206 | 1 |
-| R2 | 10 k | 1206 | 1 |
-| R3 | 0 ohm jumper | 1206 | 1 |
-| F1 | Littelfuse 0466002.NR: 2 A very fast-acting, one-time, 63 V, 50 A interrupt (alternate Bourns SF-1206F200-2) | 1206 | 1 |
-| SW1 | Copper loop on the deck; with the end plate: panel-mount SPST toggle, >= 3 A DC, 1/4 in bushing (part number to pick) | - | 0 or 1 |
-| - | Female USB-C power pigtail, optional (PoE splitter with a USB-C plug) | - | 0 or 1 |
-| - | 1/2 in HS-100 adhesive tie mounts | - | 6 |
+| J1 | JST B4B-PH-K-S; mating PHR-4 housing + SPH-002T-P0.5S crimps (4-wire harness to the ESP32, as the carrier Up port) | 2.0 mm TH | 1 |
+| J2 | JST B2B-PH-K-S; mating PHR-2 + crimps on the splitter lead (or solder the lead into the holes) | 2.0 mm TH | 0 or 1 |
+| - | 1/2 in HS-100 adhesive tie mounts | - | 3 |
+| - | Deck PCB (15 or 31 mm ducks) | - | 1 |
 | - | Face PCB | - | 3 |
 | - | End plate PCB, optional | - | 0 or 1 |
 | - | 1/2 in IPS faucet mounting lock nut (with the end plate and the pipe through it) | - | 0 or 1 |
+
+C1 (bulk capacitor) is not on revision 3; see Deck.
 
 ## Order settings (PCBWay)
 
@@ -100,10 +90,10 @@ Same as the old deck ([../PCBWAY.md](../PCBWAY.md)) except:
 
 | Setting | Deck | Face | End plate |
 | --- | --- | --- | --- |
-| Size | 170 x 170 mm, round (outline, centre opening with lugs and the nine face slots in Edge_Cuts) | 120 x 123.2 mm (with the tabs) | 144 x 144 mm, round |
+| Size | 144 x 144 mm (15 mm ducks) or 146.3 x 146.3 mm (31 mm ducks), round (outline, 22.2 mm centre hole and the nine face slots in Edge_Cuts) | 120 x 123.2 mm (with the tabs) | 144 x 144 mm, round |
 | Silkscreen | White, **both sides** | White, both sides | White, both sides |
 | Min hole | 0.4 mm (vias) | 0.4 mm | 0.4 mm (vias); 0.5 mm mouse bites |
-| Note to fab | "Round board with a 62 mm internal cutout (three lugs) and nine 2.0 mm milled slots (non-plated). Large copper pours on both layers are intentional (RF shield)." | "Tabs on two edges. Solid copper both sides is intentional (RF reflector)." | "Round board, nine 2.0 mm milled slots and a routed knockout ring with mouse-bite bridges (keep the bridges). Solid copper both sides is intentional (RF shield)." |
+| Note to fab | "Round board with a 22.2 mm centre hole and nine 2.0 mm milled slots (non-plated). Large copper pour on the bottom is intentional (RF shield)." | "Tabs on two edges. Solid copper both sides is intentional (RF reflector)." | "Round board, nine 2.0 mm milled slots and a routed knockout ring with mouse-bite bridges (keep the bridges). Solid copper both sides is intentional (RF shield)." |
 
 1.6 mm FR-4, 2 layers, 1 oz, HASL lead-free or ENIG (exposed copper must take solder). Check each in PCBWay's Gerber viewer before paying.
 
@@ -113,12 +103,12 @@ Same as the old deck ([../PCBWAY.md](../PCBWAY.md)) except:
 python3 make_pcbs.py
 ```
 
-Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path (on Debian / Ubuntu `apt install kicad kicad-footprints`), plus `pip install shapely pypdf` (tie-mount clearance check, seam distance table, merged print PDF). Sizes and rules come from `../parameters.csv` (groups `pcb`, `face`, `endplate`, plus `deck` for the antenna hole geometry, `plate` for the XIAO size and `ADAPTER_HOLE` from `pipe`). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
+Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path (on Debian / Ubuntu `apt install kicad kicad-footprints`), plus `pip install shapely pypdf pillow` (tie-mount clearance check, seam distance table, merged print PDF, preview) and `rsvg-convert` (preview). Sizes and rules come from `../parameters.csv` (groups `pcb`, `face`, `endplate`, plus `deck` for the antenna hole geometry; `DECK_VARIANTS` lists the duck spacings built; `plate` for the XIAO size and `ADAPTER_HOLE` from `pipe`). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
 
-Output in `out/`: `*.kicad_pcb` (open in KiCad 7+; KiCad 8 / 10 will upgrade the file on save), `*_gerbers.zip`, `*_drc.rpt`, `deck_part_clearance.csv`. The DRC reports should show **0 errors**; the remaining warnings are silkscreen clipped by the exposed copper or a board edge, "library not in configuration" for the generated footprints, and on the end plate "isolated copper fill" (its GND pour has no pads, only vias).
+Output in `out/`: `*.kicad_pcb` (open in KiCad 7+; KiCad 8 / 10 will upgrade the file on save), `*_gerbers.zip`, `*_drc.rpt`, `*.kicad_dru` (the +5 V clearance rule; keep it next to its board), `deck_d*_part_clearance.csv`, and `../pcb_preview.png`. The DRC reports should show **0 errors**; the remaining warnings are silkscreen clipped by the exposed copper, "library not in configuration" for the generated footprints, and on the end plate "isolated copper fill" (its GND pour has no pads, only vias).
 
 Routing is by hand in the script (no autorouter). If you move a part, re-run and read the DRC report: clearances, unconnected nets and courtyard overlaps are all checked there.
 
 ## Check a 1:1 print before ordering
 
-`out/pcb_print_1to1.pdf` has five A4 landscape pages: deck top, deck bottom (mirrored, as seen from below), one face, end plate inside, end plate outside (mirrored). Pads and exposed copper print black, with silkscreen, outline and holes. Print at 100% ("Actual size", not "Fit to page") and measure both 100 mm scale bars on each page before trusting it. Then lay the real parts on it: the XIAOs (castellations on the pads, IPEX4 on its circle), J1, J4, the SOIC, C1, the RP-SMA connectors in their holes, the pipe and ESP32 bundle through the opening, the toggle in its hole and the adapter / lock nut in the knockout ring.
+`out/pcb_print_1to1.pdf` has seven A4 landscape pages: 15 mm deck top and bottom (mirrored, as seen from below), 31 mm deck top and bottom, one face, end plate inside, end plate outside (mirrored). Pads and exposed copper print black, with silkscreen, outline and holes. Print at 100% ("Actual size", not "Fit to page") and measure both 100 mm scale bars on each page before trusting it. Then lay the real parts on it: the XIAOs (castellations on the pads, IPEX4 on its circle; the outer pad corners have no spare against the core margin), a USB-C plug in each drawn plug path, J1 and J2, the tie mounts on their squares with a pigtail run to its sector's holes, the RP-SMA connectors in their holes, the pipe adapter in the 22.2 mm hole, an M3 washer on each 10 mm circle and the adapter / lock nut in the end plate's knockout ring.

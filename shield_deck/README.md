@@ -4,7 +4,7 @@ Printable 1:1 drill templates for the electronics plates and back panel, stack v
 
 ## Quick start (files in the repo, no software)
 
-> **New (2026-11-21, revision 2 2026-11-22): parts-on-the-deck build.** A 170 mm deck PCB carrying the three XIAOs, the power + LED circuit, the ESP32 connector and a service switch loop, PCB faces for the triangle, and an optional 144 mm end plate. It replaces the acrylic plate, the bus / unified stripboard and the hand-cut faces. Files, BOM and order settings: [pcb/README.md](pcb/README.md). Generated and DRC-clean, not yet built. The pages below are for the older build.
+> **New (2026-11-21, revision 3 2026-11-23): parts-on-the-deck build.** A deck PCB (144 mm for 15 mm ducks, 146.3 mm for 31 mm) carrying the three XIAOs inside the triangle core, star-wired to one 4-pin ESP32 connector, PCB faces for the triangle, and an optional 144 mm end plate. It replaces the acrylic plate, the bus / unified stripboard and the hand-cut faces. Files, BOM and order settings: [pcb/README.md](pcb/README.md). Generated and DRC-clean, not yet built. The pages below are for the older build.
 
 **Pick one build type first: pipe or no pipe.** Print and use only the pages for the one you pick; the plate pages are alternatives, not both.
 
