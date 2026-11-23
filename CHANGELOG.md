@@ -127,6 +127,10 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Changed (2026-11-23): deck rev 3 gets the end plate's centre knockout (broken out for the pipe on a deck), so
+  a d15 deck turned over can serve as the end plate (RF model: same result as the end plate PCB, which stays as
+  the option). Repo URL on every silkscreen. Antenna strain relief ties moved out to 15 mm from the IPEX4 (3.3 mm
+  clear of the XIAO), labelled "ANT STRAIN RELIEF TIE", with a dotted pigtail path from the IPEX4 marker.
 - Changed (2026-11-23): `shield_deck/pcb/` revision 3, as specified in `REV3_PLAN.md` (KiCad 7, DRC 0 errors
   on all four boards, not yet ordered or built). The three XIAOs sit inside the core on the corner axes
   (antenna end 24 mm, USB-C out to the corners), so every net runs inside the shield, on both layers there.

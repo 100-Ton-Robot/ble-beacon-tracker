@@ -245,7 +245,8 @@ via, every hole, slot and track gap, the end plate's copper including the knocko
 | Run | S11 at 2440 | Peak | -3 dB width el 0 / -30 | F/B el 0 / -30 | Isolation | Median bearing error | 90% | Right sector |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | d15 outline | -2.8 dB | 8.8 dBi | 85 / 105 deg | 29.4 / 19.9 dB | -49.3 dB | 15 deg | 39 deg | 84.4% |
-| d15 copper | -2.7 dB | 8.7 dBi | 85 / 100 deg | 29.5 / 20.3 dB | -49.4 dB | 14 deg | 37 deg | 83.8% |
+| d15 copper | -2.7 dB | 8.7 dBi | 85 / 95 deg | 29.2 / 20.2 dB | -49.4 dB | 14 deg | 38 deg | 83.7% |
+| d15 copper, deck board as end plate | -2.6 dB | 8.7 dBi | 85 / 95 deg | 29.5 / 19.9 dB | -49.7 dB | 14 deg | 38 deg | 83.7% |
 | d31 outline | -5.1 dB | 8.0 dBi | 105 / 125 deg | 25.0 / 20.5 dB | -48.6 dB | 16 deg | 42 deg | 80.9% |
 | d31 copper | -5.0 dB | 8.1 dBi | 100 / 130 deg | 30.2 / 21.0 dB | -52.1 / -49.4 dB | 14 deg | 39 deg | 81.0% |
 
@@ -260,6 +261,10 @@ via, every hole, slot and track gap, the end plate's copper including the knocko
   dBi) and a slightly better bearing (14-15 vs 14-16 deg median, 37-39 vs 39-42 deg at 90%, 84 vs 81% right
   sector). The duck's match is worse close to the face (-2.8 vs -5.1 dB S11), as in the spacing sweep; for a
   receiver that costs little.
+- **Deck board as end plate** (`--end-plate deck`: a second d15 deck turned over, knockout in): the same as the
+  end plate PCB within 0.1 dB and 0 deg, so one board design can serve both plates at 15 mm. (The d15 and d31
+  copper runs were re-run after the deck gained its knockout, broken out in the model; within 0.3 dB / 1 deg of the
+  first runs.)
 - **Not comparable** with the older runs above (146 mm disc, no end plate, no pipe hole): both the deck size and
   the end plate changed at once.
 - **Model limits (`--copper`):** tracks and gaps narrower than the 1 mm mesh are only roughly resolved, the faces

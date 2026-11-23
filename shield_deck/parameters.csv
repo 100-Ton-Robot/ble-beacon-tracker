@@ -179,7 +179,7 @@ DECK_VARIANTS,15 31,mm,design,pcb,"duck spacings (DUCK_SPACING values) the gener
 DECK_MIN_DIAMETER,144.0,mm,design,pcb,"smallest deck: face corners (r 69.3) + 2.7 mm, as the end plate. Deck diameter = max(this, 2 x (inradius + spacing + PAD_EXPOSE / 2 + DECK_EDGE_MARGIN)) (rev 3, 2026-11-23)"
 DECK_EDGE_MARGIN,1.5,mm,design,pcb,board edge past the D hole's exposed pad
 XIAO_CENTRE_V,34.5,mm,design,pcb,"rev 3: XIAO centre this far out along its core corner axis, USB-C end out (v 45), antenna end in (v 24); outer pad corners ~0 mm inside CORE_MARGIN"
-TIE_FROM_IPEX,13.0,mm,design,pcb,"tie square centre this far from the IPEX4 along the pigtail (corner frame u -14.68 v 18.98, r 24)"
+TIE_FROM_IPEX,15.0,mm,design,pcb,"tie square centre this far from the IPEX4 along the pigtail (corner frame u -16.34 v 17.86). 15 (owner 2026-11-23, was 13 in the rev 3 spec): the square sits 3.3 mm clear of the XIAO so it stays visible and reachable once the XIAO is on; 3.1 mm from the M3 washer keep-out, 1.4 mm from the nearest slot"
 PIGTAIL_ANGLE,236.0,deg,design,pcb,"pigtail direction leaving the IPEX4, in the corner frame (clockwise from straight out): 56 deg off straight in, toward the radio's own sector. The tie square is turned square to it"
 PIGTAIL_BEND,30.0,deg,design,pcb,pigtail bend past the tie toward its sector's holes (silkscreen arrow only)
 M3_POS,25.75 342.0,mm deg,design,pcb,"rev 3 M3 registration holes: radius and first angle; the others at +120 and +240 (342 / 102 / 222), in the free ring between the radios"

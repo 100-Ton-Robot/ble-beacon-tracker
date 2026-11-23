@@ -28,6 +28,7 @@ python3 sector_model.py --antenna dipole --centre 65 --spacing 34 --out out/h503
 # shield_deck/pcb/out/*_copper.json from make_pcbs.py.
 python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate --out out/rev3_d15_outline
 python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate --copper --out out/rev3_d15_copper
+python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate deck --copper --out out/rev3_d15_copper_deckplate
 python3 sector_model.py --antenna dipole --centre 65 --deck d31 --end-plate --out out/rev3_d31_outline
 python3 sector_model.py --antenna dipole --centre 65 --deck d31 --end-plate --copper --out out/rev3_d31_copper
 
@@ -36,7 +37,7 @@ python3 bearing_sim.py out/monopole out/dipole --out out/bearing
 python3 bearing_sim.py out/dipole out/h50327_c55 out/h50327_c65 out/h50327_c75 --out out/bearing_h50327
 python3 bearing_sim.py out/h50327_c65_s15 out/h50327_c65_s20 out/h50327_c65_s25 out/h50327_c65 out/h50327_c65_s34 \
     --out out/bearing_spacing
-python3 bearing_sim.py out/rev3_d15_outline out/rev3_d15_copper out/rev3_d31_outline out/rev3_d31_copper \
+python3 bearing_sim.py out/rev3_d15_outline out/rev3_d15_copper out/rev3_d15_copper_deckplate out/rev3_d31_outline out/rev3_d31_copper \
     --out out/bearing_rev3
 
 # antenna specs (spec_sweep.py)

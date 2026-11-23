@@ -31,6 +31,7 @@ PCB build (shield_deck/pcb, rev 3), two levels of detail to compare:
                      (shield_deck/pcb/deck_size.py) with the 22.2 mm pipe hole, on the solid core; the antennas
                      go to its D holes (--spacing defaults to 15 / 31)
   --end-plate        add the 144 mm end plate across the far end of the core (outline: a solid disc)
+  --end-plate deck   with --copper: a second deck board turned over as the end plate, knockout left in
   --copper           with --deck: the boards' real copper from shield_deck/pcb/out/*_copper.json (written by
                      make_pcbs.py): both deck layers 1.6 mm apart joined by the plated holes and vias, every hole,
                      slot and track gap, the end plate's copper, and a hollow core built from the three face
@@ -83,7 +84,9 @@ def args_():
                     help="antenna axis -> copper face, mm (default DUCK_SPACING, the D hole; with --deck, its spacing)")
     ap.add_argument("--deck", choices=sorted(DECKS), help="rev 3 deck PCB for this duck spacing (outline, or "
                                                           "its real copper with --copper)")
-    ap.add_argument("--end-plate", action="store_true", help="add the end plate PCB across the far end of the core")
+    ap.add_argument("--end-plate", nargs="?", const="plate", choices=["plate", "deck"],
+                    help="add a plate across the far end of the core: the end plate PCB (plate, the default) or, with "
+                         "--copper, a second deck board turned over (deck), its knockout left in")
     ap.add_argument("--copper", action="store_true", help="with --deck: the PCBs' real copper and a hollow core")
     ap.add_argument("--gap", type=float, default=1.0, help="feed gap, mm")
     ap.add_argument("--freq", type=float, default=P["RF_FREQ"] * 1e6, help="Hz, default RF_FREQ")
@@ -94,6 +97,8 @@ def args_():
     a = ap.parse_args()
     if a.copper and not a.deck:
         ap.error("--copper needs --deck")
+    if a.end_plate == "deck" and not a.copper:
+        ap.error("--end-plate deck needs --copper (as an outline it is the same disc as the end plate at d15)")
     if a.spacing is None:
         a.spacing = DECKS[a.deck] if a.deck else P["DUCK_SPACING"]
     elif a.deck and a.spacing != DECKS[a.deck]:
@@ -115,6 +120,19 @@ def nest_depth(polys):
         p = Point(Polygon(g["outer"]).representative_point())
         out.append(sum(1 for h in holes if h.contains(p)))
     return out
+
+
+def without_knockout(polys):
+    """The deck as fitted: its knockout broken out for the pipe (drop the copper inside the finished hole)."""
+    from shapely.geometry import Point, Polygon
+    hole = Point(0, 0).buffer(P["ADAPTER_HOLE"] / 2)
+    return [g for g in polys if not hole.contains(Polygon(g["outer"]))]
+
+
+def mirror_x(polys):
+    """A board turned over about its S0 axis (top view x -> -x)."""
+    return [{"outer": [[-x, y] for x, y in g["outer"]], "holes": [[[-x, y] for x, y in h] for h in g["holes"]]}
+            for g in polys]
 
 
 def add_sheet(csx, metal, air, polys, z, base=10):
@@ -177,19 +195,31 @@ def build(a):
     else:
         # the PCBs' copper: deck bottom (shield) at z = 0, top at z = T, joined by the plated barrels
         deck = load_copper(f"deck_{a.deck}")
-        add_sheet(csx, pec, air, deck["layers"]["B.Cu"], 0.0)
-        add_sheet(csx, pec, air, deck["layers"]["F.Cu"], T)
-        for x, y, d in deck["barrels"]:
-            pts = [(x, y)] if d <= 1.0 else [(x + d / 2 * math.cos(k * math.pi / 2), y + d / 2 * math.sin(k * math.pi / 2))
-                                              for k in range(4)]
-            for px, py in pts:
-                pec.AddBox([px, py, 0.0], [px, py, T], priority=40)
+        ko = P["ADAPTER_HOLE"] / 2
+
+        def barrels(z0, z1, flip=False, keep_ko=True):
+            for x, y, d in deck["barrels"]:
+                if not keep_ko and math.hypot(x, y) < ko:
+                    continue
+                x = -x if flip else x
+                pts = [(x, y)] if d <= 1.0 else [(x + d / 2 * math.cos(k * math.pi / 2),
+                                                   y + d / 2 * math.sin(k * math.pi / 2)) for k in range(4)]
+                for px, py in pts:
+                    pec.AddBox([px, py, z0], [px, py, z1], priority=40)
+        add_sheet(csx, pec, air, without_knockout(deck["layers"]["B.Cu"]), 0.0)
+        add_sheet(csx, pec, air, without_knockout(deck["layers"]["F.Cu"]), T)
+        barrels(0.0, T, keep_ko=False)
         # hollow core: the three face boards
         face = load_copper("face_pcb")
         for s in SECTORS:
             add_face(pec, air, face, s, T)
-        if a.end_plate:   # inside copper face at z = -H (the two layers are the same GND copper; one sheet)
+        if a.end_plate == "plate":   # inside copper at z = -H (the two layers are the same GND copper; one sheet)
             add_sheet(csx, pec, air, load_copper("endplate_pcb")["layers"]["F.Cu"], -H)
+        elif a.end_plate == "deck":  # a deck turned over: its bottom (shield) up to the core at -H, top 1.6 below
+            add_sheet(csx, pec, air, mirror_x(deck["layers"]["B.Cu"]), -H)
+            add_sheet(csx, pec, air, mirror_x(deck["layers"]["F.Cu"]), -H - T)
+            barrels(-H - T, -H, flip=True)
+            zl += [-H - T]
         zl += [T]
 
     # antennas at the D holes, hanging straight down; sector 0 fed, the others 50 ohm loads
@@ -287,7 +317,9 @@ def main():
 
     lines = [(f"PCBs (rev 3): deck {a.deck}, {2 * info['R']:.1f} mm, "
               + ("real copper, hollow face-board core" if a.copper else "outline: disc + pipe hole, solid core")
-              + (", end plate" if a.end_plate else ", no end plate")) if a.deck else
+              + ({"plate": ", end plate", "deck": ", a second deck board as end plate (knockout in)"}.get(a.end_plate,
+                                                                                                     ", no end plate"))
+              ) if a.deck else
              f"deck: {2 * info['R']:.0f} mm disc, solid core" + (", end plate" if a.end_plate else ""),
              f"antenna: {a.antenna}, element {info['length']:.1f} mm, {a.spacing:g} mm in front of the face"
              + (f", feed {a.centre:.0f} mm below the deck" if a.antenna == "dipole" else "")

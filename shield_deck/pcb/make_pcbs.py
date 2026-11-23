@@ -203,25 +203,34 @@ def tie_fp(bd, ref, theta):
     bd.add_fp(fp, ref, "tie mount", cw, 0)
     fp.Reference().SetVisible(False)
     fp.Value().SetVisible(False)
-    bd.text(FS, "TIE", cw, 1.2, angle=-(theta + math.degrees(math.atan2(d[0], d[1]))) + 90)
-    # dashed arrow: the pigtail bends PIGTAIL_BEND past the tie and runs over the face line to its sector
+    a_cable = math.atan2(d[0], d[1])
+    tang = (-(theta + math.degrees(a_cable)) + 90 + 90) % 180 - 90   # along the cable, never upside down
+    off = MOUNT_SQ / 2 - 2.6                              # label beside the cable line, inside the square
+    n = (math.cos(a_cable), -math.sin(a_cable))
+    bd.text(FS, "ANT STRAIN\nRELIEF TIE", loc(theta, c[0] + off * n[0], c[1] + off * n[1]), 1.0, angle=tang)
+    # dotted pigtail path: from the IPEX4 marker along the cable through the tie, then bent PIGTAIL_BEND toward
+    # its sector, over the face line to the D / P / P2 holes; arrowhead before the slots
     b = math.radians(PIGTAIL_ANGLE + PIGTAIL_BEND)
     db = (math.sin(b), math.cos(b))
-    t0 = MOUNT_SQ / 2 / math.cos(math.radians(PIGTAIL_BEND)) + 0.6
-    s = theta - 60                     # its sector; distance across that face = -0.866 u + 0.5 v in this frame
-    face = lambda p: -0.866025 * p[0] + 0.5 * p[1]  # noqa: E731
-    t1 = t0
-    while face((c[0] + (t1 + 0.1) * db[0], c[1] + (t1 + 0.1) * db[1])) < INRADIUS - SLOT_W / 2 - FACE_THICK / 2 - 1.6:
+    face = lambda p: -0.866025 * p[0] + 0.5 * p[1]  # noqa: E731   distance across its sector's face (u < 0 side)
+    stop = INRADIUS - SLOT_W / 2 - FACE_THICK / 2 - 1.6
+
+    def dots(p0, dvec, length):
+        t = 0.0
+        while t <= length:
+            q = (p0[0] + t * dvec[0], p0[1] + t * dvec[1])
+            bd.line(FS, loc(theta, *q), loc(theta, q[0] + 0.3 * dvec[0], q[1] + 0.3 * dvec[1]), 0.25)
+            t += 1.0
+    dots((ipex[0] + 1.6 * d[0], ipex[1] + 1.6 * d[1]), d, TIE_FROM_IPEX - 1.6)
+    t1 = 0.0
+    while face((c[0] + (t1 + 0.1) * db[0], c[1] + (t1 + 0.1) * db[1])) < stop:
         t1 += 0.1
-    t = t0
-    while t < t1 - 0.2:
-        e = min(t + 1.0, t1)
-        bd.line(FS, loc(theta, c[0] + t * db[0], c[1] + t * db[1]), loc(theta, c[0] + e * db[0], c[1] + e * db[1]), 0.2)
-        t = e + 0.7
+    dots(c, db, t1 - 0.4)
     tip = (c[0] + t1 * db[0], c[1] + t1 * db[1])
     for sgn in (-1, 1):
         r = b + math.pi + sgn * math.radians(28)
         bd.line(FS, loc(theta, *tip), loc(theta, tip[0] + 1.4 * math.sin(r), tip[1] + 1.4 * math.cos(r)), 0.2)
+    s = theta - 60
     return fp, s
 
 
@@ -276,12 +285,15 @@ def pad_poly(p, grow):
 
 
 ASSEMBLY_STEPS = ("ASSEMBLY\n"
-                  "1 FACES TO DECK + END PLATE\n"
+                  "1 DECK: BREAK OUT THE KNOCKOUT,\n"
+                  "  FILE THE NUBS FLUSH\n"
+                  "2 FACES TO DECK + END PLATE\n"
                   "  FIRST, ON THE BARE BOARDS\n"
-                  "2 CLEAN (IPA)\n"
-                  "3 J1 + J2, THEN THE XIAOS\n"
-                  "4 RP-SMAS, COAX, TIE MOUNTS\n"
-                  "5 SPLITTER LEAD TO J2")
+                  "3 CLEAN (IPA)\n"
+                  "4 J1 + J2, THEN THE XIAOS\n"
+                  "5 RP-SMAS, COAX, TIE MOUNTS\n"
+                  "6 SPLITTER LEAD TO J2")
+REPO_URL = "github.com/100-Ton-Robot/ble-beacon-tracker"
 POWER_WARNING = "UNPLUG POE BEFORE USB\nDamage from ignoring this is not covered.\nBuild at your own risk."
 WARN_DECK = "UNPLUG POE BEFORE USB\nDamage from ignoring this\nis not covered.\nBuild at your own risk."
 
@@ -323,6 +335,40 @@ def jst_fp(bd, ref, lib_name, value, r, a, nets, label):
     return pins
 
 
+def knockout(bd, ref):
+    """Centre knockout, the same on the deck and the end plate: a routed ring (outer edge = ADAPTER_HOLE, the hole
+    once broken out) held by KO_BRIDGE bridges with mouse bites on the plate side, and an RP-SMA hole in the disc.
+    The disc is its own copper (net GND_KO, both sides) once the ring is routed. Returns the ring's outer and inner
+    radius."""
+    ro = ADAPTER_HOLE / 2
+    ri = ro - KO_CHANNEL
+    rc = (ro + ri) / 2
+    bw, nb = KO_BRIDGE
+    hb = math.degrees(bw / 2 / rc)
+    md, mp = MOUSE_BITE
+    for k in range(nb):
+        a0 = 45 + 360 * k / nb + hb
+        a1 = 45 + 360 * (k + 1) / nb - hb
+        bd.poly(pcbnew.Edge_Cuts, arc_pts(ro, a0, a1, 2.0) + arc_pts(ri, a1, a0, 2.0), 0.1)
+        ab = 45 + 360 * k / nb
+        for j in (-1, 0, 1):   # holes on the plate side of the bridge, tangent to the finished hole edge
+            npth_fp(bd, f"MB{k * 3 + j + 2}", loc(ab, j * mp, ro - md / 2), md)
+    fp = K.custom_fp(bd, ref, "RP-SMA")
+    K.th_pad(fp, "1", 0, 0, PAD_EXPOSE, HOLE_RPSMA, "GND_KO", bd)
+    bd.add_fp(fp, ref, "RP-SMA", (K.CX, K.CY), 0)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
+    circ = [pol(ri, 360 * i / 180) for i in range(180)]
+    for lay in (F, B):
+        bd.zone(lay, circ, "GND_KO", 1, thermal=False)
+    return ro, ri
+
+
+def url_text(bd, layer, pos, angle=0.0, mirror=False, size=0.9, one_line=False):
+    sep = "" if one_line else "\n"
+    bd.text(layer, REPO_URL.replace("Robot/", "Robot/" + sep), pos, size, angle=angle, mirror=mirror)
+
+
 def build_deck(spacing):
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=EDGE_CLEAR)
@@ -330,9 +376,9 @@ def build_deck(spacing):
     R = deck_diameter(spacing) / 2
     t0, t1, t2 = VERTICES
 
-    # outline, pipe hole
+    # outline; centre knockout (broken out for the pipe on a deck, kept or broken out on a deck used as end plate)
     bd.circle(pcbnew.Edge_Cuts, C, R, 0.1)
-    bd.circle(pcbnew.Edge_Cuts, C, ADAPTER_HOLE / 2, 0.1)
+    knockout(bd, "H10")
 
     # antenna holes (D, P, P2), plated, 12 mm exposed GND pads both sides; one antenna per sector
     a = INRADIUS
@@ -488,7 +534,10 @@ def build_deck(spacing):
     bd.text(FS, "J1 TO ESP32: 1 5V  2 GND\n3 DATA (HEAD D10)  4 CMD\nJ2 5V IN: 1 +  2 GND", band(0, 19.5, a + 14.5), 0.8,
             angle=0)
     bd.text(FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, angle=-120)
-    bd.text(FS, ASSEMBLY_STEPS, band(240, 17.5, a + 14.5), 0.85, angle=-240)
+    bd.text(FS, ASSEMBLY_STEPS, band(240, 18.5, a + 15.0), 0.8, angle=-240)
+    bd.text(FS, "AS END PLATE:\nTHIS SIDE OUT, NO PARTS", band(0, 19.5, a + 23.5), 0.9, angle=0)
+    url_text(bd, FS, band(120, 19.5, a + 21.5), angle=-120)
+    bd.text(FS, "KNOCKOUT", pol(7.6, 0), 0.8)
     scale_bars(bd, K.CX - 50, K.CY - 50, K.CX + R + 8, K.CY + R + 6)
     # tie mounts, one per XIAO pigtail
     for k, th in enumerate(VERTICES):
@@ -501,6 +550,9 @@ def build_deck(spacing):
     bd.text(BS, "BOTTOM - ANTENNA SIDE", band(0, 19.5, a + 12.0), 1.2, angle=0, mirror=True)
     bd.text(BS, "SOLDER FACES\nBEFORE ANY PARTS", band(120, 19.5, a + 12.8), 1.2, angle=-120, mirror=True)
     bd.text(BS, f"DUCK SPACING {spacing:g} MM", band(240, 19.5, a + 12.0), 1.2, angle=-240, mirror=True)
+    bd.text(BS, "THIS SIDE TO THE CORE\n(AS DECK OR END PLATE)", band(0, 19.5, a + 16.5), 1.0, angle=0, mirror=True)
+    url_text(bd, BS, band(240, 19.5, a + 16.8), angle=-240, mirror=True)
+    bd.text(BS, "KNOCKOUT", pol(7.6, 0), 0.8, mirror=True)
     return bd
 
 
@@ -563,6 +615,8 @@ def build_face():
     bd.text(FS, "OUTSIDE - DIPOLE SIDE", (K.CX - 28, y0 + 16), 2.0)
     bd.text(BS, "INSIDE - CORE SIDE", (K.CX + 28, y0 + 16), 2.0, mirror=True)
     bd.text(FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1)
+    url_text(bd, FS, (K.CX + 28, K.CY + 20), size=1.2, one_line=True)
+    url_text(bd, BS, (K.CX - 28, K.CY + 20), mirror=True, size=1.2, one_line=True)
     return bd
 
 
@@ -581,30 +635,11 @@ def build_endplate():
         for t in FACE_TABS:
             bd.poly(pcbnew.Edge_Cuts, [loc(s, t + du, rv + dv) for du, dv in (
                 (-SLOT_L / 2, -SLOT_W / 2), (SLOT_L / 2, -SLOT_W / 2), (SLOT_L / 2, SLOT_W / 2), (-SLOT_L / 2, SLOT_W / 2))], 0.1)
-    # knockout: a routed ring (outer edge = ADAPTER_HOLE) broken by KO_BRIDGE bridges with mouse bites
-    ro = ADAPTER_HOLE / 2
-    ri = ro - KO_CHANNEL
-    rc = (ro + ri) / 2
-    bw, nb = KO_BRIDGE
-    hb = math.degrees(bw / 2 / rc)
-    md, mp = MOUSE_BITE
-    for k in range(nb):
-        a0 = 45 + 360 * k / nb + hb
-        a1 = 45 + 360 * (k + 1) / nb - hb
-        bd.poly(pcbnew.Edge_Cuts, arc_pts(ro, a0, a1, 2.0) + arc_pts(ri, a1, a0, 2.0), 0.1)
-        ab = 45 + 360 * k / nb
-        for j in (-1, 0, 1):   # holes on the plate side of the bridge, tangent to the finished hole edge
-            npth_fp(bd, f"MB{k * 3 + j + 2}", loc(ab, j * mp, ro - md / 2), md)
-    fp = K.custom_fp(bd, "H1", "RP-SMA")   # downward antenna; the disc is its own copper once the ring is routed
-    K.th_pad(fp, "1", 0, 0, PAD_EXPOSE, HOLE_RPSMA, "GND_KO", bd)
-    bd.add_fp(fp, "H1", "RP-SMA", C, 0)
-    fp.Reference().SetVisible(False)
-    fp.Value().SetVisible(False)
-    # copper: GND both sides round the knockout, the disc on its own net
+    ro, ri = knockout(bd, "H1")
+    # copper: GND both sides round the knockout
     circ = lambda r, n=180: [pol(r, 360 * i / n) for i in range(n)]  # noqa: E731
     for lay in (F, B):
         bd.zone(lay, circ(Re + 1), "GND", 0, holes=[circ(ro + 0.3)], thermal=False)
-        bd.zone(lay, circ(ri), "GND_KO", 1, thermal=False)
     rs, ns = ENDPLATE_STITCH
     for k in range(ns):
         bd.via(pol(rs, k * 360 / ns), "GND", VIA_D, VIA_DRILL)
@@ -627,6 +662,8 @@ def build_endplate():
     bd.text(BS, POWER_WARNING, pol(50, 240), 1.1, angle=-240, mirror=True)
     bd.text(BS, "END PLATE - OUTSIDE", pol(45, 60), 1.5, angle=-60 + 90, mirror=True)
     bd.text(BS, "KNOCKOUT: BREAK OUT FOR\n1/2 IN PVC ADAPTER", pol(16, 0), 1.0, mirror=True)
+    for lay, mir in ((FS, False), (BS, True)):
+        url_text(bd, lay, loc(120, 19.5, INRADIUS + 14.0), angle=-120, mirror=mir)
     scale_bars(bd, K.CX - 50, K.CY - 50, K.CX + Re + 8, K.CY + Re + 6)
     return bd
 
