@@ -28,7 +28,7 @@ The core is a solid copper prism (only its outside matters to the pattern), the 
 
 PCB build (shield_deck/pcb, rev 3), two levels of detail to compare:
   --deck d15|d31     the deck PCB for that duck spacing as an outline: a copper disc of its diameter
-                     (shield_deck/pcb/deck_size.py) with the 22.2 mm pipe hole, on the solid core; the antennas
+                     (shield_deck/layout.py) with the 22.2 mm pipe hole, on the solid core; the antennas
                      go to its D holes (--spacing defaults to 15 / 31)
   --end-plate        add the 144 mm end plate across the far end of the core (outline: a solid disc)
   --end-plate deck   with --copper: a second deck board turned over as the end plate, knockout left in
@@ -51,10 +51,9 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "shield_deck"))
-sys.path.insert(0, os.path.join(HERE, "..", "shield_deck", "pcb"))
 import params  # noqa: E402
 import runlog  # noqa: E402
-import deck_size  # noqa: E402
+import layout  # noqa: E402
 
 P = params.load()
 C0 = 299_792_458.0
@@ -164,7 +163,7 @@ def build(a):
     f0 = a.freq
     lam = C0 / f0 * 1e3
     length = a.length or 0.95 * lam / (4 if a.antenna == "monopole" else 2)
-    R = (deck_size.deck_diameter(P, DECKS[a.deck]) if a.deck else P["DISC_DIAMETER"]) / 2
+    R = (layout.deck_diameter(DECKS[a.deck]) if a.deck else P["DISC_DIAMETER"]) / 2
     H = P["FACE_H"]
     T = P["FACE_THICK"]                               # board thickness: deck top copper at z = T with --copper
 

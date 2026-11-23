@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 import params  # noqa: E402
 import kicad_lib as K  # noqa: E402
-import deck_size  # noqa: E402
+import layout  # noqa: E402
 from kicad_lib import loc, pol  # noqa: E402
 
 P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate"])
@@ -32,19 +32,19 @@ globals().update(P)
 ADAPTER_HOLE = params.load(["pipe"])["ADAPTER_HOLE"]
 OUT = os.path.join(HERE, "out")
 
-INRADIUS = FACE_WIDTH / (2 * math.sqrt(3))
+LAYOUT0 = layout.Layout(DECK_VARIANTS[0])     # spacing-independent values (shield_deck/layout.py)
+INRADIUS = LAYOUT0.r_in
 SECTORS = [0.0, 120.0, 240.0]
 VERTICES = [60.0, 180.0, 300.0]       # core corners; XIAO U2 (head) / U3 / U4 sit on these
 VIA_D, VIA_DRILL = VIA
 F, B = pcbnew.F_Cu, pcbnew.B_Cu
 FS, BS = pcbnew.F_SilkS, pcbnew.B_SilkS
-CORE_LIM = INRADIUS - SEAM_STRIP / 2 - CORE_MARGIN
+CORE_LIM = LAYOUT0.core_lim
 
 
 def deck_diameter(spacing):
-    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN (deck_size.py, shared with the RF
-    model)."""
-    return deck_size.deck_diameter(P, spacing)
+    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN (shield_deck/layout.py)."""
+    return layout.Layout(spacing).deck_d
 
 
 def core_ok(u, v, pad=0.0):
@@ -174,18 +174,9 @@ def m3_fp(bd, ref, pos):
 
 
 def tie_geom(theta):
-    """Tie square for the XIAO on corner theta: centre (u, v), cable direction and the square's corners (corner frame).
-    The cable leaves the IPEX4 at PIGTAIL_ANGLE; the square sits TIE_FROM_IPEX along it, two sides square to it."""
-    ix, iy = XIAO_IPEX
-    ipex = (-iy, XIAO_CENTRE_V - ix)
-    a = math.radians(PIGTAIL_ANGLE)
-    d = (math.sin(a), math.cos(a))
-    n = (math.cos(a), -math.sin(a))
-    c = (ipex[0] + TIE_FROM_IPEX * d[0], ipex[1] + TIE_FROM_IPEX * d[1])
-    h = MOUNT_SQ / 2
-    sq = [(c[0] + h * (sd * d[0] + sn * n[0]), c[1] + h * (sd * d[1] + sn * n[1]))
-          for sd, sn in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
-    return ipex, c, d, sq
+    """Tie square for the XIAO on corner theta: (IPEX4, centre, cable direction, corners) in the corner frame
+    (shield_deck/layout.py)."""
+    return LAYOUT0.tie(theta)
 
 
 def tie_fp(bd, ref, theta):
@@ -404,16 +395,16 @@ def build_deck(spacing):
     knockout(bd, "H10")
 
     # antenna holes (D, P, P2), plated, 12 mm exposed GND pads both sides; one antenna per sector
+    LY = layout.Layout(spacing)
     a = INRADIUS
-    p2_u = -(FACE_WIDTH / 2 - PATCH_END_INSET)
+    p2_u = -LY.s_P2
     n = 0
     for s in SECTORS:
-        for pos in (loc(s, 0, a + spacing), loc(s, 0, a + PATCH_OFFSET), loc(s, p2_u, a + PATCH_OFFSET)):
+        for pos in (loc(s, 0, LY.r_D), loc(s, 0, LY.r_P), loc(s, p2_u, LY.r_P)):
             n += 1
             rpsma_fp(bd, f"H{n}", pos)
-    r3, a3 = M3_POS
-    for k in range(3):
-        m3_fp(bd, f"M{k + 1}", pol(r3, a3 + 120 * k))
+    for k, am in enumerate(LY.m3_angles):
+        m3_fp(bd, f"M{k + 1}", pol(LY.m3_r, am))
     for k in range(STITCH_COUNT):
         bd.via(pol(R - RIM_MASK_WIDTH / 2, k * 360 / STITCH_COUNT), "GND", VIA_D, VIA_DRILL)
 
