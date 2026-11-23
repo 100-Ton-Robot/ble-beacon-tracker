@@ -1,0 +1,3 @@
+name,sectors,width,height,spacing,element,disc,plate,peak,back0,back30,back55,worst,med,p90,sector
+w45_s15_short_ep,3,45.00,45.00,15.00,short,71.00,57.40,4.60,-8.22,-3.87,0.23,0.23,30.98,108.99,62.18
+w60_s15_short_ep,3,60.00,60.00,15.00,short,79.70,74.80,5.80,-11.98,-7.37,-2.00,-2.00,22.14,71.74,73.92

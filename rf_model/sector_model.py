@@ -8,6 +8,8 @@ like their radios, so the pattern includes their coupling and the run also gives
     python3 sector_model.py --antenna dipole              # rubber duck as a vertical half-wave dipole
     python3 sector_model.py --antenna dipole --centre 50  # its feed point this far below the deck
     python3 sector_model.py --coarse                      # quick check: coarser mesh, about 5x faster
+    python3 sector_model.py --sectors 4                   # square core, 4 sectors (any N >= 3)
+    python3 sector_model.py --set FACE_WIDTH=80 --set DISC_DIAMETER=98   # any parameters.csv value, this run only
     python3 sector_model.py --deck d15 --end-plate        # rev 3 PCBs as outlines: deck disc + pipe hole, end plate
     python3 sector_model.py --deck d15 --end-plate --copper   # rev 3 PCBs' real copper, hollow core of face boards
 
@@ -16,6 +18,13 @@ Writes to out/<antenna>/ (or --out):
                 (the deck's own convention); el 0 = horizon, negative = below the deck (where the antennas hang).
                 Sectors 1 and 2 are the same pattern turned by +120 / +240 deg.
   summary.txt   match (S11, input impedance), peak, beamwidth, front-to-back and sector isolation
+  meta.json     sectors, face size, deck and end plate diameters, spacing, feed, overrides: bearing_sim.py reads
+                the sector count from it
+
+Every dimension comes from shield_deck/parameters.csv (FACE_WIDTH, FACE_H, DISC_DIAMETER, DUCK_SPACING,
+ENDPLATE_DIAMETER, RF_SECTORS, RF_FEED_DEPTH, RF_FREQ, ...). --set NAME=VALUE overrides one for this run only
+(repeatable; the command, overrides included, is logged in out/runs.csv and summary.txt). size_sweep.py drives
+its sweeps this way.
   pattern.png   azimuth cuts at el 0, -15, -30 and -45 deg
   s11.png       S11 over the BLE band
 
@@ -57,8 +66,33 @@ import layout  # noqa: E402
 
 P = params.load()
 C0 = 299_792_458.0
-SECTORS = [0.0, 120.0, 240.0]          # face normals, clockwise from +Y, as in make_shield_deck.py
-INRADIUS = P["FACE_WIDTH"] / (2 * math.sqrt(3))
+
+
+def sector_angles(n):
+    """Face normals, clockwise from +Y (S0 = +Y, as in make_shield_deck.py), for an N-sided core."""
+    return [360.0 * k / n for k in range(n)]
+
+
+def inradius(width, n=3):
+    """Core centre -> face for a regular N-gon with faces this wide (N = 3: width / (2 sqrt 3))."""
+    return width / (2 * math.tan(math.pi / n))
+
+
+def circumradius(width, n=3):
+    """Core centre -> corner."""
+    return width / (2 * math.sin(math.pi / n))
+
+
+def apply_overrides(pairs):
+    """--set NAME=VALUE: replace parameters.csv values in P for this run. Returns {name: value}."""
+    done = {}
+    for pair in pairs or []:
+        name, sep, value = pair.partition("=")
+        if not sep or name not in P:
+            raise SystemExit(f"--set {pair!r}: expected NAME=VALUE with NAME in parameters.csv")
+        P[name] = params.parse(value)
+        done[name] = P[name]
+    return done
 BAND = (2402e6, 2480e6)
 PCB_OUT = os.path.join(HERE, "..", "shield_deck", "pcb", "out")
 DECKS = {f"d{s:g}": s for s in (P["DECK_VARIANTS"] if isinstance(P["DECK_VARIANTS"], tuple) else (P["DECK_VARIANTS"],))}
@@ -76,9 +110,9 @@ def args_():
     ap.add_argument("--antenna", choices=["monopole", "dipole"], default="monopole")
     ap.add_argument("--length", type=float, help="element length in mm (default 0.95 x lambda/4 monopole, "
                                                  "0.95 x lambda/2 dipole, at RF_FREQ)")
-    ap.add_argument("--centre", type=float, default=45.0,
-                    help="dipole only: feed point depth below the deck, mm (a duck's base sits on the jack, "
-                         "its feed about a quarter wave down)")
+    ap.add_argument("--centre", type=float,
+                    help="dipole only: feed point depth below the deck, mm, default RF_FEED_DEPTH (a duck's base sits "
+                         "on the jack, its feed about a quarter wave down)")
     ap.add_argument("--spacing", type=float,
                     help="antenna axis -> copper face, mm (default DUCK_SPACING, the D hole; with --deck, its spacing)")
     ap.add_argument("--deck", choices=sorted(DECKS), help="rev 3 deck PCB for this duck spacing (outline, or "
@@ -87,13 +121,27 @@ def args_():
                     help="add a plate across the far end of the core: the end plate PCB (plate, the default) or, with "
                          "--copper, a second deck board turned over (deck), its knockout left in")
     ap.add_argument("--copper", action="store_true", help="with --deck: the PCBs' real copper and a hollow core")
+    ap.add_argument("--sectors", type=int, help="sectors / core faces, default RF_SECTORS (3)")
+    ap.add_argument("--set", action="append", metavar="NAME=VALUE",
+                    help="override a parameters.csv value for this run (repeatable)")
     ap.add_argument("--gap", type=float, default=1.0, help="feed gap, mm")
     ap.add_argument("--freq", type=float, default=P["RF_FREQ"] * 1e6, help="Hz, default RF_FREQ")
-    ap.add_argument("--single", action="store_true", help="leave out the other two sectors' antennas")
+    ap.add_argument("--single", action="store_true", help="leave out the other sectors' antennas")
     ap.add_argument("--coarse", action="store_true", help="coarser mesh, fewer timesteps: a quick check")
+    ap.add_argument("--fine", action="store_true", help="finer mesh (0.5 mm at the antenna, lambda/32 elsewhere): "
+                                                        "a convergence check on the default mesh")
     ap.add_argument("--out", help="output folder (default out/<antenna>)")
     ap.add_argument("--keep", action="store_true", help="keep the raw FDTD data (prints where)")
     a = ap.parse_args()
+    a.overrides = apply_overrides(a.set)
+    if a.sectors is None:
+        a.sectors = int(P["RF_SECTORS"])
+    if a.sectors < 3:
+        ap.error("--sectors must be 3 or more")
+    if a.centre is None:
+        a.centre = P["RF_FEED_DEPTH"]
+    if a.copper and (a.sectors != 3 or a.overrides):
+        ap.error("--copper models the rev 3 boards as built: 3 sectors, no --set")
     if a.copper and not a.deck:
         ap.error("--copper needs --deck")
     if a.end_plate == "deck" and not a.copper:
@@ -144,15 +192,15 @@ def add_sheet(csx, metal, air, polys, z, base=10):
             air.AddPolygon(np.array(h).T, "z", z, priority=base + 2 * d + 1)
 
 
-def add_face(metal, air, face, sector, thick, base=30):
+def add_face(metal, air, face, sector, thick, inr, base=30):
     """One face board as a solid slab (both copper layers and the FR-4 between, all metal here): outer copper on
-    the face line (INRADIUS out), the slab reaching `thick` inward, holes as air. Face json: x along the face
+    the face line (inr out), the slab reaching `thick` inward, holes as air. Face json: x along the face
     (clockwise), y = -60 at the deck edge and +60 at the end plate edge; the tabs pass through both plates' slots.
     Built for sector 0 (normal +y; LinPoly points are (z, x) for a y normal) and turned clockwise by `sector`."""
     for g in face["layers"]["F.Cu"]:
         for pts, kind, pr in [(g["outer"], metal, base)] + [(h, air, base + 1) for h in g["holes"]]:
             zx = np.array([[-(y + 60.0) for x, y in pts], [x for x, y in pts]])
-            prim = kind.AddLinPoly(zx, "y", INRADIUS - thick, thick, priority=pr)
+            prim = kind.AddLinPoly(zx, "y", inr - thick, thick, priority=pr)
             prim.AddTransform("RotateAxis", "z", -sector)
 
 
@@ -179,14 +227,19 @@ def build(a):
     air = csx.AddMaterial("air", epsilon=1.0)       # holes in copper sheets (higher priority than the sheet)
     circ = lambda r, n=72: np.array([[r * math.cos(2 * math.pi * i / n) for i in range(n)],  # noqa: E731
                                      [r * math.sin(2 * math.pi * i / n) for i in range(n)]])
-    verts = [pol(2 * INRADIUS, v) for v in (60.0, 180.0, 300.0)]
+    n_sec = a.sectors
+    sectors = sector_angles(n_sec)
+    inr = inradius(P["FACE_WIDTH"], n_sec)
+    if inr + a.spacing >= R:
+        raise SystemExit(f"antennas ({inr + a.spacing:.1f} mm out) fall outside the deck (radius {R:.1f} mm)")
+    verts = [pol(circumradius(P["FACE_WIDTH"], n_sec), s + 180.0 / n_sec) for s in sectors]
     zl = [0.0]
     if not a.copper:
         # deck: zero-thickness disc at z = 0 (the rev 3 deck: its diameter and the pipe hole)
         pec.AddPolygon(circ(R), "z", 0.0, priority=10)
         if a.deck:
             air.AddPolygon(circ(P["ADAPTER_HOLE"] / 2, 48), "z", 0.0, priority=11)
-        # core: solid triangular prism from the deck down to FACE_H, vertices between the faces
+        # core: solid N-sided prism from the deck down to FACE_H, vertices between the faces
         tri = np.array([[v[0] for v in verts], [v[1] for v in verts]])
         pec.AddLinPoly(tri, "z", -H, H, priority=10)
         if a.end_plate:
@@ -210,8 +263,8 @@ def build(a):
         barrels(0.0, T, keep_ko=False)
         # hollow core: the three face boards
         face = load_copper("face_pcb")
-        for s in SECTORS:
-            add_face(pec, air, face, s, T)
+        for s in sectors:
+            add_face(pec, air, face, s, T, inr)
         if a.end_plate == "plate":   # inside copper at z = -H (the two layers are the same GND copper; one sheet)
             add_sheet(csx, pec, air, load_copper("endplate_pcb")["layers"]["F.Cu"], -H)
         elif a.end_plate == "deck":  # a deck turned over: its bottom (shield) up to the core at -H, top 1.6 below
@@ -223,9 +276,9 @@ def build(a):
 
     # antennas at the D holes, hanging straight down; sector 0 fed, the others 50 ohm loads
     ports = []
-    feeds = SECTORS if not a.single else SECTORS[:1]
+    feeds = sectors if not a.single else sectors[:1]
     for i, s in enumerate(feeds):
-        x, y = pol(INRADIUS + a.spacing, s)
+        x, y = pol(inr + a.spacing, s)
         if a.copper:   # the RP-SMA bulkhead body fills its hole and bonds both deck layers
             pec.AddCylinder([x, y, 0.0], [x, y, T], P["HOLE_RPSMA"] / 2, priority=40)
         if a.antenna == "monopole":
@@ -244,22 +297,26 @@ def build(a):
         mesh.AddLine("y", [y])
 
     # mesh: fixed lines at the structure's edges, then smoothed; air margin about lambda/2 past the parts
-    fine = 2.0 if a.coarse else 1.0
-    coarse = lam / (15 if a.coarse else 22)
+    fine = 2.0 if a.coarse else 0.5 if a.fine else 1.0
+    coarse = lam / (15 if a.coarse else 32 if a.fine else 22)
     margin = lam / 2
     lowest = min(min(zl), -H)
     mesh.AddLine("x", [-R, R, *[v[0] for v in verts], -R - margin, R + margin])
     mesh.AddLine("y", [-R, R, *[v[1] for v in verts], -R - margin, R + margin])
     mesh.AddLine("z", [*zl, -H, lowest - margin, margin])
     if a.copper:   # the face slabs: both surfaces of face 0 (normal +y); the others are slanted (staircased)
-        mesh.AddLine("y", [round(INRADIUS - T, 4), round(INRADIUS, 4)])   # rounded as pol(): no near-duplicates
-    x0, y0 = pol(INRADIUS + a.spacing, 0.0)
+        mesh.AddLine("y", [round(inr - T, 4), round(inr, 4)])   # rounded as pol(): no near-duplicates
+    x0, y0 = pol(inr + a.spacing, 0.0)
     mesh.AddLine("y", [y0 - fine, y0 + fine])
     mesh.AddLine("x", [x0 - fine, x0 + fine])
     for d in "xyz":
         mesh.SmoothMeshLines(d, coarse, 1.4)
     nf2ff = fdtd.CreateNF2FFBox()
     info = dict(f0=f0, lam=lam, length=length, R=R, cells=[len(mesh.GetLines(d)) for d in "xyz"])
+    info["meta"] = dict(sectors=n_sec, face_width=P["FACE_WIDTH"], face_h=H, deck_diameter=round(2 * R, 2),
+                        end_plate=(P["ENDPLATE_DIAMETER"] if a.end_plate == "plate" and not a.copper else a.end_plate),
+                        spacing=a.spacing, antenna=a.antenna, length=round(length, 2),
+                        feed_depth=a.centre if a.antenna == "dipole" else None, overrides=a.overrides)
     return fdtd, csx, ports, nf2ff, info
 
 
@@ -308,6 +365,8 @@ def main():
     az = (90.0 - phi) % 360.0
     order = np.argsort(az)
     az, dbi = az[order], dbi[:, order]
+    with open(os.path.join(out, "meta.json"), "w") as fh:
+        json.dump(info["meta"], fh, indent=1)
     with open(os.path.join(out, "pattern.csv"), "w") as fh:
         fh.write("az_deg,el_deg,dbi\n")
         for ti in range(len(el)):
@@ -319,11 +378,14 @@ def main():
               + ({"plate": ", end plate", "deck": ", a second deck board as end plate (knockout in)"}.get(a.end_plate,
                                                                                                      ", no end plate"))
               ) if a.deck else
-             f"deck: {2 * info['R']:.0f} mm disc, solid core" + (", end plate" if a.end_plate else ""),
+             f"deck: {2 * info['R']:.0f} mm disc, solid core"
+             + (f", end plate {P['ENDPLATE_DIAMETER']:g} mm" if a.end_plate else ""),
+             f"{a.sectors} sectors, faces {P['FACE_WIDTH']:g} x {P['FACE_H']:g} mm"
+             + ("" if not a.overrides else ", overrides: " + ", ".join(f"{k}={v:g}" for k, v in a.overrides.items())),
              f"antenna: {a.antenna}, element {info['length']:.1f} mm, {a.spacing:g} mm in front of the face"
              + (f", feed {a.centre:.0f} mm below the deck" if a.antenna == "dipole" else "")
              + (", other sectors left out" if a.single else ", other sectors' antennas in, 50 ohm"),
-             f"f0 {info['f0'] / 1e6:.0f} MHz, mesh {info['cells']} cells{' (coarse)' if a.coarse else ''}",
+             f"f0 {info['f0'] / 1e6:.0f} MHz, mesh {info['cells']} cells{' (coarse)' if a.coarse else ' (fine)' if a.fine else ''}",
              "",
              "match (sector 0 port, 50 ohm):"]
     for fb in (BAND[0], info["f0"], BAND[1]):

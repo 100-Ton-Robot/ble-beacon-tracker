@@ -141,6 +141,10 @@ RULE_HOLE_GAP,2.0,mm,rule,rules,edge to edge between drilled plate holes
 RULE_RIM_HOLE,3.0,mm,rule,rules,hole edge -> plate rim
 RULE_RIM_PART,3.0,mm,rule,rules,part outline -> plate rim
 RF_FREQ,2440.0,MHz,spec,formulas,BLE band centre (2402-2480 MHz): sets the wavelength on the formulas page (page 8)
+RF_SECTORS,3,count,design,rf,rf_model: sectors (core faces) the RF model builds; 3 today. sector_model.py --sectors / size_sweep.py --sectors override it
+RF_FEED_DEPTH,45.0,mm,design,rf,rf_model: default dipole feed point depth below the deck (sector_model.py --centre)
+DUCK_FEED_DEPTH,65.0,mm,estimated,rf,"rf_model: HiRO H50327 duck (108 mm long, base on the deck jack) modelled as a half-wave dipole fed this far below the deck; 55 and 75 give 19-22 deg bearing error, a small effect (README)"
+CHIP_STANDIN_LENGTH,20.0,mm,design,rf,rf_model size_sweep.py: short centre-fed dipole standing in for a chip antenna (pattern only; the chip's match and carrier ground are not modelled)
 FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page drawing scale
 LED_PIXELS,24,count,design,led,LED direction ring option: pixels in the ring (2026-11-16). At LED_PER_M this sets the ring's diameter; keep it inside the deck (DISC_DIAMETER)
 LED_PER_M,60,count,spec,led,strip pixels per metre

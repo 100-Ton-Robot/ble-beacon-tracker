@@ -1,0 +1,9 @@
+command: python3 size_sweep.py --fine --end-plate --sectors 3 --widths 45 60 --spacings 15 --elements short --out out/size_ep_fine
+date: 2026-11-23 19:20 UTC
+Size sweep: N-gon core, deck and end plate scaled from today's boards (see size_sweep.py).
+Bearing: bearing_sim.py default noise (fading 5, room 3, shadow 4 dB, 3 adverts/s, 1 s window).
+Back = worst level over az 120-240 relative to az 0 (dB, more negative is better); target <= -20.
+
+name                          N  face  high  disc plate   peak dBi  back el0  el-30  el-55  worst   median  90%   right sector
+w45_s15_short_ep              3   45    45    71    57      4.6     -8.2   -3.9    0.2    0.2      31   109    62.2%
+w60_s15_short_ep              3   60    60    80    75      5.8    -12.0   -7.4   -2.0   -2.0      22    72    73.9%
