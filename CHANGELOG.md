@@ -127,6 +127,9 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 
 ### Shield deck
 
+- Removed (2026-11-23): the face PCB's centre RP-SMA hole (face-centre dipole option); the face is now solid
+  GND both sides. USB warning with a caution sign right in front of each XIAO USB-C plug and beside J2; caution
+  signs on every power warning.
 - Changed (2026-11-23): deck rev 3 gets the end plate's centre knockout (broken out for the pipe on a deck), so
   a d15 deck turned over can serve as the end plate (RF model: same result as the end plate PCB, which stays as
   the option). Repo URL on every silkscreen. Antenna strain relief ties moved out to 15 mm from the IPEX4 (3.3 mm

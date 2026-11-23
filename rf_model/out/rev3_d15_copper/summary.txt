@@ -1,23 +1,23 @@
 command: python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate --copper --out out/rev3_d15_copper
-date: 2026-11-23 14:19 UTC
+date: 2026-11-23 14:50 UTC
 PCBs (rev 3): deck d15, 144.0 mm, real copper, hollow face-board core, end plate
 antenna: dipole, element 58.4 mm, 15 mm in front of the face, feed 65 mm below the deck, other sectors' antennas in, 50 ohm
 f0 2440 MHz, mesh [61, 64, 56] cells
 
 match (sector 0 port, 50 ohm):
-  2402 MHz  S11   -3.2 dB  Zin   40.3  +84.5j ohm
-  2440 MHz  S11   -2.7 dB  Zin   43.3 +101.2j ohm
-  2480 MHz  S11   -2.2 dB  Zin   47.0 +119.5j ohm
+  2402 MHz  S11   -3.3 dB  Zin   40.1  +84.0j ohm
+  2440 MHz  S11   -2.7 dB  Zin   43.1 +100.6j ohm
+  2480 MHz  S11   -2.2 dB  Zin   46.7 +118.8j ohm
 
 peak 8.7 dBi at az 0, el 0 deg
 
 elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
-     0         8.7       0       85 deg       29.2 dB
-   -15         7.8       0       85 deg       25.7 dB
-   -30         5.0       0       95 deg       20.2 dB
-   -45         0.6       0      125 deg       25.2 dB
-   -60        -5.6       0      155 deg       14.3 dB
+     0         8.7       0       85 deg       29.7 dB
+   -15         7.7       0       85 deg       26.1 dB
+   -30         5.1       0       95 deg       20.3 dB
+   -45         0.7       0      125 deg       24.2 dB
+   -60        -5.6       0      155 deg       15.5 dB
 
 isolation, sector 0 -> other sectors' ports (|S21|):
-  S1: -49.1 dB
-  S2: -49.5 dB
+  S1: -47.3 dB
+  S2: -47.3 dB
