@@ -294,6 +294,7 @@ ASSEMBLY_STEPS = ("ASSEMBLY\n"
                   "5 RP-SMAS, COAX, TIE MOUNTS\n"
                   "6 SPLITTER LEAD TO J2")
 REPO_URL = "github.com/100-Ton-Robot/ble-beacon-tracker"
+USB_WARNING = "UNPLUG POE\nBEFORE USB"
 POWER_WARNING = "UNPLUG POE BEFORE USB\nDamage from ignoring this is not covered.\nBuild at your own risk."
 WARN_DECK = "UNPLUG POE BEFORE USB\nDamage from ignoring this\nis not covered.\nBuild at your own risk."
 
@@ -528,6 +529,7 @@ def build_deck(spacing):
     for th, lab in ((t0, "U2 HEAD"), (t1, "U3 -> HEAD D0"), (t2, "U4 -> HEAD D1")):
         bd.text(FS, lab, loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 3.2), 1.0, angle=-th)
         # USB-C plug path (13 x 25 mm past the USB-C end), for the print check
+        bd.text(FS, USB_WARNING, loc(th, -10.6, 53.0), 0.9, angle=-th + 90)   # beside the USB-C plug path
         x = [(-6.5, 45.0), (6.5, 45.0), (6.5, 70.0), (-6.5, 70.0)]
         bd.poly(pcbnew.Dwgs_User, [loc(th, u, v) for u, v in x], 0.15)
     bd.text(FS, "TOP - ELECTRONICS SIDE", band(0, 19.5, a + 19.5), 1.3, angle=0)
@@ -535,6 +537,8 @@ def build_deck(spacing):
             angle=0)
     bd.text(FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, angle=-120)
     bd.text(FS, ASSEMBLY_STEPS, band(240, 18.5, a + 15.0), 0.8, angle=-240)
+    for lay, mir in ((FS, False), (BS, True)):   # beside J2 (5V in from PoE), both sides like its outline
+        bd.text(lay, USB_WARNING, loc(J2_POS[1], -7.8, J2_POS[0] + 1.0), 0.8, angle=-J2_POS[1], mirror=mir)
     bd.text(FS, "AS END PLATE:\nTHIS SIDE OUT, NO PARTS", band(0, 19.5, a + 23.5), 0.9, angle=0)
     url_text(bd, FS, band(120, 19.5, a + 21.5), angle=-120)
     bd.text(FS, "KNOCKOUT", pol(7.6, 0), 0.8)
