@@ -19,6 +19,11 @@ in Home Assistant. See `README.md` and each folder's README.
   hand-edit outputs. Plate layouts round-trip through Inkscape: `make_plate_svg.py` -> edit ->
   `read_plate_svg.py` (writes `builds/hand/parameters.csv`, checks rules). `shield_deck/README.md`
   only points to the new folders.
+- Fab rules (what a board house can make) live apart from the design, in `fab/board_rules.csv` (the master,
+  `FAB_*` names), with `fab/overrides/<fab>.csv` changing some of them for one fab or a builder's requirements
+  (`params.load_fab()`; an override may only change a rule the master has). Generators check the design against
+  them, size knockouts and silkscreen up to them and write them into DRC: change a rule in the CSV and regenerate.
+  Committed outputs use the master; `make_pcbs.py --fab NAME` writes `out_NAME/` (not committed).
 - Docs take their numbers from the parameter CSVs, unless there is a reason not to (a measured result, a part's
   datasheet value used once): generate them where practical (e.g. `docs/make_antenna_doc.py` writes
   `docs/ANTENNA_SELECTION.md` from `parameters.csv`, `common/layout.py` and the RF runs), and name the parameter

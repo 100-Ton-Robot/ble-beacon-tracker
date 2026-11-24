@@ -1,0 +1,4 @@
+name,value,unit,source,group,note
+FAB_SLOT_NPTH_MIN,0.8,mm,spec,fab,PCBWay non-plated slot (https://www.pcbway.com/capabilities.html)
+FAB_SILK_TEXT_MIN,0.8,mm,spec,fab,PCBWay minimum character height (https://www.pcbway.com/capabilities.html)
+FAB_HOLE_TO_HOLE_MIN,0.406,mm,spec,fab,"PCBWay component hole to hole, 16 mil (vias <= 0.45 mm: 11 mil) (https://www.pcbway.com/capabilities.html)"

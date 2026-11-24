@@ -15,6 +15,16 @@
 A name may appear in one file only, across common, every build and every board: a name in two files is an error,
 never an override.
 
+Fab rules (what a board house can make) are the one place overrides are allowed, and only through load_fab():
+
+    fab/board_rules.csv          the master rules every generated board is held to (FAB_* names)
+    fab/overrides/<fab>.csv      a fab's own limits, or a builder's requirements; may only change FAB_* names that
+                                 are in the master, never add new ones
+
+    R = params.load_fab()                                  # master only (what the committed outputs use)
+    R = params.load_fab("jlcpcb")                          # master, then fab/overrides/jlcpcb.csv
+    R = params.load_fab("pcbway", overrides=["my.csv"])    # ... then any further override files, in order
+
 Columns: name, value, unit, source, group, note.
 - value: one number, or several separated by spaces (a tuple, e.g. "33.0 5.0 -13.0"). Whole numbers written without a
   decimal point load as int (counts, pin numbers, signs); everything else loads as float.
@@ -37,6 +47,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 BUILDS = ("pcb", "hand")
 BOARDS_DIR = os.path.join(ROOT, "boards")
+FAB_DIR = os.path.join(ROOT, "fab")
+FAB_RULES = os.path.join(FAB_DIR, "board_rules.csv")
 CSV_PATH = os.path.join(HERE, "parameters.csv")
 FIELDS = ["name", "value", "unit", "source", "group", "note"]
 
@@ -92,7 +104,7 @@ def _check_unique():
     """Every name in exactly one file, across common, every build and every board (so a value can't hide behind
     another)."""
     seen = {}
-    paths = [csv_path(b) for b in (None,) + BUILDS] + [board_csv_path(b) for b in boards()]
+    paths = [csv_path(b) for b in (None,) + BUILDS] + [board_csv_path(b) for b in boards()] + [FAB_RULES]
     for p in paths:
         if not os.path.exists(p):
             continue
@@ -128,6 +140,40 @@ def load(groups=None, exclude=(), build=None, boards=(), path=None):
             except ValueError as e:
                 raise ValueError(f"{r['name']}: bad value {r['value']!r} ({e})") from None
     return out
+
+
+def fab_override_path(fab):
+    """fab/overrides/<fab>.csv for a name, or the path itself when `fab` is a path to a CSV."""
+    if fab.endswith(".csv") or os.sep in fab:
+        return fab
+    p = os.path.join(FAB_DIR, "overrides", fab + ".csv")
+    if not os.path.exists(p):
+        have = sorted(f[:-4] for f in os.listdir(os.path.join(FAB_DIR, "overrides")) if f.endswith(".csv"))
+        raise ValueError(f"fab {fab!r}: no {os.path.relpath(p, ROOT)} (have {have})")
+    return p
+
+
+def load_fab(fab=None, overrides=()):
+    """{FAB_*: value}: fab/board_rules.csv, then `fab`'s override file (a name under fab/overrides/ or a path), then
+    each file in `overrides`, later files winning. An override row must name a rule the master has."""
+    _check_unique()
+    out = load(path=FAB_RULES)
+    for p in ([fab_override_path(fab)] if fab else []) + [fab_override_path(o) for o in overrides]:
+        for r in rows(p):
+            if r["name"] not in out:
+                raise ValueError(f"{os.path.relpath(p, ROOT)}: {r['name']} is not a rule in "
+                                 f"{os.path.relpath(FAB_RULES, ROOT)} (overrides change rules, never add them)")
+            try:
+                out[r["name"]] = parse(r["value"], r["unit"])
+            except ValueError as e:
+                raise ValueError(f"{p}: {r['name']}: bad value {r['value']!r} ({e})") from None
+    return out
+
+
+def fab_tag(fab=None, overrides=()):
+    """Short name for a rule set, used in output folder names: '' for the master rules."""
+    parts = ([fab] if fab else []) + [os.path.splitext(os.path.basename(o))[0] for o in overrides]
+    return "-".join(parts)
 
 
 def fmt(v):

@@ -1,0 +1,2 @@
+name,value,unit,source,group,note
+FAB_ANNULAR_MIN,0.13,mm,spec,fab,JLCPCB annular ring for 1 oz plated holes (https://jlcpcb.com/capabilities/pcb-capabilities)

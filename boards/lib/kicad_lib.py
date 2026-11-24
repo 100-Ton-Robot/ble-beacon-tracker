@@ -43,6 +43,8 @@ class Board:
         self.b = pcbnew.BOARD()
         self.b.SetCopperLayerCount(2)
         self.nets = {}
+        self.text_min = 0.0       # silkscreen minimums, set by fab_rules(): text() draws at least this big
+        self.line_min = 0.0
 
     # ---- nets ----
     def net(self, name):
@@ -67,6 +69,26 @@ class Board:
         nc.SetTrackWidth(mm(track))
         nc.SetViaDiameter(mm(via_d))
         nc.SetViaDrill(mm(via_drill))
+
+    def fab_rules(self, R, edge):
+        """Hold DRC to the fab rules R (params.load_fab()): the minimums the board house can make. The design's own
+        sizes (net class above) must already be at or above them; the generator checks that before it draws."""
+        ds = self.b.GetDesignSettings()
+        ds.m_TrackMinWidth = mm(R["FAB_TRACK_MIN"])
+        ds.m_MinClearance = mm(R["FAB_CLEARANCE_MIN"])
+        ds.m_ViasMinSize = mm(R["FAB_VIA_DIA_MIN"])
+        ds.m_ViasMinAnnularWidth = mm(R["FAB_ANNULAR_MIN"])
+        ds.m_MinThroughDrill = mm(R["FAB_PTH_DRILL_MIN"])
+        ds.m_CopperEdgeClearance = mm(max(edge, R["FAB_EDGE_CLEAR_MIN"]))
+        ds.m_HoleClearance = mm(R["FAB_HOLE_CLEAR_MIN"])
+        ds.m_SolderMaskMinWidth = mm(R["FAB_MASK_BRIDGE_MIN"])
+        ds.m_MinSilkTextHeight = mm(R["FAB_SILK_TEXT_MIN"])
+        ds.m_MinSilkTextThickness = mm(R["FAB_SILK_LINE_MIN"])
+        self.text_min, self.line_min = R["FAB_SILK_TEXT_MIN"], R["FAB_SILK_LINE_MIN"]
+
+    def ts(self, size):
+        """A text size raised to the fab minimum: what text() will draw for `size`, for laying things out round it."""
+        return max(size, self.text_min)
 
     # ---- graphics ----
     def shape(self, layer, kind, width=0.15, fill=False):
@@ -104,8 +126,9 @@ class Board:
         t.SetText(s)
         t.SetLayer(layer)
         t.SetPosition(V(*pos))
+        size = self.ts(size)
         t.SetTextSize(V(size, size))
-        t.SetTextThickness(mm(thick if thick else size * 0.15))
+        t.SetTextThickness(mm(max(thick if thick else size * 0.15, self.line_min)))
         t.SetTextAngleDegrees(angle)
         if mirror:
             t.SetMirrored(True)
@@ -203,6 +226,36 @@ class Board:
                 q = p.GetPosition()
                 return pcbnew.ToMM(q.x), pcbnew.ToMM(q.y)
         raise KeyError(f"{ref}.{num}")
+
+    def fab_silk(self, R):
+        """Bring every silkscreen line and visible text up to the fab minimums (FAB_SILK_LINE_MIN,
+        FAB_SILK_TEXT_MIN): thinner lines are widened, smaller text is enlarged with its stroke scaled to match.
+        Library footprints are included. Returns (lines widened, texts enlarged)."""
+        lmin, hmin = mm(R["FAB_SILK_LINE_MIN"]), mm(R["FAB_SILK_TEXT_MIN"])
+        silk = (pcbnew.F_SilkS, pcbnew.B_SilkS)
+        nl = nt = 0
+        items = list(self.b.GetDrawings())
+        for fp in self.b.GetFootprints():
+            items += list(fp.GraphicalItems()) + [fp.Reference(), fp.Value()]
+        for it in items:
+            if it.GetLayer() not in silk:
+                continue
+            if hasattr(it, "GetTextHeight"):
+                if not it.IsVisible():
+                    continue
+                h, w, t = it.GetTextHeight(), it.GetTextWidth(), it.GetTextThickness()
+                if h < hmin:
+                    k = hmin / h
+                    it.SetTextSize(pcbnew.VECTOR2I(int(w * k), hmin))
+                    t = int(t * k)
+                    nt += 1
+                if t < lmin:
+                    t = lmin
+                it.SetTextThickness(t)
+            elif hasattr(it, "GetWidth") and 0 < it.GetWidth() < lmin:
+                it.SetWidth(lmin)
+                nl += 1
+        return nl, nt
 
     def save(self, path):
         self.b.Save(path)

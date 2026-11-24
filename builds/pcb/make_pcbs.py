@@ -3,6 +3,12 @@
     python3 make_pcbs.py            # writes deck_d15, deck_d31, face_pcb and endplate_pcb .kicad_pcb, fills zones,
                                     # runs DRC, exports Gerber + drill zips, SVG previews, the 1:1 print PDF and
                                     # pcb_preview.png into out/ (preview one level up)
+    python3 make_pcbs.py --fab jlcpcb               # the same boards held to a fab's rules, into out_jlcpcb/
+    python3 make_pcbs.py --fab pcbway --override my_rules.csv   # ... plus a builder's own rule file, later wins
+
+Fab rules (what the board house can make) come from ../../fab/board_rules.csv, then fab/overrides/<fab>.csv, then each
+--override file. Every design size must be at or above them (checked before drawing); knockout bridges, mouse bites
+and silkscreen are sized up to them. The committed out/ is built with the master rules only.
 
 Sizes and rules come from parameters.csv here and ../../common/parameters.csv (groups deck, pcb, face, endplate).
 Part placement and track routes are the tables below, in each core corner's local frame (u along the rim clockwise,
@@ -13,6 +19,7 @@ Deck (revision 3, spec REV3_PLAN.md): top = electronics side (bare except the +5
 ring), bottom = antenna side (solid GND, the shield). The three XIAOs sit inside the core, so every net runs inside the
 shield; both layers carry signals there, clear of the seam strip. One deck per duck spacing in DECK_VARIANTS.
 """
+import argparse
 import math
 import os
 import subprocess
@@ -32,7 +39,15 @@ from kicad_lib import loc, pol  # noqa: E402
 P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate", "gusset"], build="pcb")
 globals().update(P)
 ADAPTER_HOLE = params.load(["pipe"], build="pcb")["ADAPTER_HOLE"]
-OUT = os.path.join(HERE, "out")
+
+_ap = argparse.ArgumentParser(description="Generate the mast PCBs.")
+_ap.add_argument("--fab", help="fab/overrides/<FAB>.csv on top of fab/board_rules.csv (e.g. jlcpcb, pcbway)")
+_ap.add_argument("--override", action="append", default=[], metavar="CSV",
+                 help="further rule override file(s), applied in order after --fab")
+ARGS = _ap.parse_args() if __name__ == "__main__" else _ap.parse_args([])
+FAB = params.load_fab(ARGS.fab, ARGS.override)
+FAB_TAG = params.fab_tag(ARGS.fab, ARGS.override)
+OUT = os.path.join(HERE, "out_" + FAB_TAG if FAB_TAG else "out")
 
 LAYOUT0 = layout.Layout(DECK_VARIANTS[0])     # spacing-independent values (common/layout.py)
 INRADIUS = LAYOUT0.r_in
@@ -42,6 +57,40 @@ VIA_D, VIA_DRILL = VIA
 F, B = pcbnew.F_Cu, pcbnew.B_Cu
 FS, BS = pcbnew.F_SilkS, pcbnew.B_SilkS
 CORE_LIM = LAYOUT0.core_lim
+
+
+def fab_check():
+    """Every design size the fab rules limit must be at or above the rule; returns the list of failures. Sizes the
+    generator can raise on its own (knockout bridges, mouse bites, silkscreen) are not here: see fab_sizes."""
+    R = FAB
+    tab_t = FACE_THICK * (1 + R["FAB_THICK_TOL"])                  # thickest face board the fab may ship
+    rs = SLOT_W / 2                                                # slot end radius
+    sag = rs - math.sqrt(max(rs * rs - (FACE_THICK / 2) ** 2, 0))  # a square tab end needs this much past R
+    need_l = TAB_W + 2 * sag + 2 * R["FAB_OUTLINE_TOL"]
+    checks = [
+        ("TRACK", TRACK, "FAB_TRACK_MIN", R["FAB_TRACK_MIN"]),
+        ("CLEARANCE", CLEARANCE, "FAB_CLEARANCE_MIN", R["FAB_CLEARANCE_MIN"]),
+        ("VIA pad", VIA_D, "FAB_VIA_DIA_MIN", R["FAB_VIA_DIA_MIN"]),
+        ("VIA drill", VIA_DRILL, "FAB_VIA_DRILL_MIN", R["FAB_VIA_DRILL_MIN"]),
+        ("VIA annular ring", (VIA_D - VIA_DRILL) / 2, "FAB_ANNULAR_MIN", R["FAB_ANNULAR_MIN"]),
+        ("EDGE_CLEAR", EDGE_CLEAR, "FAB_EDGE_CLEAR_MIN", R["FAB_EDGE_CLEAR_MIN"]),
+        ("SLOT_W", SLOT_W, "FAB_SLOT_NPTH_MIN", R["FAB_SLOT_NPTH_MIN"]),
+        ("KO_CHANNEL", KO_CHANNEL, "FAB_SLOT_NPTH_MIN", R["FAB_SLOT_NPTH_MIN"]),
+        ("SLOT_W - FAB_OUTLINE_TOL (face fit)", SLOT_W - R["FAB_OUTLINE_TOL"], "FACE_THICK x (1 + FAB_THICK_TOL)",
+         tab_t),
+        ("SLOT_L (tab fit)", SLOT_L, "TAB_W + slot-end sag + 2 x FAB_OUTLINE_TOL", need_l),
+    ]
+    return [f"{n} {v:.3f} mm < {rn} {r:.3f} mm" for n, v, rn, r in checks if v < r - 1e-9]
+
+
+def fab_sizes():
+    """Knockout sizes raised to the fab rules: bridge width, mouse-bite drill and pitch (the design's web between
+    holes kept), holes per bridge (spread across the bridge, one drill in from each side)."""
+    bw = max(KO_BRIDGE[0], FAB["FAB_BREAKAWAY_TAB_MIN"])
+    md = max(MOUSE_BITE[0], FAB["FAB_NPTH_MIN"])
+    mp = md + (MOUSE_BITE[1] - MOUSE_BITE[0])
+    n = max(3, int((bw - 2 * md) / mp) + 1)
+    return bw, md, mp, n
 
 
 def deck_diameter(spacing):
@@ -399,16 +448,16 @@ def knockout(bd, ref):
     ro = ADAPTER_HOLE / 2
     ri = ro - KO_CHANNEL
     rc = (ro + ri) / 2
-    bw, nb = KO_BRIDGE
+    nb = KO_BRIDGE[1]
+    bw, md, mp, nmb = fab_sizes()
     hb = math.degrees(bw / 2 / rc)
-    md, mp = MOUSE_BITE
     for k in range(nb):
         a0 = 45 + 360 * k / nb + hb
         a1 = 45 + 360 * (k + 1) / nb - hb
         bd.poly(pcbnew.Edge_Cuts, arc_pts(ro, a0, a1, 2.0) + arc_pts(ri, a1, a0, 2.0), 0.1)
         ab = 45 + 360 * k / nb
-        for j in (-1, 0, 1):   # holes on the plate side of the bridge, tangent to the finished hole edge
-            npth_fp(bd, f"MB{k * 3 + j + 2}", loc(ab, j * mp, ro - md / 2), md)
+        for j in range(nmb):   # holes on the plate side of the bridge, tangent to the finished hole edge
+            npth_fp(bd, f"MB{k * nmb + j + 1}", loc(ab, (j - (nmb - 1) / 2) * mp, ro - md / 2), md)
     fp = K.custom_fp(bd, ref, "RP-SMA")
     K.th_pad(fp, "1", 0, 0, PAD_EXPOSE, HOLE_RPSMA, "GND_KO", bd)
     bd.add_fp(fp, ref, "RP-SMA", (K.CX, K.CY), 0)
@@ -424,6 +473,7 @@ def warn_icon(bd, layer, text, pos, size, angle, side="before", height=4.0):
     """ISO 7010 W001-style caution sign (triangle with !) drawn in silkscreen lines beside a warning text: before
     its first character (side "before"), after its end ("after") or above it ("above"), upright with the text.
     The text's extent is estimated from its line lengths (KiCad's stroke font is ~0.9 x size per character)."""
+    size = bd.ts(size)
     lines = text.split("\n")
     half_l = max(len(s) for s in lines) * size * 0.9 / 2
     half_h = len(lines) * size * 1.6 / 2
@@ -450,6 +500,7 @@ def url_text(bd, layer, pos, angle=0.0, mirror=False, size=0.9, one_line=False):
 def build_deck(spacing):
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=EDGE_CLEAR)
+    bd.fab_rules(FAB, EDGE_CLEAR)
     C = (K.CX, K.CY)
     R = deck_diameter(spacing) / 2
     t0, t1, t2 = VERTICES
@@ -613,14 +664,14 @@ def build_deck(spacing):
             angle=0)
     bd.text(FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, angle=-120)
     warn_icon(bd, FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, -120, "after")
-    bd.text(FS, ASSEMBLY_STEPS, band(240, 18.5, a + 15.0), 0.8, angle=-240)
+    bd.text(FS, ASSEMBLY_STEPS, band(240, 23.0, a + 15.0), 0.8, angle=-240)
     for lay, mir in ((FS, False), (BS, True)):   # J2 (5V in from PoE), both sides: inward of its label
         jw = loc(J2_POS[1], 0.0, J2_POS[0] - 6.0)
         bd.text(lay, USB_WARNING, jw, 0.8, angle=-J2_POS[1], mirror=mir)
         warn_icon(bd, lay, USB_WARNING, jw, 0.8, -J2_POS[1], "before", 2.8)
     bd.text(FS, "AS END PLATE:\nTHIS SIDE OUT, NO PARTS", band(0, 19.5, a + 23.5), 0.9, angle=0)
     url_text(bd, FS, band(120, 19.5, a + 21.5), angle=-120)
-    bd.text(FS, "KNOCKOUT", pol(7.6, 0), 0.8)
+    bd.text(FS, "KNOCKOUT", pol(6.8, 0), 0.8)
     scale_bars(bd, K.CX - 50, K.CY - 50, K.CX + R + 8, K.CY + R + 6)
     # tie mounts, one per XIAO pigtail
     for k, th in enumerate(VERTICES):
@@ -635,7 +686,7 @@ def build_deck(spacing):
     bd.text(BS, f"DUCK SPACING {spacing:g} MM", band(240, 19.5, a + 12.0), 1.2, angle=-240, mirror=True)
     bd.text(BS, "THIS SIDE TO THE CORE\n(AS DECK OR END PLATE)", band(0, 19.5, a + 16.5), 1.0, angle=0, mirror=True)
     url_text(bd, BS, band(240, 19.5, a + 16.8), angle=-240, mirror=True)
-    bd.text(BS, "KNOCKOUT", pol(7.6, 0), 0.8, mirror=True)
+    bd.text(BS, "KNOCKOUT", pol(6.8, 0), 0.8, mirror=True)
     return bd
 
 
@@ -645,6 +696,7 @@ def build_face():
     end plate edge. Solid GND both sides, one plated RP-SMA hole at the centre (DIPOLE_HOLE)."""
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=0.3)
+    bd.fab_rules(FAB, 0.3)
     w, h = FACE_W, FACE_H
     x0, y0 = K.CX - w / 2, K.CY - h / 2
     x1, y1 = x0 + w, y0 + h
@@ -733,6 +785,7 @@ def build_gusset():
     from shapely.ops import unary_union
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=0.3)
+    bd.fab_rules(FAB, 0.3)
     trap, tabs, _ = LAYOUT0.gusset(*GUSSET_R, GUSSET_TAB_PROUD)
     r_m4 = LAYOUT0.m4_r
     # the nut pad must sit inside the gusset, clear of the faces' inner surfaces by NUT_GAP
@@ -770,6 +823,7 @@ def build_endplate():
     adapter thread. Top view from the deck side, sector S0 up, as on the deck."""
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=EDGE_CLEAR)
+    bd.fab_rules(FAB, EDGE_CLEAR)
     Re = ENDPLATE_DIAMETER / 2
     C = (K.CX, K.CY)
     bd.circle(pcbnew.Edge_Cuts, C, Re, 0.1)
@@ -801,7 +855,7 @@ def build_endplate():
         bd.circle(lay, C, nk, 0.2)
         bd.text(lay, lab, pol(nk + 1.6, 180), 1.0, angle=-180, mirror=mir)
     bd.text(FS, "END PLATE - INSIDE", pol(45, 60), 1.5, angle=-60 + 90)
-    bd.text(FS, "SOLDER FACES TO DECK AND END PLATE\nFIRST, ON THE BARE BOARDS", pol(45, 300), 0.9, angle=-300 + 90)
+    bd.text(FS, "SOLDER FACES TO DECK\nAND END PLATE FIRST,\nON THE BARE BOARDS", pol(43, 300), 0.9, angle=-300 + 90)
     bd.text(FS, "RP-SMA", pol(7.6, 0), 0.9)
     # silkscreen, outside (bottom), read from below
     bd.text(BS, POWER_WARNING, pol(50, 240), 1.1, angle=-240, mirror=True)
@@ -819,15 +873,27 @@ DRU = """(version 1)
 (rule "+5V clearance"
   (constraint clearance (min {c}mm))
   (condition "A.NetName == '+5V' && B.NetName != '+5V'"))
+(rule "fab: via drill"
+  (constraint hole_size (min {via_drill}mm))
+  (condition "A.Type == 'Via'"))
+(rule "fab: annular ring"
+  (constraint annular_width (min {annular}mm)))
+(rule "fab: hole to hole, different nets"
+  (constraint hole_to_hole (min {h2h}mm))
+  (condition "A.NetName != B.NetName"))
 """
 
 
 def finish(bd, name):
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, name + ".kicad_pcb")
+    nl, nt = bd.fab_silk(FAB)
+    if nl or nt:
+        print(f"  silkscreen raised to the fab rules: {nl} lines widened, {nt} texts enlarged")
     bd.save(path)
     with open(path[:-len(".kicad_pcb")] + ".kicad_dru", "w") as f:   # custom rules, read by DRC next to the board
-        f.write(DRU.format(c=CLEARANCE_5V))
+        f.write(DRU.format(c=CLEARANCE_5V, via_drill=FAB["FAB_VIA_DRILL_MIN"], annular=FAB["FAB_ANNULAR_MIN"],
+                           h2h=FAB["FAB_HOLE_TO_HOLE_MIN"]))
     b = pcbnew.LoadBoard(path)
     pcbnew.ZONE_FILLER(b).Fill(b.Zones())
     b.Save(path)
@@ -1011,6 +1077,15 @@ def make_preview(names, path):
 
 
 if __name__ == "__main__":
+    bad = fab_check()
+    if bad:
+        sys.exit("design below the fab rules (" + (FAB_TAG or "master") + "):\n  " + "\n  ".join(bad))
+    os.makedirs(OUT, exist_ok=True)
+    with open(os.path.join(OUT, "fab_rules_used.csv"), "w") as f:   # the rule set these outputs were checked to
+        f.write("name,value\n" + "".join(f"{k},{params.fmt(v)}\n" for k, v in FAB.items()))
+    kb = fab_sizes()
+    print(f"fab rules: {FAB_TAG or 'master'}; knockout bridge {kb[0]:g} mm, mouse bites {kb[3]} x {kb[1]:g} mm "
+          f"at {kb[2]:g} mm")
     decks = [(f"deck_d{s:g}", s) for s in DECK_VARIANTS]
     boards = [(n, (lambda s=s: build_deck(s))) for n, s in decks] + [("face_pcb", build_face),
                                                                     ("endplate_pcb", build_endplate),
@@ -1062,4 +1137,4 @@ if __name__ == "__main__":
                   ("face_pcb", "top", "FACE x3 (outside)"),
                   ("endplate_pcb", "top", "END PLATE INSIDE (top)"),
                   ("endplate_pcb", "bottom", "END PLATE OUTSIDE (mirrored)")],
-                 os.path.join(HERE, "pcb_preview.png"))
+                 os.path.join(HERE, "pcb_preview.png") if not FAB_TAG else os.path.join(OUT, "pcb_preview.png"))

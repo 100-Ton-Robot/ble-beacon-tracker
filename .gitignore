@@ -26,3 +26,4 @@ builds/pcb/out/*_gerbers/
 builds/pcb/out/*.svg
 builds/pcb/out/*.png
 builds/pcb/out/*-backups/
+builds/pcb/out_*/

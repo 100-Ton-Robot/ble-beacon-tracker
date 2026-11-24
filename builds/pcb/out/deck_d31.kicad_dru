@@ -2,3 +2,11 @@
 (rule "+5V clearance"
   (constraint clearance (min 0.5mm))
   (condition "A.NetName == '+5V' && B.NetName != '+5V'"))
+(rule "fab: via drill"
+  (constraint hole_size (min 0.3mm))
+  (condition "A.Type == 'Via'"))
+(rule "fab: annular ring"
+  (constraint annular_width (min 0.15mm)))
+(rule "fab: hole to hole, different nets"
+  (constraint hole_to_hole (min 0.5mm))
+  (condition "A.NetName != B.NetName"))

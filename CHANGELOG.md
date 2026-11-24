@@ -6,6 +6,20 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Fab rules (2026-11-24)
+
+- Added: `fab/board_rules.csv`, the master fab rules (`FAB_*`: minimum track, clearance, via, annular ring, holes,
+  slots, edge and hole clearance, mask web, silkscreen line and text, breakaway tab, tolerances, minimum order),
+  set to the stricter of JLCPCB's and PCBWay's published 2-layer limits, and `fab/overrides/` (`jlcpcb.csv`,
+  `pcbway.csv`) to change some of them per fab or per builder. Loaded by `params.load_fab()`; an override may
+  only change a rule the master has.
+- Changed: `builds/pcb/make_pcbs.py` checks the design against the rules before drawing, sizes the knockout
+  bridges (now 5 mm, `FAB_BREAKAWAY_TAB_MIN`; six mouse bites each) and every silkscreen line and text (at least
+  0.153 mm / 1.0 mm) up to them, and writes them into each board's DRC settings and `.kicad_dru`.
+  `--fab NAME` / `--override CSV` build to `out_<name>/` (not committed). Two silkscreen texts moved to fit the
+  larger text (deck assembly list, end plate solder note). DRC 0 errors on all five boards.
+- J1 / J2 in the BOM carry the JLCPCB / LCSC parts (C131334, C131337).
+
 ### Wiring docs (2026-11-24)
 
 - Changed: docs that still showed per-radio D8 TX wiring now say D8 has no UART on the nRF54L15 and point to the

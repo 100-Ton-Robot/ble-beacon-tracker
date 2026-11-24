@@ -32,8 +32,8 @@ C1_CAN,8.0 3.5,mm,design,pcb,"Not placed on the rev 3 deck (2026-11-23): the 8 m
 ENDPLATE_STITCH,70.5 36,mm count,design,endplate,"stitching via ring on the end plate: radius, count"
 ENDPLATE_NUT_OD,50.0,mm,estimated,endplate,"1/2 in IPS faucet lock nut, estimated to cover hex / winged / flanged nuts; keep-clear ring is this + 4 mm, both sides"
 KO_CHANNEL,2.0,mm,design,endplate,knockout: routed channel width; its outer edge is ADAPTER_HOLE (the hole once broken out)
-KO_BRIDGE,2.5 4,mm count,design,endplate,"knockout bridges: width, count"
-MOUSE_BITE,0.5 0.75,mm,design,endplate,"mouse-bite holes across each knockout bridge, on the plate side of it: drill, pitch"
+KO_BRIDGE,2.5 4,mm count,design,endplate,"knockout bridges: width, count. The width is a design minimum: the generator makes the bridges at least FAB_BREAKAWAY_TAB_MIN (fab/board_rules.csv) wide"
+MOUSE_BITE,0.5 0.75,mm,design,endplate,"mouse-bite holes across each knockout bridge, on the plate side of it: drill, pitch. The drill is at least FAB_NPTH_MIN; the web between holes (pitch - drill) is kept and as many holes as fit cross the bridge"
 SWITCH_HOLE,6.5,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped (end plate hole removed). Rev 2: 6.5 mm toggle hole
 SWITCH_R,45.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: toggle hole radius on the end plate
 DECK_CENTRE_CLEAR,39.0,mm,design,pcb,"deck top: no part, pad or tie square inside this diameter round the centre (the knockout aside), for a 1/2 in PVC pipe or threaded fitting / nut (~34 mm across corners, estimate; measure). Flat tracks may pass. Checked by centre_check in make_pcbs.py (2026-11-23)"
