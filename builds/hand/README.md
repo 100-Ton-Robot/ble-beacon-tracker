@@ -3,8 +3,8 @@
 Build the mast by hand from copper-clad board, acrylic and stripboard, with printable 1:1 templates. The PCB build is the other way to build the same mast: [`../pcb/README.md`](../pcb/README.md). Both builds share the same physical layout of antennas and plates (deck size per duck spacing, antenna holes, faces, pipe hole, M3 registration holes), computed once in [`common/layout.py`](../../common/layout.py) from [`common/parameters.csv`](../../common/parameters.csv). This build's own numbers (templates, plates, wiring, the copper deck, the LED ring and unified board options) are in [`parameters.csv`](parameters.csv) here.
 
 > **Status (2026-11-24): the templates follow the shared layout and the star wiring.**
-> - **Updated:** page 1 (one deck drill template for both duck spacings: D15 and D31 holes, 146.3 mm cut line with the 144 mm line dashed, no part positions; drawn in the plates' frame so every hole lines up with them), pages 2-3 (plates: dotted D15 and D31 reference holes; the no-pipe plate shows the deck's centre hole and M3 bolts), page 4 (plain face, one 6.5 mm centre hole, butt joints), page 6 (star wiring, relay protocol 4) and page 9 (formulas, printed from `common/layout.py`).
-> - **Not updated yet:** page 5 (stack views: still shows the 2-1/4" deck hole; the deck template now has the 22.2 mm pipe hole), page 7 (LED ring) and page 8 (unified board: its wire list still shows each radio's own data wire).
+> - **Updated:** page 1 (one deck drill template for both duck spacings: D15 and D31 holes, 2-1/4" centre hole for the pipe build, 146.3 mm cut line with the 144 mm line dashed, no part positions; drawn in the plates' frame so every hole lines up with them), pages 2-3 (plates: dotted D15 and D31 reference holes; the no-pipe plate shows the deck's centre hole and M3 bolts), page 4 (plain face, one 6.5 mm centre hole, butt joints), page 6 (star wiring, relay protocol 4) and page 9 (formulas, printed from `common/layout.py`).
+> - **Not updated yet:** page 7 (LED ring) and page 8 (unified board: its wire list still shows each radio's own data wire).
 > - **Decided:** electronics on the acrylic plate above the deck (the on-deck layout is the PCB build's); the plate keeps its three M4 bolts in the deck's core corners, with spacers, so its radios sit near the deck. Faces are plain butt-jointed squares. The LED ring stays as an option.
 > - `shield_deck_gerbers.zip` (`make_shield_deck.py`, a bare 146 mm deck for 31 mm ducks) is the older layout and is superseded by the deck template and the PCB decks; it stays in the repo.
 
@@ -39,7 +39,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 | 8 | Option: unified power + LED board | older wiring |
 | 9 | Design formulas (reference, no need to print), without the PCB deck's radio placement | updated |
 
-- **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; the pipe passes the deck's 22.2 mm centre hole.
+- **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; they go in through the deck's 2-1/4" centre hole.
 - **No pipe:** pages 1, 3, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
 
 **Pipe option, 1/2" EMT instead of PVC** (page 5 notes):
@@ -86,7 +86,8 @@ Holes you drill yourself (the deck PCB comes drilled from the fab). Counts are f
 | 4.8 mm | 3/16" | Plate: zip tie holes (pairs; any 3.0-4.8 mm fits a 2.5 mm tie) | 6 (3 XIAOs) | 10 (3 XIAOs + 2 across the ESP32) |
 | 3.4 mm | 9/64" | Plate: bus board M3 | 1 (skip if the bus goes on the pipe) | 1 |
 | 22.2 mm | 7/8" | Plate centre + enclosure top: 1/2" male pipe adapter thread | 2 (1 plate, 1 enclosure top) | - |
-| 22.2 mm | 7/8" | Deck centre: the pipe | 1 | 1 (optional) |
+| 57 mm hole saw | 2-1/4" | Deck centre, pipe build: splitter and ESP32 pass into the core (cuts away the M3 holes) | 1 | - |
+| 22.2 mm | 7/8" | Deck centre, no pipe | - | 1 (optional) |
 | 6.5 mm | 17/64" | Deck: RP-SMA antenna jack, one per sector (D15, D31, P or P2) | 3 | 3 |
 | 4.8 mm | 3/16" | Deck: M4 bolts in the core corners (plate spacers) | 3 | 3 |
 | 3.4 mm | 9/64" | Deck: M3 registration to the collar (optional, as the PCB deck) | 0 or 3 | 0 or 3 |

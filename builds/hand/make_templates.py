@@ -1925,6 +1925,10 @@ def deck_page(c):
     hole(0, 0, L.pipe_d)                               # pipe hole
     c.setFont("Helvetica-Bold", 6.5)
     c.drawCentredString(cx * mm, (cy - L.pipe_d / 2 - 3.5) * mm, f"pipe {L.pipe_d:g} (7/8 in)")
+    saw = PIPE_SAW                                     # pipe build: 2-1/4 in hole saw round the same centre (re-added
+    c.setLineWidth(0.6)                                # 2026-11-24): splitter and ESP32 pass into the core
+    c.circle(cx * mm, cy * mm, saw / 2 * mm)
+    c.drawCentredString(cx * mm, (cy - saw / 2 + 1.5) * mm, f"pipe build: 2-1/4 in hole saw ({saw:.1f})")
 
     c.saveState()                                      # faces: copper side out on this line
     c.setStrokeColorRGB(*COPPER_INK)
@@ -1983,8 +1987,10 @@ def deck_page(c):
         "the face,",
         f"P / P2 = patch {PATCH_OFFSET:g} mm in front (P2 {L.s_P2:g} mm along the face). D{layout.VARIANTS[0]:g} and "
         "P are close: never drill both.",
-        f"Centre {L.pipe_d:g} mm = the pipe (1/2 in PVC adapter).  M3 {COLLAR_HOLE:g} mm x3 = registration to the "
-        f"collar (dashed: {M3_KEEPOUT:g} mm washer keep-out).",
+        f"Centre: pipe build 2-1/4 in ({PIPE_SAW:.1f} mm) hole saw, for the splitter and ESP32 (page 5); "
+        f"otherwise {L.pipe_d:g} mm (1/2 in PVC adapter).",
+        f"M3 {COLLAR_HOLE:g} mm x3 = registration to the collar (dashed: {M3_KEEPOUT:g} mm washer keep-out); the "
+        "2-1/4 in hole cuts them away.",
         f"M4 {g.HOLE_M4:g} mm x3 in the core corners = bolts + spacers for the electronics plate (pages 2 and 3), nut "
         "in the corner (dashed hex).",
         f"Turned like the plates: plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it, so the plates' "
