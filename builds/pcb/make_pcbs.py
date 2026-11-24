@@ -29,7 +29,7 @@ import kicad_lib as K  # noqa: E402
 import layout  # noqa: E402
 from kicad_lib import loc, pol  # noqa: E402
 
-P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate"], build="pcb")
+P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate", "gusset"], build="pcb")
 globals().update(P)
 ADAPTER_HOLE = params.load(["pipe"], build="pcb")["ADAPTER_HOLE"]
 OUT = os.path.join(HERE, "out")
@@ -175,11 +175,11 @@ def m3_fp(bd, ref, pos):
     return fp
 
 
-def m4_fp(bd, ref, pos):
-    """Core-corner M4 service bolt: plated hole, NUT_PAD bare GND copper both sides (washer on top, nut or standoff
-    underneath)."""
+def m4_fp(bd, ref, pos, hole=None):
+    """Core-corner M4 service bolt: plated hole (M4_PLATE_HOLE on the plates, oversize for play), NUT_PAD bare GND
+    copper both sides (washer outside, the gusset nut inside)."""
     fp = K.custom_fp(bd, ref, "M4")
-    K.th_pad(fp, "1", 0, 0, NUT_PAD, HOLE_M4, "GND", bd)
+    K.th_pad(fp, "1", 0, 0, NUT_PAD, hole or M4_PLATE_HOLE, "GND", bd)
     bd.add_fp(fp, ref, "M4", pos, 0)
     fp.Reference().SetVisible(False)
     fp.Value().SetVisible(False)
@@ -664,6 +664,9 @@ def build_face():
                     (c, y1 + th), (c, y1 - rd), (c - rw, y1 - rd), (c - rw, y1)]
     outline += [(x0, y1)]
     bd.poly(pcbnew.Edge_Cuts, outline, 0.1)
+    slots = face_gusset_slots(x0, y0, x1, y1)
+    for sl in slots:                              # corner gusset slots, near both ends of both end edges
+        bd.poly(pcbnew.Edge_Cuts, sl, 0.1)
     fp = K.custom_fp(bd, "H1", "RP-SMA")
     K.th_pad(fp, "1", 0, 0, PAD_EXPOSE, DIPOLE_HOLE, "GND", bd)
     bd.add_fp(fp, "H1", "RP-SMA", (K.CX, K.CY), 0)
@@ -675,8 +678,12 @@ def build_face():
     for k in range(4):   # stitching vias round the hole and along the edges
         bd.via((K.CX + 9 * math.cos(k * math.pi / 2 + math.pi / 4), K.CY + 9 * math.sin(k * math.pi / 2 + math.pi / 4)),
                "GND", VIA_D, VIA_DRILL)
+    from shapely.geometry import Point, Polygon
+    keep = [Polygon(sl).buffer(1.5) for sl in slots]
     for t in range(1, 12):
         for x, y in ((x0 + 5, y0 + 10 * t), (x1 - 5, y0 + 10 * t), (x0 + 10 * t, y1 - 5), (x0 + 10 * t, y0 + 5)):
+            if any(k.distance(Point(x, y)) < VIA_D / 2 for k in keep):
+                continue                          # no stitching via in or beside a gusset slot
             bd.via((x, y), "GND", VIA_D, VIA_DRILL)
     e = FACE_EDGE_EXPOSE
     for lay in (pcbnew.F_Mask, pcbnew.B_Mask):   # exposed seam edges: left, right, deck end, end plate end
@@ -701,6 +708,58 @@ def build_face():
     warn_icon(bd, FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1, 0, "above", 5.0)
     url_text(bd, FS, (K.CX + 28, K.CY + 20), size=1.2, one_line=True)
     url_text(bd, BS, (K.CX - 28, K.CY + 20), mirror=True, size=1.2, one_line=True)
+    return bd
+
+
+def face_gusset_slots(x0, y0, x1, y1):
+    """The four corner-gusset slots on a face (KiCad mm): GUSSET_SLOT_DEPTH below each end edge, centred under the
+    gusset tab's span along the face, GUSSET_SLOT_PLAY longer at each end, SLOT_W wide."""
+    _, _, (s_a, s_b) = LAYOUT0.gusset(*GUSSET_R, GUSSET_TAB_PROUD)
+    h = LAYOUT0.face_inner_half()
+    out = []
+    for yc in (y0 + GUSSET_SLOT_DEPTH, y1 - GUSSET_SLOT_DEPTH):
+        for sg in (1, -1):
+            a, b = K.CX + sg * (h - s_b - GUSSET_SLOT_PLAY), K.CX + sg * (h - s_a + GUSSET_SLOT_PLAY)
+            out.append([(a, yc - SLOT_W / 2), (b, yc - SLOT_W / 2), (b, yc + SLOT_W / 2), (a, yc + SLOT_W / 2)])
+    return out
+
+
+# --------------------------------------------------------------------------------------------- gusset
+def build_gusset():
+    """Corner gusset: a flat board in each core corner, parallel to the plates, its two side edges tabs through the
+    faces' gusset slots, GUSSET_TAB_PROUD past their outer surface. M4 nut soldered on the side away from the plate,
+    over a HOLE_M4 hole at r_M4. Bare GND copper both sides (solder the tabs to the face, inside and out)."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    bd = K.Board()
+    bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=0.3)
+    trap, tabs, _ = LAYOUT0.gusset(*GUSSET_R, GUSSET_TAB_PROUD)
+    r_m4 = LAYOUT0.m4_r
+    # the nut pad must sit inside the gusset, clear of the faces' inner surfaces by NUT_GAP
+    g = unary_union([Polygon(trap)] + [Polygon(t) for t in tabs])
+    hole_c = (0.0, r_m4)
+    assert Polygon(trap).buffer(0).contains(Polygon([(hole_c[0] + NUT_PAD / 2 * math.cos(a / 8 * math.pi),
+                                                        hole_c[1] + NUT_PAD / 2 * math.sin(a / 8 * math.pi))
+                                                       for a in range(16)]).buffer(-0.6)), "nut pad outside the gusset"
+    to = lambda u, v: (K.CX + u, K.CY - (v - r_m4))  # noqa: E731   corner frame -> board, hole at the centre
+    pts = [to(*q) for q in list(g.exterior.coords)[:-1]]
+    bd.poly(pcbnew.Edge_Cuts, pts, 0.1)
+    box = [(K.CX - 15, K.CY - 15), (K.CX + 15, K.CY - 15), (K.CX + 15, K.CY + 15), (K.CX - 15, K.CY + 15)]
+    for lay, mask in ((F, pcbnew.F_Mask), (B, pcbnew.B_Mask)):
+        bd.zone(lay, box, "GND", 0, thermal=False, clearance=0.2)
+        sh = pcbnew.PCB_SHAPE(bd.b)                 # whole board bare copper: tabs, nut and fillets solder anywhere
+        sh.SetShape(pcbnew.SHAPE_T_POLY)
+        sh.SetPolyPoints([K.V(*q) for q in pts])
+        sh.SetFilled(True)
+        sh.SetWidth(0)
+        sh.SetLayer(mask)
+        bd.b.Add(sh)
+    fp = K.custom_fp(bd, "H1", "M4 nut")
+    K.th_pad(fp, "1", 0, 0, NUT_PAD, HOLE_M4, "GND", bd)
+    bd.add_fp(fp, "H1", "M4 nut", (K.CX, K.CY), 0)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
+    scale_bars(bd, K.CX - 10, K.CY - 10, K.CX + 16, K.CY + 14)
     return bd
 
 
@@ -805,7 +864,7 @@ def finish(bd, name):
             cmd.insert(4, "--mirror")
         subprocess.run(cmd, check=False, capture_output=True)
     pages = [("top", "F.Mask,F.Silkscreen,Edge.Cuts,Dwgs.User", False)]
-    if name != "face_pcb":
+    if name not in ("face_pcb", "gusset_pcb"):
         pages.append(("bottom", "B.Mask,B.Silkscreen,Edge.Cuts,Dwgs.User", True))
     for side, layers, mir in pages:
         cmd = ["kicad-cli", "pcb", "export", "pdf", "--layers", layers, "--black-and-white",
@@ -954,7 +1013,8 @@ def make_preview(names, path):
 if __name__ == "__main__":
     decks = [(f"deck_d{s:g}", s) for s in DECK_VARIANTS]
     boards = [(n, (lambda s=s: build_deck(s))) for n, s in decks] + [("face_pcb", build_face),
-                                                                    ("endplate_pcb", build_endplate)]
+                                                                    ("endplate_pcb", build_endplate),
+                                                                    ("gusset_pcb", build_gusset)]
     for name, fn in boards:
         bd = fn()
         if name.startswith("deck"):
@@ -975,7 +1035,8 @@ if __name__ == "__main__":
         from pypdf import PdfReader, PdfWriter
         w = PdfWriter()
         pages = [f"{n}_print_{side}.pdf" for n, _ in decks for side in ("top", "bottom")]
-        pages += ["face_pcb_print_top.pdf", "endplate_pcb_print_top.pdf", "endplate_pcb_print_bottom.pdf"]
+        pages += ["face_pcb_print_top.pdf", "endplate_pcb_print_top.pdf", "endplate_pcb_print_bottom.pdf",
+                  "gusset_pcb_print_top.pdf"]
         for f in pages:
             p = os.path.join(OUT, f)
             w.add_page(PdfReader(p).pages[0])
@@ -983,6 +1044,10 @@ if __name__ == "__main__":
         w.write(os.path.join(OUT, "pcb_print_1to1.pdf"))
     except ImportError:
         print("pypdf not installed: print pages left as separate PDFs")
+    # gusset outline as DXF, for a 3D-printed or hand-cut gusset
+    subprocess.run(["kicad-cli", "pcb", "export", "dxf", "--layers", "Edge.Cuts", "--exclude-refdes",
+                    "--exclude-value", "--output-units", "mm", "-o", os.path.join(OUT, "gusset_outline.dxf"),
+                    os.path.join(OUT, "gusset_pcb.kicad_pcb")], check=False, capture_output=True)
     (d0, s0), (d1, s1) = decks[0], decks[-1]
     make_preview([(d0, "top", f"DECK, {s0:g} MM DUCKS, TOP (electronics side)"),
                   (d0, "bottom", f"DECK, {s0:g} MM DUCKS, BOTTOM (antenna side, mirrored)"),

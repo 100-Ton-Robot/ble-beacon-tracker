@@ -4,7 +4,7 @@ PATCH_OFFSET,7.0,mm,measured,deck,"P / P2 holes: patch connector axis -> copper 
 PATCH_END_INSET,35.0,mm,design,deck,"P2 hole: same offset, this far in from the face's counter-clockwise end (top view), i.e. 25 mm off the face centre. Moved in from 14 on 2026-11-10 (user) so one coax length reaches from back-panel positions A and C (notch assumed centred on the board's long edge)"
 FACE_THICK,1.6,mm,spec,deck,core face board (copper clad) thickness: the M4 nuts sit against its inner side
 NUT_AF,7.0,mm,spec,deck,"M4 nut (or M4 hex standoff) across flats (3.2 mm thick). One per core corner, two flats flush against the faces: soldered to the faces, or trapped in a glued 3D-printed holder (2026-11-01; PCB service bolts 2026-11-23)"
-NUT_GAP,0.0,mm,design,deck,extra room per face (e.g. for a seam fillet in the corner)
+NUT_GAP,0.5,mm,design,deck,"room per face between the core-corner M4 nut's flats and the face (seam fillet, tape, angle error). 0.0 until 2026-11-23 (flats flush): 0.5 so a nut drops in; moves r_M4 59.1 -> 58.1, both builds"
 NUT_PAD,9.0,mm,design,deck,bottom mask opening round each M4 hole for the nut solder (nut across corners ~8.1 mm)
 HOLE_M4,4.8,mm,design,deck,"M4 bolt, slightly loose so it finds the nut. Core-corner bolts: acrylic plate option (hand build); deck and end plate service bolts (PCB, 2026-11-23)"
 EDGE_CLEAR,0.5,mm,design,deck,copper pull-back from the board edge

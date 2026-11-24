@@ -144,6 +144,29 @@ class Layout:
               for sd, sn in ((1, 1), (1, -1), (-1, -1), (-1, 1))]
         return self.ipex, c, d, sq
 
+    def gusset(self, r0, r1, proud):
+        """Corner gusset in the corner frame (u across, v along the corner axis, out): the trapezoid between the two
+        faces' inner surfaces from v = r0 to r1, plus one tab per side as a rectangle square to its face, from the
+        inner surface out through the face and `proud` past it. Returns (trapezoid, [tab, tab], (s_a, s_b)) with s
+        the distance along each face's inner surface from the inner corner."""
+        vi = 2 * (self.r_in - P["FACE_THICK"])                 # faces' inner surfaces meet here
+        t30 = math.tan(math.radians(30))
+        trap = [((vi - r0) * t30, r0), ((vi - r1) * t30, r1), (-(vi - r1) * t30, r1), (-(vi - r0) * t30, r0)]
+        c30 = math.cos(math.radians(30))
+        s_a, s_b = (vi - r1) / c30, (vi - r0) / c30
+        tabs = []
+        for sg in (1, -1):
+            d = (sg * 0.5, -c30)                               # along the face, from the corner in
+            n = (sg * c30, 0.5)                                # out through the face
+            t = P["FACE_THICK"] + proud
+            tabs.append([(sg * 0 + s * d[0] + w * n[0], vi + s * d[1] + w * n[1])
+                         for s, w in ((s_a, 0.0), (s_b, 0.0), (s_b, t), (s_a, t))])
+        return trap, tabs, (s_a, s_b)
+
+    def face_inner_half(self):
+        """Distance along a face from its centre to the faces' inner corner, on the inner surface."""
+        return (self.r_in - P["FACE_THICK"]) * math.sqrt(3)
+
     def core_ok(self, u, v, pad=0.0):
         """(u, v) in a corner frame is inside the core, r_core from the centre across both neighbouring faces."""
         return 0.866025 * abs(u) + 0.5 * v + pad <= self.core_lim

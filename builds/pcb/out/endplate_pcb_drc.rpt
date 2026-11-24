@@ -1,10 +1,7 @@
 ** Drc report for /home/claude/ble-beacon-tracker/builds/pcb/out/endplate_pcb.kicad_pcb **
-** Created on 2026-11-23 20:19:29 **
+** Created on 2026-11-23 21:01:36 **
 
 ** Found 22 DRC violations **
-[silk_over_copper]: Silkscreen clipped by solder mask
-    Local override; Severity: warning
-    @(153.2646 mm, 69.8250 mm): Line on F.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
     @(99.5000 mm, 161.2160 mm): Line on F.Silkscreen
@@ -13,61 +10,64 @@
     @(47.2354 mm, 68.9590 mm): Line on F.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
+    @(153.2646 mm, 69.8250 mm): Line on F.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
     @(138.9711 mm, 77.5000 mm): PCB Text 'END PLATE - OUTSIDE' on B.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
-    @(138.9711 mm, 77.5000 mm): PCB Text 'END PLATE - INSIDE' on F.Silkscreen
+    @(61.0289 mm, 77.5000 mm): PCB Text 'SOLDER FACES TO DECK AND END PLATE...' on F.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
-    @(61.0289 mm, 77.5000 mm): PCB Text 'SOLDER FACES TO DECK AND END PLATE...' on F.Silkscreen
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(91.7976 mm, 92.8582 mm): Footprint MB10
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(91.7976 mm, 107.1418 mm): Footprint MB9
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.6721 mm, 92.3279 mm): Footprint MB2
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.8582 mm, 108.2024 mm): Footprint MB7
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.1418 mm, 108.2024 mm): Footprint MB6
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(48.8335 mm, 70.4590 mm): Footprint M3
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(100.0000 mm, 100.0000 mm): Footprint H1
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.3279 mm, 107.6721 mm): Footprint MB8
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(92.8582 mm, 91.7976 mm): Footprint MB12
-[lib_footprint_issues]: The current configuration does not include the library ''.
-    Local override; Severity: warning
-    @(107.6721 mm, 107.6721 mm): Footprint MB5
+    @(138.9711 mm, 77.5000 mm): PCB Text 'END PLATE - INSIDE' on F.Silkscreen
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
     @(108.2024 mm, 107.1418 mm): Footprint MB4
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(108.2024 mm, 92.8582 mm): Footprint MB3
+    @(92.3279 mm, 107.6721 mm): Footprint MB8
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(100.0000 mm, 159.0820 mm): Footprint M2
+    @(100.0000 mm, 158.0820 mm): Footprint M2
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
     @(107.1418 mm, 91.7976 mm): Footprint MB1
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(151.1665 mm, 70.4590 mm): Footprint M1
+    @(107.6721 mm, 107.6721 mm): Footprint MB5
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(49.6995 mm, 70.9590 mm): Footprint M3
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(91.7976 mm, 92.8582 mm): Footprint MB10
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(92.8582 mm, 108.2024 mm): Footprint MB7
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(107.6721 mm, 92.3279 mm): Footprint MB2
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(150.3005 mm, 70.9590 mm): Footprint M1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(91.7976 mm, 107.1418 mm): Footprint MB9
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 100.0000 mm): Footprint H1
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(108.2024 mm, 92.8582 mm): Footprint MB3
 [lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
     @(92.3279 mm, 92.3279 mm): Footprint MB11
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(92.8582 mm, 91.7976 mm): Footprint MB12
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(107.1418 mm, 108.2024 mm): Footprint MB6
 
 ** Found 0 unconnected pads **
 

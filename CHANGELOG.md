@@ -156,6 +156,12 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   duck spacing (with the acrylic plate's M4 corner holes and the on-deck parts' positions), a plain
   butt-jointed face and a formulas page printed from `layout.py`; the plate, stack, wiring, LED and unified
   board pages still show the older layout and D8 wiring (marked in `HAND_BUILD.md`).
+- Added (2026-11-23): corner gusset PCB (`gusset_pcb`, 21.3 x 13.3 mm, 6 per mast with both plates bolted) that
+  holds the M4 nut for each service bolt; its side tabs pass through four new 2.0 x 14.5 mm slots per face, 6 mm
+  below each end edge, and stand 1 mm proud outside. `NUT_GAP` 0 -> 0.5 mm, so the nut drops in: `r_M4` 59.1 ->
+  58.1 mm (both builds: the hand build's M4 corner holes move with it). Plate M4 holes 4.8 -> 5.2 mm
+  (`M4_PLATE_HOLE`). M4 x 14 cap bolts with washers in the BOM. Gusset outline also as DXF. Print PDF gains a
+  gusset page.
 - Changed (2026-11-23): deck rev 3 service and centre clearance. M4 service bolts at the three core corners
   (r 59.1 mm, plated, 9 mm pads) on the deck and the end plate, so either plate bolts onto nuts or standoffs in
   the core corners; on the deck each bolt sits in front of a XIAO's USB-C on purpose (USB with the bolt out).

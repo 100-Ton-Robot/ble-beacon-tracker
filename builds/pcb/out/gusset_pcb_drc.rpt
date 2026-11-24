@@ -1,0 +1,13 @@
+** Drc report for /home/claude/ble-beacon-tracker/builds/pcb/out/gusset_pcb.kicad_pcb **
+** Created on 2026-11-23 21:01:38 **
+
+** Found 1 DRC violations **
+[lib_footprint_issues]: The current configuration does not include the library ''.
+    Local override; Severity: warning
+    @(100.0000 mm, 100.0000 mm): Footprint H1
+
+** Found 0 unconnected pads **
+
+** Found 0 Footprint errors **
+
+** End of Report **

@@ -37,3 +37,8 @@ MOUSE_BITE,0.5 0.75,mm,design,endplate,"mouse-bite holes across each knockout br
 SWITCH_HOLE,6.5,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped (end plate hole removed). Rev 2: 6.5 mm toggle hole
 SWITCH_R,45.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: toggle hole radius on the end plate
 DECK_CENTRE_CLEAR,39.0,mm,design,pcb,"deck top: no part, pad or tie square inside this diameter round the centre (the knockout aside), for a 1/2 in PVC pipe or threaded fitting / nut (~34 mm across corners, estimate; measure). Flat tracks may pass. Checked by centre_check in make_pcbs.py (2026-11-23)"
+M4_PLATE_HOLE,5.2,mm,design,pcb,"deck / end plate M4 service-bolt holes: oversize for play against the gusset nut (washer 9 mm and cap head 7 mm cover it); gusset hole is HOLE_M4 (2026-11-23)"
+GUSSET_R,51.5 63.5,mm,design,gusset,"corner gusset extent along the corner axis (inner edge, tip): holds the M4 nut at r_M4; tip 2.6 mm short of the faces' inner corner for the seam fillet (2026-11-23)"
+GUSSET_SLOT_DEPTH,6.0,mm,design,gusset,"face slot centre below each face end edge for the gusset tabs (slot 5-7 mm: clear of the 3 mm seam band; owner 2026-11-23)"
+GUSSET_TAB_PROUD,1.0,mm,design,gusset,"gusset tabs stand this far past the face's outer surface, for an outside solder fillet (owner 2026-11-23)"
+GUSSET_SLOT_PLAY,0.3,mm,design,gusset,"face slot longer than the gusset tab by this much at each end (router radius, fit)"
