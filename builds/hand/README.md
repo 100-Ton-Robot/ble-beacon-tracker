@@ -49,7 +49,7 @@ D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 
 - **ESP32 antenna:** mount it in a plastic cap or insulating bushing, not on the bare steel end.
 
 1. Print your pages of `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
-2. Order the deck PCB: upload `shield_deck_gerbers.zip` to a PCB fab. Steps and settings: [PCBWAY.md](../pcb/PCBWAY.md).
+2. Make the deck: drill copper-clad board from the deck template (page 1), or order a PCB deck ([../pcb/README.md](../pcb/README.md)). The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
 3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
 4. Drill the plate and back panel (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). Page 1 is the deck's own hole pattern, for checking the board (and marking the pipe's hole-saw cut).
 5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
@@ -107,7 +107,7 @@ Buy a few spares, and 2 more 150 mm ties if the pipe build's bus board goes on t
 
 ## Next
 
-- **Order the deck PCB:** [PCBWAY.md](../pcb/PCBWAY.md): order steps, fab settings, what's on the board and the hole table.
+- **Order a PCB deck instead:** [../pcb/README.md](../pcb/README.md), with its fab settings. The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
 - **Build or change the files:** [Using the scripts](#using-the-scripts): change a measurement, [lay out a plate in Inkscape](#lay-out-a-plate-in-inkscape), regenerate the Gerbers, PDF and SVGs, [when something goes wrong](#when-something-goes-wrong).
 
 ## Using the scripts
@@ -154,7 +154,7 @@ The pages, in order (pick one build type, pipe or no pipe, and print only its pa
 
 1. Find the name in `parameters.csv` here or in `../../common/parameters.csv` (it is in one of them only), open that file in a spreadsheet or text editor and change the `value` cell. Keep the name as it is. A shared value changes the PCB build too: re-run `../pcb/make_pcbs.py` as well.
 2. Rebuild whatever uses it:
-   - **Deck rows** (`group` = `deck`): run `python make_shield_deck.py` and re-order the board ([PCBWAY.md](../pcb/PCBWAY.md)).
+   - **Deck rows** (`group` = `deck`): run `python make_shield_deck.py` (the superseded bare deck's Gerbers and `hole_table.csv`).
    - **Plate placement rows** (`alt` or `pipe`): run `python make_plate_svg.py` so the Inkscape files match the CSV, then `python read_plate_svg.py --check`.
    - **Anything else**: run `python make_templates.py`.
 

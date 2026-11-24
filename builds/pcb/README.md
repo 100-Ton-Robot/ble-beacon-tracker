@@ -103,7 +103,7 @@ C1 (bulk capacitor) is not on revision 3; see Deck.
 
 ## Order settings (PCBWay)
 
-Same as the old deck ([PCBWAY.md](PCBWAY.md)) except:
+Per board (PCBWay, or any fab: the Gerbers are standard RS-274X):
 
 | Setting | Deck | Face | End plate |
 | --- | --- | --- | --- |
@@ -112,7 +112,7 @@ Same as the old deck ([PCBWAY.md](PCBWAY.md)) except:
 | Min hole | 0.4 mm (vias) | 0.4 mm | 0.4 mm (vias); 0.5 mm mouse bites |
 | Note to fab | "Round board, nine 2.0 mm milled slots (non-plated) and a routed centre knockout ring with mouse-bite bridges (keep the bridges). Large copper pour on the bottom is intentional (RF shield)." | "Tabs on two edges. Solid copper both sides is intentional (RF reflector)." | "Round board, nine 2.0 mm milled slots and a routed knockout ring with mouse-bite bridges (keep the bridges). Solid copper both sides is intentional (RF shield)." |
 
-1.6 mm FR-4, 2 layers, 1 oz, HASL lead-free or ENIG (exposed copper must take solder). Check each in PCBWay's Gerber viewer before paying.
+All boards: single pieces, 2 layers, FR-4 (TG130 or better), 1.6 mm, 1 oz outer copper, HASL lead-free or ENIG (exposed copper must take solder), any solder mask colour, all holes plated unless noted, sizes are finished hole sizes, quantity 5 (the minimum). Check each in PCBWay's Gerber viewer before paying.
 
 ## Rebuild
 

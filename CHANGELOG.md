@@ -10,7 +10,7 @@ when the image was built, where known.
 
 - Split (2026-11-23): `shield_deck/` is now two builds of the same mast plus their shared geometry.
   `common/` holds `parameters.csv` (rows read by `layout.py`, by both builds, or by the RF model for both),
-  `params.py` and `layout.py`; `builds/pcb/` the PCB build (`make_pcbs.py`, `out/`, `PCBWAY.md`, `REV3_PLAN.md`)
+  `params.py` and `layout.py`; `builds/pcb/` the PCB build (`make_pcbs.py`, `out/`, `REV3_PLAN.md`)
   and `builds/hand/` the hand build (templates, plate SVGs, copper deck Gerbers; `HAND_BUILD.md` became its
   `README.md`). Each build has its own `parameters.csv`; `params.load(build="pcb"|"hand")` reads common plus that
   file and refuses a name in two files. `read_plate_svg.py` writes `builds/hand/parameters.csv`.
@@ -18,7 +18,8 @@ when the image was built, where known.
   Files moved with `git mv`; every generator gives the same output as before (only the templates' formulas page
   names the new paths). `shield_deck/README.md` points to the new folders. Pins are unchanged: the hand build's
   wiring, firmware 0.8.0 and the PCB deck still disagree (see either build's README, Firmware and pins).
-  New `boards/` for module boards either build can use: `carrier/` (one radio, Up + two branch ports),
+  `PCBWAY.md` (order notes for the superseded bare 146 mm deck) is retired; the PCB README's order settings
+  now stand alone. New `boards/` for module boards either build can use: `carrier/` (one radio, Up + two branch ports),
   `radio3/` (three radios, one Up cable) and `led/` (LED add-on), README stubs with empty `parameters.csv`
   so far, loaded with `params.load(boards=[...])`; `kicad_lib.py` moved to `boards/lib/`.
 

@@ -6,7 +6,7 @@ parameter file, and share one set of geometry:
 | Was | Now |
 | --- | --- |
 | `shield_deck/pcb/` (PCB build: `make_pcbs.py`, `out/`, `REV3_PLAN.md`, previews) | [`builds/pcb/`](../builds/pcb/README.md) |
-| `shield_deck/PCBWAY.md` | [`builds/pcb/PCBWAY.md`](../builds/pcb/PCBWAY.md) |
+| `shield_deck/PCBWAY.md` | retired 2026-11-23 (in git history): the bare 146 mm deck it ordered is superseded; fab settings are in [`builds/pcb/README.md`](../builds/pcb/README.md) |
 | `shield_deck/HAND_BUILD.md` and the hand build's scripts, templates PDF, plate SVGs, copper deck Gerbers, `hole_table.csv` | [`builds/hand/`](../builds/hand/README.md) (`HAND_BUILD.md` is now its `README.md`) |
 | `shield_deck/parameters.csv` | split three ways: [`common/parameters.csv`](../common/parameters.csv) (shared by both builds), [`builds/pcb/parameters.csv`](../builds/pcb/parameters.csv), [`builds/hand/parameters.csv`](../builds/hand/parameters.csv). Each name is in exactly one file. |
 | `shield_deck/params.py`, `shield_deck/layout.py` | [`common/params.py`](../common/params.py), [`common/layout.py`](../common/layout.py) |
