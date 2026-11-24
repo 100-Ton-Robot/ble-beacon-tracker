@@ -156,6 +156,11 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   duck spacing (with the acrylic plate's M4 corner holes and the on-deck parts' positions), a plain
   butt-jointed face and a formulas page printed from `layout.py`; the plate, stack, wiring, LED and unified
   board pages still show the older layout and D8 wiring (marked in `HAND_BUILD.md`).
+- Restored (2026-11-23): the face's centre 6.5 mm RP-SMA hole, on the face PCB (plated, 12 mm nut pad, four
+  stitching vias, "OUTSIDE - DIPOLE SIDE") and the hand-build face template, for an antenna on the face (a dipole or
+  the printed fin). `DIPOLE_HOLE` moved to `common/parameters.csv`. The face copper is the same as before the
+  removal, so the earlier rev 3 copper runs (with the hole) are back in `rf_model/out/rev3_*_copper*` and
+  `bearing_rev3`; the solid-face runs are kept in the same folders with `_solidface` added.
 - Removed (2026-11-23): the face PCB's centre RP-SMA hole (face-centre dipole option); the face is now solid
   GND both sides. USB warning with a caution sign right in front of each XIAO USB-C plug and beside J2; caution
   signs on every power warning.

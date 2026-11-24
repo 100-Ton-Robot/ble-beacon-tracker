@@ -10,6 +10,7 @@ PAD_EXPOSE,12.0,mm,design,deck,exposed copper round each RP-SMA hole (nut contac
 STITCH_COUNT,36,count,design,deck,
 HOLE_RPSMA,6.5,mm,spec,deck,RP-SMA bulkhead (thread OD 6.3 mm)
 FACE_H,120.0,mm,design,panel,back panel height: square 120 x 120 faces so the core fits the enclosure
+DIPOLE_HOLE,6.5,mm,spec,panel,"RP-SMA bulkhead at the face centre, both builds (dipole / printed fin feed). Dropped 2026-11-23 08:55, restored the same day (owner)"
 XIAO_L,21.0,mm,spec,plate,Seeed XIAO nRF54L15 board length
 XIAO_W,17.8,mm,spec,plate,XIAO board width
 XIAO_IPEX,8.25 3.9,mm,measured,plate,"IPEX4 (MHF4) centre from the XIAO centre: along toward its end, across toward the D0-D6 pin edge"

@@ -10,7 +10,6 @@ STITCH_RADIUS,71.0,mm,design,deck,ring of stitching vias tying top and bottom co
 HOLE_COAX,10.0,mm,design,deck,coax + RP-SMA end pass-through
 HOLE_M4,4.8,mm,design,deck,"M4 bolt, slightly loose so it finds the soldered nut"
 HOLE_VIA,0.6,mm,design,deck,
-DIPOLE_HOLE,6.5,mm,spec,panel,RP-SMA bulkhead at the face centre (DIY dipole option)
 BOARD_W,50.0,mm,measured,panel,printed-dipole panel board as mounted (turned 90 deg): short side across
 BOARD_H,60.0,mm,measured,panel,same board: long side down
 BOARD_CY,65.0,mm,design,panel,"position A: board centre below the deck (35-95 mm), as low as its coax reaches P2. Position B (one hole pitch lower) dropped with the 120 mm faces"

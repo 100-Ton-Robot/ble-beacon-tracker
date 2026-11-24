@@ -583,7 +583,7 @@ def build_deck(spacing):
 # --------------------------------------------------------------------------------------------- face
 def build_face():
     """One face design for both ends: tabs, relief notches and exposed seam copper on the deck edge and on the
-    end plate edge. Solid GND both sides, no holes."""
+    end plate edge. Solid GND both sides, one plated RP-SMA hole at the centre (DIPOLE_HOLE)."""
     bd = K.Board()
     bd.rules(CLEARANCE, TRACK, VIA_D, VIA_DRILL, edge=0.3)
     w, h = FACE_W, FACE_H
@@ -605,10 +605,17 @@ def build_face():
                     (c, y1 + th), (c, y1 - rd), (c - rw, y1 - rd), (c - rw, y1)]
     outline += [(x0, y1)]
     bd.poly(pcbnew.Edge_Cuts, outline, 0.1)
+    fp = K.custom_fp(bd, "H1", "RP-SMA")
+    K.th_pad(fp, "1", 0, 0, PAD_EXPOSE, DIPOLE_HOLE, "GND", bd)
+    bd.add_fp(fp, "H1", "RP-SMA", (K.CX, K.CY), 0)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
     rect = [(x0 - 1, y0 - th - 1), (x1 + 1, y0 - th - 1), (x1 + 1, y1 + th + 1), (x0 - 1, y1 + th + 1)]
     bd.zone(F, rect, "GND", 0, thermal=False)
     bd.zone(B, rect, "GND", 0, thermal=False)
-    # stitching vias along the edges (no centre hole since 2026-11-23: the face-centre dipole option is dropped)
+    for k in range(4):   # stitching vias round the hole and along the edges
+        bd.via((K.CX + 9 * math.cos(k * math.pi / 2 + math.pi / 4), K.CY + 9 * math.sin(k * math.pi / 2 + math.pi / 4)),
+               "GND", VIA_D, VIA_DRILL)
     for t in range(1, 12):
         for x, y in ((x0 + 5, y0 + 10 * t), (x1 - 5, y0 + 10 * t), (x0 + 10 * t, y1 - 5), (x0 + 10 * t, y0 + 5)):
             bd.via((x, y), "GND", VIA_D, VIA_DRILL)
@@ -622,13 +629,14 @@ def build_face():
             bd.line(lay, (K.CX + t, y1 - e), (K.CX + t, y1 + th), TAB_W)
             bd.line(lay, (K.CX + t, y0 + e), (K.CX + t, y0 - th), TAB_W)
     for lay, mir in ((FS, False), (BS, True)):
-        bd.line(lay, (K.CX, y0 + e + 0.6), (K.CX, y1 - e - 0.6), 0.2)
+        bd.line(lay, (K.CX, y0 + e + 0.6), (K.CX, K.CY - PAD_EXPOSE / 2 - 1), 0.2)
+        bd.line(lay, (K.CX, K.CY + PAD_EXPOSE / 2 + 1), (K.CX, y1 - e - 0.6), 0.2)
         for y in (y1 - e - 0.6, y0 + e + 0.6):
             bd.line(lay, (K.CX - 6, y), (K.CX + 6, y), 0.3)
         bd.text(lay, "TABS INTO THE DECK OR END PLATE SLOTS", (K.CX + (-30 if mir else 30), y1 - 10), 1.3, mirror=mir)
         bd.text(lay, "TABS INTO THE DECK OR END PLATE SLOTS", (K.CX + (-30 if mir else 30), y0 + 10), 1.3, mirror=mir)
     scale_bars(bd, K.CX - 50, K.CY - 50, x1 + 8, y1 + th + 6)
-    bd.text(FS, "OUTSIDE", (K.CX - 28, y0 + 16), 2.0)
+    bd.text(FS, "OUTSIDE - DIPOLE SIDE", (K.CX - 28, y0 + 16), 2.0)
     bd.text(BS, "INSIDE - CORE SIDE", (K.CX + 28, y0 + 16), 2.0, mirror=True)
     bd.text(FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1)
     warn_icon(bd, FS, POWER_WARNING, (K.CX - 31, K.CY), 1.1, 0, "above", 5.0)

@@ -1,16 +1,19 @@
-** Drc report for /home/claude/ble-beacon-tracker/shield_deck/pcb/out/face_pcb.kicad_pcb **
-** Created on 2026-11-23 08:48:18 **
+** Drc report for /home/claude/ble-beacon-tracker/builds/pcb/out/face_pcb.kicad_pcb **
+** Created on 2026-11-23 19:33:21 **
 
-** Found 8 DRC violations **
+** Found 9 DRC violations **
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
-    @(100.0000 mm, 43.6000 mm): Line on B.Silkscreen
+    @(100.0000 mm, 107.0000 mm): Line on B.Silkscreen
+[silk_over_copper]: Silkscreen clipped by solder mask
+    Local override; Severity: warning
+    @(94.0000 mm, 156.4000 mm): Line on B.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
     @(94.0000 mm, 43.6000 mm): Line on B.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
-    @(94.0000 mm, 156.4000 mm): Line on B.Silkscreen
+    @(100.0000 mm, 43.6000 mm): Line on B.Silkscreen
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
     @(100.0000 mm, 43.6000 mm): Line on F.Silkscreen
@@ -20,12 +23,12 @@
 [silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
     @(94.0000 mm, 156.4000 mm): Line on F.Silkscreen
-[isolated_copper]: Isolated copper fill
+[silk_over_copper]: Silkscreen clipped by solder mask
     Local override; Severity: warning
-    @(39.0000 mm, 37.4000 mm): Zone [GND] on F.Cu
-[isolated_copper]: Isolated copper fill
+    @(100.0000 mm, 107.0000 mm): Line on F.Silkscreen
+[lib_footprint_issues]: The current configuration does not include the library ''.
     Local override; Severity: warning
-    @(39.0000 mm, 37.4000 mm): Zone [GND] on B.Cu
+    @(100.0000 mm, 100.0000 mm): Footprint H1
 
 ** Found 0 unconnected pads **
 

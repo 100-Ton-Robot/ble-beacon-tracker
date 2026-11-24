@@ -2010,7 +2010,7 @@ def face_page(c):
     c.setFont("Helvetica", 9)
     c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
                  "Make 3 from copper-clad board. Viewed from the FRONT (copper side, facing the antenna). "
-                 "No holes. Top edge goes against the deck.")
+                 f"{DIPOLE_HOLE:g} mm centre hole. Top edge to the deck.")
     scale_bar(c, 15, PAGE_H / mm - 32)
 
     c.setLineWidth(0.8)
@@ -2021,6 +2021,13 @@ def face_page(c):
     c.setDash()
     c.setFont("Helvetica-Bold", 8)
     c.drawCentredString(xc * mm, (Y(0) + 2) * mm, "TOP - against the deck")
+    # centre hole: RP-SMA bulkhead for a dipole or the printed fin's feed
+    c.setLineWidth(0.5)
+    c.circle(xc * mm, Y(FACE_H / 2) * mm, DIPOLE_HOLE / 2 * mm)
+    crosshair(c, xc, Y(FACE_H / 2), DIPOLE_HOLE / 2)
+    c.setFont("Helvetica", 7)
+    c.drawString((xc + DIPOLE_HOLE / 2 + 3) * mm, (Y(FACE_H / 2) + 1) * mm, f"Centre {DIPOLE_HOLE:g} mm: RP-SMA bulkhead")
+    c.drawString((xc + DIPOLE_HOLE / 2 + 3) * mm, (Y(FACE_H / 2) - 2.5) * mm, "(dipole or printed fin feed)")
     # where the deck's antenna jacks sit in front of this face: P (and D) over the centre, P2 toward one end
     c.setLineWidth(0.4)
     c.setFont("Helvetica", 6.5)
@@ -2038,7 +2045,8 @@ def face_page(c):
         "tabs; this cut-by-hand face doesn't need them, the finished triangle is the same.",
         f"Whips hang on the deck's D holes in front of the face (page 1 / 2); P / P2 hold a patch {PATCH_OFFSET:g} mm "
         "in front of it.",
-        "Holes in the face are not needed: the face-centre dipole was dropped (2026-11-23).",
+        f"Centre {DIPOLE_HOLE:g} mm hole: RP-SMA bulkhead for an antenna on the face (dipole or the printed fin); the nut",
+        "goes on the inside, so keep it clear of anything mounted inside the core. No other holes in the face.",
     ]
     for n, t in enumerate(lines):
         c.drawString(15 * mm, (Y(FACE_H) - 16 - n * 4.4) * mm, t)

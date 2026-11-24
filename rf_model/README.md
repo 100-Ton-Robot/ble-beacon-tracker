@@ -332,6 +332,10 @@ via, every hole, slot and track gap, the end plate's copper including the knocko
 
 (`out/rev3_*`, bearing at default noise in `out/bearing_rev3`.)
 
+The copper runs above have the face's centre RP-SMA hole (the face PCB as built). The same runs with a solid face
+(hole dropped for a few hours on 2026-11-23) are kept in `out/rev3_*_copper*_solidface` and
+`out/bearing_rev3_solidface`: bearing within 0-1 deg of these, so the hole doesn't change the result.
+
 - **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
   median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,
   the hollow core, the layer-to-layer vias) doesn't change the result: the outline model is enough for size and
