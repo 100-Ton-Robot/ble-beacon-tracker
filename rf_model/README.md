@@ -287,6 +287,14 @@ What it shows:
 - 45 mm faces are about 30 deg either way.
 - No geometry reaches 20 dB back rejection at el -55 (best about 12 dB).
 
+## Printed dipole fin (2026-11-23) — shelved, not tested
+
+A hand-made printed dipole on a 1 mm FR-4 fin standing out from each face over the centre hole, modelled with its own
+script, [`antennas/printed_fin/fin_model.py`](../antennas/printed_fin/README.md). Simulation only, never built:
+S11 -11.1 dB worst in band nominal, -6.8 / -9.0 dB at the stacked tolerance corners, bearing median 15 deg / 90 %
+40 deg against the duck stand-in's 15 / 39 on the D15 core with the end plate. Shelved 2026-11-24 because its tabs
+can't be cut by hand. Code, every run and the template are in [`antennas/printed_fin/`](../antennas/printed_fin/README.md).
+
 ## Every simulation run
 
 All runs are kept. `run_all.sh` holds every run behind this README, in order, and re-runs the lot in about 4 min:

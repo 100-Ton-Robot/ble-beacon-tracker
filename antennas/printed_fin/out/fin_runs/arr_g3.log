@@ -1,0 +1,81 @@
+mesh [65, 99, 166] = 1.07 M cells
+ ---------------------------------------------------------------------- 
+ | openEMS 64bit -- version 305df56
+ | (C) 2010-2026 Thorsten Liebig <thorsten.liebig@gmx.de>  GPL license
+ ---------------------------------------------------------------------- 
+	Used external libraries:
+		CSXCAD -- Version: c46e320
+		hdf5   -- Version: 1.10.10
+		          compiled against: HDF5 library version: 1.10.10
+		tinyxml -- compiled against: 2.6.2
+		fparser
+		boost  -- compiled against: 1_83
+		vtk -- Version: 9.1.0
+		       compiled against: 9.1.0
+
+Create FDTD operator (compressed SSE + multi-threading)
+FDTD simulation size: 65x99x166 --> 1.06821e+06 FDTD cells 
+FDTD timestep is: 4.86602e-13 s; Nyquist rate: 338 timesteps @3.04004e+09 Hz
+Excitation signal length is: 9813 timesteps (4.77503e-09s)
+Max. number of timesteps: 80000 ( --> 8.15245 * Excitation signal length)
+Create FDTD engine (compressed SSE + multi-threading)
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: copper!
+Warning: Unused primitive (type: Box) detected in property: load1!
+Warning: Unused primitive (type: Box) detected in property: load2!
+Running FDTD engine... this may take a while... grab a cup of coffee?!?
+[@        4s] Timestep:          252 || Speed:   61.2 MC/s (1.745e-02 s/TS) || Energy: ~2.92e-22 (- 0.00dB)
+[@        8s] Timestep:          672 || Speed:   99.3 MC/s (1.076e-02 s/TS) || Energy: ~7.13e-21 (- 0.00dB)
+[@       13s] Timestep:         1092 || Speed:   96.1 MC/s (1.112e-02 s/TS) || Energy: ~1.00e-19 (- 0.00dB)
+[@       18s] Timestep:         1512 || Speed:   96.6 MC/s (1.106e-02 s/TS) || Energy: ~1.07e-18 (- 0.00dB)
+[@       22s] Timestep:         1932 || Speed:  103.5 MC/s (1.032e-02 s/TS) || Energy: ~8.93e-18 (- 0.00dB)
+[@       27s] Timestep:         2352 || Speed:   90.9 MC/s (1.175e-02 s/TS) || Energy: ~5.81e-17 (- 0.00dB)
+[@       32s] Timestep:         2772 || Speed:   89.9 MC/s (1.189e-02 s/TS) || Energy: ~2.97e-16 (- 0.00dB)
+[@       36s] Timestep:         3192 || Speed:  101.0 MC/s (1.057e-02 s/TS) || Energy: ~1.19e-15 (- 0.00dB)
+[@       41s] Timestep:         3612 || Speed:   93.8 MC/s (1.139e-02 s/TS) || Energy: ~3.76e-15 (- 0.00dB)
+[@       46s] Timestep:         4032 || Speed:   94.7 MC/s (1.128e-02 s/TS) || Energy: ~9.45e-15 (- 0.00dB)
+[@       51s] Timestep:         4452 || Speed:   97.0 MC/s (1.101e-02 s/TS) || Energy: ~1.90e-14 (- 0.00dB)
+[@       55s] Timestep:         4872 || Speed:   95.9 MC/s (1.114e-02 s/TS) || Energy: ~3.09e-14 (- 0.00dB)
+[@     1m00s] Timestep:         5292 || Speed:   97.1 MC/s (1.100e-02 s/TS) || Energy: ~4.14e-14 (- 0.00dB)
+[@     1m05s] Timestep:         5712 || Speed:   93.3 MC/s (1.146e-02 s/TS) || Energy: ~4.70e-14 (- 0.00dB)
+[@     1m09s] Timestep:         6132 || Speed:  102.9 MC/s (1.038e-02 s/TS) || Energy: ~4.63e-14 (- 0.06dB)
+[@     1m14s] Timestep:         6552 || Speed:   99.6 MC/s (1.072e-02 s/TS) || Energy: ~4.07e-14 (- 0.62dB)
+[@     1m18s] Timestep:         6972 || Speed:   94.5 MC/s (1.131e-02 s/TS) || Energy: ~3.25e-14 (- 1.60dB)
+[@     1m23s] Timestep:         7392 || Speed:   96.6 MC/s (1.106e-02 s/TS) || Energy: ~2.38e-14 (- 2.95dB)
+[@     1m28s] Timestep:         7812 || Speed:   93.2 MC/s (1.146e-02 s/TS) || Energy: ~1.62e-14 (- 4.61dB)
+[@     1m32s] Timestep:         8232 || Speed:   99.3 MC/s (1.076e-02 s/TS) || Energy: ~1.04e-14 (- 6.53dB)
+[@     1m37s] Timestep:         8652 || Speed:   97.3 MC/s (1.097e-02 s/TS) || Energy: ~6.44e-15 (- 8.63dB)
+[@     1m41s] Timestep:         9072 || Speed:  101.1 MC/s (1.056e-02 s/TS) || Energy: ~3.85e-15 (-10.86dB)
+[@     1m46s] Timestep:         9492 || Speed:   90.9 MC/s (1.175e-02 s/TS) || Energy: ~2.26e-15 (-13.18dB)
+[@     1m51s] Timestep:         9912 || Speed:  102.8 MC/s (1.039e-02 s/TS) || Energy: ~1.31e-15 (-15.55dB)
+[@     1m55s] Timestep:        10332 || Speed:  102.6 MC/s (1.041e-02 s/TS) || Energy: ~7.55e-16 (-17.94dB)
+[@     1m59s] Timestep:        10752 || Speed:  103.4 MC/s (1.033e-02 s/TS) || Energy: ~4.35e-16 (-20.33dB)
+[@     2m04s] Timestep:        11172 || Speed:  102.6 MC/s (1.041e-02 s/TS) || Energy: ~2.52e-16 (-22.70dB)
+[@     2m08s] Timestep:        11592 || Speed:   97.4 MC/s (1.097e-02 s/TS) || Energy: ~1.47e-16 (-25.06dB)
+[@     2m13s] Timestep:        12012 || Speed:   99.9 MC/s (1.069e-02 s/TS) || Energy: ~8.52e-17 (-27.41dB)
+[@     2m17s] Timestep:        12432 || Speed:   97.4 MC/s (1.097e-02 s/TS) || Energy: ~4.93e-17 (-29.79dB)
+[@     2m22s] Timestep:        12852 || Speed:   97.4 MC/s (1.096e-02 s/TS) || Energy: ~2.84e-17 (-32.18dB)
+[@     2m26s] Timestep:        13272 || Speed:  104.4 MC/s (1.024e-02 s/TS) || Energy: ~1.64e-17 (-34.56dB)
+[@     2m31s] Timestep:        13692 || Speed:   98.4 MC/s (1.085e-02 s/TS) || Energy: ~9.54e-18 (-36.92dB)
+[@     2m36s] Timestep:        14112 || Speed:   93.6 MC/s (1.141e-02 s/TS) || Energy: ~5.61e-18 (-39.23dB)
+[@     2m40s] Timestep:        14532 || Speed:   95.4 MC/s (1.120e-02 s/TS) || Energy: ~3.33e-18 (-41.50dB)
+RunFDTD: end-criteria of -40.00dB reached after 14532 timesteps (-41.50dB)
+Time for 14532 iterations with 1068210.00 cells : 160.87 sec
+Speed: 96.50 MCells/s 
+{"worst_band_db": -11.053186549498253, "f_min_mhz": 2465.0, "min_db": -22.04603292758445, "s11_db": {"2400": -11.053186549498253, "2440": -17.74833669406541, "2483": -19.30958263134214}, "zin_2440": [39.52260176699894, 5.024335897191046], "cells": [65, 99, 166], "peak_dbi": 8.588828125246641}

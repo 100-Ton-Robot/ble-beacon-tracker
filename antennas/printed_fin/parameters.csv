@@ -1,0 +1,19 @@
+name,value,unit,source,group,note
+t,1.0,mm,spec,fin,"board overall thickness, copper included (1 mm stock: measure yours)"
+cu,0.035,mm,spec,fin,copper per side
+er,4.3,ratio,assumed,fin,FR-4 relative permittivity
+tand,0.02,ratio,assumed,fin,FR-4 loss tangent
+S,15.0,mm,design,fin,dipole axis -> face outer copper (the sweep's best spacing)
+Wa,4.0,mm,design,fin,dipole arm width (along u)
+L,52.6,mm,design,fin,"dipole length tip to tip (along v), tuned 2026-11-23"
+g,2.0,mm,design,fin,slot gap between the strips (2 mm: less sensitive to hand-cut error)
+Ws,8.0,mm,design,fin,"strip width (along v), each side of the slot"
+Wf,1.9,mm,design,fin,feed line width (50 ohm on 0.93 mm FR-4)
+u0,0.8,mm,design,fin,"feed line start, clear of the face (coax solders here)"
+uc,11.0,mm,design,fin,crossing: centre of the feed's vertical leg (u)
+Lsh,7.8,mm,design,fin,"stub's leg back toward the face, from the crossing leg's face-side edge"
+m,1.5,mm,design,fin,bare board past the copper (outline margin)
+tab_w,2.5,mm,design,fin,tab width (along v)
+tab_len,2.6,mm,design,fin,tab length below u = 0 (face 1.6 + 1.0 through)
+slot_w,1.2,mm,design,fin,face slot width for the 1 mm board
+etch,0.0,mm,design,fin,tolerance runs only: every copper edge moved out by this (negative = over-cut)

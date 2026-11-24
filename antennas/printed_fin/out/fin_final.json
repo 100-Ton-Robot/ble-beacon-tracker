@@ -1,0 +1,52 @@
+{
+ "params": {
+  "t": 1.0,
+  "cu": 0.035,
+  "er": 4.3,
+  "tand": 0.02,
+  "S": 15.0,
+  "Wa": 4.0,
+  "L": 52.6,
+  "g": 2.0,
+  "Ws": 8.0,
+  "Wf": 1.9,
+  "u0": 0.8,
+  "uc": 11.0,
+  "Lsh": 7.8,
+  "m": 1.5,
+  "tab_w": 2.5,
+  "tab_len": 2.6,
+  "slot_w": 1.2,
+  "face_t": 1.6,
+  "hole": 6.5,
+  "etch": 0.0
+ },
+ "worst_band_db": -11.11498801860645,
+ "f_min_mhz": 2463.0,
+ "min_db": -22.792788081843682,
+ "s11_db": {
+  "2400": -11.11498801860645,
+  "2440": -18.19407894064214,
+  "2483": -19.295466904785116
+ },
+ "zin_2440": [
+  40.12601746329588,
+  5.099844533838694
+ ],
+ "cells": [
+  55,
+  89,
+  156
+ ],
+ "notes": [
+  "SHELVED 2026-11-24 - NOT TESTED: no fin has been built, fitted or measured. Every number here is a model result.",
+  "openEMS: one fin per face on the rev 3 core (deck d15 outline, end plate), 1.0 mm FR-4 er 4.3, tan d 0.02.",
+  "Check 1, nominal: S11 -11.1 dB worst in 2400-2483.5 MHz (pass: < -10). Best -22.8 dB at 2463 MHz.",
+  "Check 2, worst stacked corners: -6.8 dB (er 4.7, copper +0.3 mm every edge, 0.9 mm board, both lengths +0.3/0.5)",
+  "   and -9.0 dB (er 4.0, copper -0.3 mm, 1.1 mm board, lengths short). Pass: < -6 dB.",
+  "Check 3, bearing (bearing_sim, room 3 dB, 1 s window): fin median 15 deg / 90% 40 deg vs duck stand-in",
+  "   at 15 mm 15 deg / 39 deg. Right sector 84.6 % vs 84.4 %. Peak 8.6 dBi. Pass: within 2 deg.",
+  "Not modelled: the coax run inside the core, solder blobs, the hollow core behind the hole, the enclosure."
+ ],
+ "plot": "out/fin_s11.png"
+}

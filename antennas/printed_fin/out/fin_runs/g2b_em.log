@@ -1,0 +1,52 @@
+mesh [55, 90, 157] = 0.78 M cells
+ ---------------------------------------------------------------------- 
+ | openEMS 64bit -- version 305df56
+ | (C) 2010-2026 Thorsten Liebig <thorsten.liebig@gmx.de>  GPL license
+ ---------------------------------------------------------------------- 
+	Used external libraries:
+		CSXCAD -- Version: c46e320
+		hdf5   -- Version: 1.10.10
+		          compiled against: HDF5 library version: 1.10.10
+		tinyxml -- compiled against: 2.6.2
+		fparser
+		boost  -- compiled against: 1_83
+		vtk -- Version: 9.1.0
+		       compiled against: 9.1.0
+
+Create FDTD operator (compressed SSE + multi-threading)
+FDTD simulation size: 55x90x157 --> 777150 FDTD cells 
+FDTD timestep is: 4.86726e-13 s; Nyquist rate: 337 timesteps @3.04828e+09 Hz
+Excitation signal length is: 9810 timesteps (4.77479e-09s)
+Max. number of timesteps: 80000 ( --> 8.15494 * Excitation signal length)
+Create FDTD engine (compressed SSE + multi-threading)
+Running FDTD engine... this may take a while... grab a cup of coffee?!?
+[@        4s] Timestep:          336 || Speed:   56.5 MC/s (1.376e-02 s/TS) || Energy: ~4.98e-22 (- 0.00dB)
+[@        9s] Timestep:          924 || Speed:  102.5 MC/s (7.582e-03 s/TS) || Energy: ~1.32e-20 (- 0.00dB)
+[@       13s] Timestep:         1428 || Speed:   97.7 MC/s (7.957e-03 s/TS) || Energy: ~3.18e-19 (- 0.00dB)
+[@       17s] Timestep:         2016 || Speed:   98.4 MC/s (7.897e-03 s/TS) || Energy: ~8.30e-18 (- 0.00dB)
+[@       22s] Timestep:         2604 || Speed:  101.6 MC/s (7.651e-03 s/TS) || Energy: ~7.29e-17 (- 0.00dB)
+[@       26s] Timestep:         3108 || Speed:   97.8 MC/s (7.943e-03 s/TS) || Energy: ~5.47e-16 (- 0.00dB)
+[@       30s] Timestep:         3612 || Speed:   96.4 MC/s (8.062e-03 s/TS) || Energy: ~2.47e-15 (- 0.00dB)
+[@       34s] Timestep:         4116 || Speed:   92.1 MC/s (8.441e-03 s/TS) || Energy: ~5.99e-15 (- 0.00dB)
+[@       39s] Timestep:         4704 || Speed:   95.8 MC/s (8.109e-03 s/TS) || Energy: ~1.53e-14 (- 0.00dB)
+[@       43s] Timestep:         5208 || Speed:   94.7 MC/s (8.207e-03 s/TS) || Energy: ~2.93e-14 (- 0.00dB)
+[@       47s] Timestep:         5712 || Speed:   91.0 MC/s (8.543e-03 s/TS) || Energy: ~3.40e-14 (- 0.00dB)
+[@       51s] Timestep:         6216 || Speed:   93.7 MC/s (8.297e-03 s/TS) || Energy: ~3.00e-14 (- 0.54dB)
+[@       56s] Timestep:         6720 || Speed:   95.9 MC/s (8.103e-03 s/TS) || Energy: ~2.57e-14 (- 1.21dB)
+[@     1m00s] Timestep:         7308 || Speed:  100.4 MC/s (7.739e-03 s/TS) || Energy: ~1.77e-14 (- 2.84dB)
+[@     1m05s] Timestep:         7896 || Speed:   99.0 MC/s (7.850e-03 s/TS) || Energy: ~1.01e-14 (- 5.28dB)
+[@     1m09s] Timestep:         8400 || Speed:   93.4 MC/s (8.320e-03 s/TS) || Energy: ~5.45e-15 (- 7.95dB)
+[@     1m13s] Timestep:         8904 || Speed:   96.7 MC/s (8.037e-03 s/TS) || Energy: ~2.70e-15 (-11.00dB)
+[@     1m17s] Timestep:         9408 || Speed:   93.0 MC/s (8.354e-03 s/TS) || Energy: ~1.28e-15 (-14.24dB)
+[@     1m21s] Timestep:         9912 || Speed:   95.0 MC/s (8.183e-03 s/TS) || Energy: ~5.91e-16 (-17.60dB)
+[@     1m26s] Timestep:        10500 || Speed:  101.4 MC/s (7.664e-03 s/TS) || Energy: ~2.67e-16 (-21.05dB)
+[@     1m30s] Timestep:        11004 || Speed:   92.1 MC/s (8.442e-03 s/TS) || Energy: ~1.28e-16 (-24.23dB)
+[@     1m34s] Timestep:        11508 || Speed:   93.5 MC/s (8.312e-03 s/TS) || Energy: ~5.60e-17 (-27.83dB)
+[@     1m38s] Timestep:        12012 || Speed:   91.9 MC/s (8.452e-03 s/TS) || Energy: ~2.41e-17 (-31.49dB)
+[@     1m43s] Timestep:        12600 || Speed:  100.9 MC/s (7.701e-03 s/TS) || Energy: ~1.10e-17 (-34.90dB)
+[@     1m48s] Timestep:        13188 || Speed:   98.5 MC/s (7.887e-03 s/TS) || Energy: ~4.34e-18 (-38.94dB)
+[@     1m52s] Timestep:        13692 || Speed:   90.2 MC/s (8.619e-03 s/TS) || Energy: ~1.94e-18 (-42.43dB)
+RunFDTD: end-criteria of -40.00dB reached after 13692 timesteps (-42.43dB)
+Time for 13692 iterations with 777150.00 cells : 112.50 sec
+Speed: 94.59 MCells/s 
+{"worst_band_db": -14.101451726330492, "f_min_mhz": 2440.0, "min_db": -17.563563820925395, "s11_db": {"2400": -14.209825285600125, "2440": -17.563563820925395, "2483": -14.101451726330492}, "zin_2440": [62.31412257742256, 8.40605773960603], "cells": [55, 90, 157]}

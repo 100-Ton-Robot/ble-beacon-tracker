@@ -1,0 +1,51 @@
+mesh [55, 91, 152] = 0.76 M cells
+ ---------------------------------------------------------------------- 
+ | openEMS 64bit -- version 305df56
+ | (C) 2010-2026 Thorsten Liebig <thorsten.liebig@gmx.de>  GPL license
+ ---------------------------------------------------------------------- 
+	Used external libraries:
+		CSXCAD -- Version: c46e320
+		hdf5   -- Version: 1.10.10
+		          compiled against: HDF5 library version: 1.10.10
+		tinyxml -- compiled against: 2.6.2
+		fparser
+		boost  -- compiled against: 1_83
+		vtk -- Version: 9.1.0
+		       compiled against: 9.1.0
+
+Create FDTD operator (compressed SSE + multi-threading)
+FDTD simulation size: 55x91x152 --> 760760 FDTD cells 
+FDTD timestep is: 4.86726e-13 s; Nyquist rate: 337 timesteps @3.04828e+09 Hz
+Excitation signal length is: 9810 timesteps (4.77479e-09s)
+Max. number of timesteps: 80000 ( --> 8.15494 * Excitation signal length)
+Create FDTD engine (compressed SSE + multi-threading)
+Running FDTD engine... this may take a while... grab a cup of coffee?!?
+[@        4s] Timestep:          336 || Speed:   59.2 MC/s (1.285e-02 s/TS) || Energy: ~5.43e-22 (- 0.00dB)
+[@        8s] Timestep:          840 || Speed:   85.7 MC/s (8.876e-03 s/TS) || Energy: ~1.33e-20 (- 0.00dB)
+[@       13s] Timestep:         1344 || Speed:   87.2 MC/s (8.728e-03 s/TS) || Energy: ~1.98e-19 (- 0.00dB)
+[@       17s] Timestep:         1848 || Speed:   88.5 MC/s (8.600e-03 s/TS) || Energy: ~3.22e-18 (- 0.00dB)
+[@       21s] Timestep:         2352 || Speed:   87.2 MC/s (8.725e-03 s/TS) || Energy: ~3.92e-17 (- 0.00dB)
+[@       26s] Timestep:         2856 || Speed:   93.9 MC/s (8.098e-03 s/TS) || Energy: ~2.62e-16 (- 0.00dB)
+[@       30s] Timestep:         3360 || Speed:   94.2 MC/s (8.073e-03 s/TS) || Energy: ~1.15e-15 (- 0.00dB)
+[@       34s] Timestep:         3864 || Speed:   95.4 MC/s (7.975e-03 s/TS) || Energy: ~4.59e-15 (- 0.00dB)
+[@       38s] Timestep:         4368 || Speed:   88.5 MC/s (8.595e-03 s/TS) || Energy: ~1.37e-14 (- 0.00dB)
+[@       42s] Timestep:         4905 || Speed:   99.7 MC/s (7.631e-03 s/TS) || Energy: ~2.30e-14 (- 0.00dB)
+[@       46s] Timestep:         5376 || Speed:   85.1 MC/s (8.936e-03 s/TS) || Energy: ~2.97e-14 (- 0.00dB)
+[@       50s] Timestep:         5880 || Speed:   92.1 MC/s (8.261e-03 s/TS) || Energy: ~3.65e-14 (- 0.00dB)
+[@       55s] Timestep:         6384 || Speed:   90.0 MC/s (8.450e-03 s/TS) || Energy: ~3.84e-14 (- 0.00dB)
+[@       59s] Timestep:         6888 || Speed:   90.4 MC/s (8.411e-03 s/TS) || Energy: ~2.86e-14 (- 1.27dB)
+[@     1m03s] Timestep:         7476 || Speed:   97.3 MC/s (7.822e-03 s/TS) || Energy: ~1.68e-14 (- 3.58dB)
+[@     1m08s] Timestep:         7980 || Speed:   94.6 MC/s (8.046e-03 s/TS) || Energy: ~9.11e-15 (- 6.25dB)
+[@     1m12s] Timestep:         8484 || Speed:   92.6 MC/s (8.211e-03 s/TS) || Energy: ~4.09e-15 (- 9.72dB)
+[@     1m16s] Timestep:         9072 || Speed:   98.2 MC/s (7.749e-03 s/TS) || Energy: ~1.48e-15 (-14.13dB)
+[@     1m21s] Timestep:         9660 || Speed:  100.1 MC/s (7.603e-03 s/TS) || Energy: ~5.70e-16 (-18.28dB)
+[@     1m25s] Timestep:        10248 || Speed:   96.7 MC/s (7.865e-03 s/TS) || Energy: ~1.82e-16 (-23.23dB)
+[@     1m29s] Timestep:        10752 || Speed:   95.4 MC/s (7.975e-03 s/TS) || Energy: ~6.55e-17 (-27.68dB)
+[@     1m33s] Timestep:        11256 || Speed:   92.8 MC/s (8.196e-03 s/TS) || Energy: ~3.02e-17 (-31.04dB)
+[@     1m38s] Timestep:        11760 || Speed:   94.7 MC/s (8.030e-03 s/TS) || Energy: ~1.47e-17 (-34.16dB)
+[@     1m42s] Timestep:        12264 || Speed:   94.1 MC/s (8.085e-03 s/TS) || Energy: ~5.66e-18 (-38.31dB)
+[@     1m46s] Timestep:        12852 || Speed:   95.4 MC/s (7.976e-03 s/TS) || Energy: ~1.92e-18 (-43.02dB)
+RunFDTD: end-criteria of -40.00dB reached after 12852 timesteps (-43.02dB)
+Time for 12852 iterations with 760760.00 cells : 106.80 sec
+Speed: 91.55 MCells/s 
+{"worst_band_db": -9.630712350970207, "f_min_mhz": 2485.0, "min_db": -12.850421738765668, "s11_db": {"2400": -9.630712350970207, "2440": -11.702855649949004, "2483": -12.848079974412494}, "zin_2440": [50.5381417196594, 27.05742235314763], "cells": [55, 91, 152]}
