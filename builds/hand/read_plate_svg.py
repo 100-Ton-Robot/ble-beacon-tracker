@@ -253,7 +253,10 @@ def check(which, p):
          [(seg_poly(a, b, poly), f"{cn} / {n}") for cn, co, a, b in coax for n, o, poly in parts if o != co])
     rule("RULE_HOLE_GAP", p["RULE_HOLE_GAP"],
          [(math.hypot(a[1] - b[1], a[2] - b[2]) - a[0] / 2 - b[0] / 2, f"{a[3]} / {b[3]}")
-          for k, a in enumerate(drilled) for b in drilled[k + 1:]])
+          for k, a in enumerate(drilled) for b in drilled[k + 1:]
+          # two of the deck's antenna jacks: one antenna per sector, so only one is ever drilled (D15 / P are
+          # 1.5 mm apart, as the PCB deck's merged pads)
+          if not (a[3].endswith(" ant") and b[3].endswith(" ant"))])
     rule("RULE_RIM_HOLE", p["RULE_RIM_HOLE"], [(R - math.hypot(x, y) - d / 2, tag) for d, x, y, tag, _ in drilled])
     rule("RULE_RIM_PART", p["RULE_RIM_PART"],
          [(R - max(math.hypot(*q) for q in poly), n) for n, _, poly in parts])

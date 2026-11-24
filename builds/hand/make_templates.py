@@ -199,8 +199,10 @@ ESP_PAD_X = ESP32[0] + ESP32[2] - 1.3   # header pads just inside the ESP32's ri
 ESP_PIN40_Y = ESP32[1] + ESP32[3] - 2.5
 BUS_COLS = tuple(POWER[0] + POWER[2] / 2 + k * 2.54 for k in (-1.5, -0.5, 0.5, 1.5))  # cols 1-4: ESP, S0, S1, S2
 RED, BLACK, YELLOW, GREEN = (0.85, 0.0, 0.0), (0.0, 0.0, 0.0), (0.85, 0.65, 0.0), (0.0, 0.6, 0.2)  # JST wire colours
-JST_PINS = ((RED, "red", "5V (14)"), (BLACK, "black", "GND (13)"), (YELLOW, "yellow", "D8 TX (9)"),
-            (GREEN, "green", "D7 RX (8)"))   # JST pins 1-4, crimp side, key peg up, left to right
+JST_PINS = ((RED, "red", "5V (14)"), (BLACK, "black", "GND (13)"), (YELLOW, "yellow", "DATA D10 (11)"),
+            (GREEN, "green", "CMD D7 (8)"))   # JST pins 1-4, crimp side, key peg up: protocol 4 Up port order
+HEAD = 0              # star wiring (protocol 4, 2026-11-24, as PCB rev 3): S0 is the head on gateway pin 0,
+BRANCHES = (1, 2)     # S1 -> head D0 (Branch 1), S2 -> head D1 (Branch 2), each by a wire soldered pad to pad
 SECTOR_PINS = tuple(zip(SECTOR_RX_PINS, SECTOR_RX_GPIOS))   # (header pin, GPIO) of each sector's ESP32 RX
 WIRING_XIAO_X = XIAO_X + WIRING_XIAO_DX
 USBC_W, USBC_IN, USBC_OUT = 9.0, 6.0, 1.0   # wiring page only: USB-C outline, approximate (width, on board, overhang)
@@ -234,7 +236,7 @@ def wiring_routes():
     XIAO tail: pad -> that pin on the XIAO half; far tail: same pin on the far half -> ESP32 pin or bus pad."""
     xr = WIRING_XIAO_X + XIAO_L / 2
     pad = [xr - 2.88 - k * 2.54 for k in range(7)]   # pad x from the USB end; top: D0..D6, bottom: 5V, GND, 3V3, D10..D7
-    d8x, d7x, gndx, v5x = pad[5], pad[6], pad[1], pad[0]   # TX moved D6 -> D8 (2026-11-19): all four on one edge
+    d10x, d7x, gndx, v5x = pad[3], pad[6], pad[1], pad[0]   # DATA on D10 (protocol 4, 2026-11-24): all four on one edge
     xr_, xb_, xy_, xg_ = (xr + d for d in XT_LANES)
     txr, gnd, v5 = BUS_ROWS[0], BUS_ROWS[1], BUS_ROWS[3]
     etx, getx = ESP_TX
@@ -269,7 +271,7 @@ def wiring_routes():
 
         c = BUS_COLS[i + 1]
         yl = YELLOW_LANES[i]
-        yellow = ((fx, fp(3)), (yl, fp(3)), (yl, esp_pin_y(rx)), (ESP_PAD_X, esp_pin_y(rx)))
+        yellow = ((fx, fp(3)), (yl, fp(3)), (yl, esp_pin_y(rx)), (ESP_PAD_X, esp_pin_y(rx)))   # head only
         if i == 0:                                   # straight up the left side of the strip
             red = ((fx, fp(1)), (c, fp(1)), (c, v5))
             black = ((fx, fp(2)), (bx(1), fp(2)), (bx(1), gnd), (c, gnd))
@@ -284,12 +286,14 @@ def wiring_routes():
                    (lr, tr), (c, tr), (c, v5))
             black = ((fx, fp(2)), (bx(1), fp(2)), (bx(1), top_f + RISE[2]), (lb, top_f + RISE[2]),
                      (lb, tb), (bx(i + 1), tb), (bx(i + 1), gnd), (c, gnd))
+        if i == HEAD:
+            out.append((YELLOW, ((d10x, bot), (d10x, below - 2 * XT_STEP), (xy_, below - 2 * XT_STEP), (xy_, jp(3)),
+                                 (jx, jp(3))), yellow,
+                        f"D10 (11) -- JST 3 -- ESP GPIO{grx} ({rx})",
+                        f"GPIO{grx} RX ({rx}) -- S{i} head DATA"))
         out += [
-            (YELLOW, ((d8x, bot), (d8x, below - 2 * XT_STEP), (xy_, below - 2 * XT_STEP), (xy_, jp(3)), (jx, jp(3))),
-             yellow,
-             f"D8 TX (9) -- JST 3 -- ESP32 GPIO{grx} RX ({rx})", f"GPIO{grx} RX ({rx}) -- {s} D8 TX (9)"),
             (GREEN, ((d7x, bot), (d7x, below - 3 * XT_STEP), (xg_, below - 3 * XT_STEP), (xg_, jp(4)), (jx, jp(4))),
-             green, f"D7 RX (8) -- JST 4 -- bus TX row, col S{i}", None),
+             green, f"CMD D7 (8) -- JST 4 -- bus TX row, col S{i}", None),
             (BLACK, ((gndx, bot), (gndx, below - XT_STEP), (xb_, below - XT_STEP), (xb_, jp(2)), (jx, jp(2))),
              black, f"GND (13) -- JST 2 -- bus GND row, col S{i}", None),
             (RED, ((v5x, bot), (v5x, below), (xr_, below), (xr_, jp(1)), (jx, jp(1))),
@@ -379,7 +383,8 @@ def wiring_page(c):
     # XIAOs: outline, pads, name (no wire crosses a board)
     xl, xr = WIRING_XIAO_X - XIAO_L / 2, WIRING_XIAO_X + XIAO_L / 2
     pad = [xr - 2.88 - k * 2.54 for k in range(7)]
-    used = {9: ("D8", YELLOW), 8: ("D7", GREEN), 13: ("GND", BLACK), 14: ("5V", RED)}
+    used = {11: ("D10", YELLOW), 8: ("D7", GREEN), 13: ("GND", BLACK), 14: ("5V", RED), 1: ("D0", YELLOW),
+            2: ("D1", YELLOW)}
 
     def usb_outline(yc):                 # USB-C receptacle, approximate, light grey, overhanging the USB end
         c.saveState()
@@ -401,8 +406,8 @@ def wiring_page(c):
                 if n in used:
                     name, col = used[n]
                     c.setFillColorRGB(*col)
-                    if side == 1 and not flipped:   # top view, upper row: beside the number, clear of the IPEX4
-                        c.drawRightString(*P(px - 0.8, py - 1.9), name)
+                    if side == 1 and not flipped:   # top view, upper row: under the number (wires leave over the top)
+                        c.drawCentredString(*P(px, py - 3.3), name)
                     else:
                         c.drawCentredString(*P(px, py - side * 2.6 - 0.4), name)
         c.setFillGray(0)
@@ -418,7 +423,7 @@ def wiring_page(c):
         c.setStrokeGray(0)
         usb_outline(yc)
         c.setFont("Helvetica-Bold", 6.5)
-        c.drawString(*P(xl, yc + XIAO_W / 2 + 2.0), "XIAO nRF54L15 [1,2,3] - TOP VIEW (parts side up)")
+        c.drawString(*P(xl, yc + XIAO_W / 2 + 4.6), "S0 HEAD XIAO nRF54L15 - TOP VIEW (parts side up)")
         pin_labels(yc, flipped=False)
         ix, iy = WIRING_XIAO_X - XIAO_IPEX[0], yc + XIAO_IPEX[1]     # IPEX4: two rings, not a pad
         c.setStrokeColorRGB(0.1, 0.3, 0.75)
@@ -438,9 +443,15 @@ def wiring_page(c):
         c.setFillGray(0)
         c.setStrokeGray(0)
 
-    for r, (col, xiao, _, _, _) in enumerate(routes):   # XIAO tails: one radio drawn, all three are the same
+    for r, (col, xiao, _, _, _) in enumerate(routes):   # XIAO tails: the head drawn; S1 / S2 the same, less DATA
         if xiao and r < 7:
             wire(col, xiao)
+    yc = WIRING_XIAO_YS[HEAD]                           # branch inputs: D0 / D1 up off the top edge, then right,
+    bend = []                                           # each a wire soldered straight to its branch's D10
+    for k, (b, ly) in enumerate(zip(BRANCHES, (yc + XIAO_W / 2 + 0.9, yc + XIAO_W / 2 + 2.9))):
+        pts = ((pad[k], yc + XIAO_ROW), (pad[k], ly), (BRANCH_STUB_X, ly))
+        wire(YELLOW, pts)
+        bend.append((b, k, pts[-1]))
     c.setStrokeColorRGB(0, 0, 0)
 
     for i in range(3):                  # the two JST halves: far half in the strip, XIAO half off the USB end
@@ -465,6 +476,11 @@ def wiring_page(c):
             if seg:
                 for q in (seg[0], seg[-1]):
                     c.circle(*P(*q), R(0.45), fill=1, stroke=0)
+    for b, k, (x, y) in bend:                            # branch wire ends: to that radio, no connector
+        c.setFillColorRGB(*YELLOW)
+        c.circle(*P(pad[k], yc + XIAO_ROW), R(0.45), fill=1, stroke=0)
+        c.setFont("Helvetica-Bold", 5.5)
+        c.drawString(*P(x + 0.6, y - 0.6), f"S{b} D10 (11)")
     c.setFillGray(0)
     c.setFont("Helvetica-Bold", 4.5)
     for x, t in zip(BUS_COLS, ("ESP", "S0", "S1", "S2")):
@@ -498,24 +514,23 @@ def wiring_page(c):
     c.setFillGray(0)
 
     same = [                                           # where S1 / S2's XIAOs would be
-        ("Helvetica-Bold", "All three XIAOs are wired the same,"),
-        ("Helvetica-Bold", "pad for pad, to their own JST:"),
+        ("Helvetica-Bold", "STAR WIRING: S0 is the head."),
+        ("Helvetica-Bold", "Every XIAO to its own JST, pad for pad:"),
         ("Helvetica-Bold", "5V (14) -> 1, GND (13) -> 2,"),
-        ("Helvetica-Bold", "D8 TX (9) -> 3, D7 RX (8) -> 4."),
+        ("Helvetica-Bold", "D7 CMD (8) -> 4. Head only: D10 (11) -> 3."),
         ("Helvetica", ""),
         ("Helvetica", "Shared by every radio on the bus: 5V,"),
         ("Helvetica", "GND and the ESP32 TX (GPIO21) into"),
-        ("Helvetica", "every D7. All radios hear the same"),
-        ("Helvetica", "commands; each names one chip ID (or"),
-        ("Helvetica", "all), and only the named radios act."),
+        ("Helvetica", "every D7 (CMD). All radios hear the"),
+        ("Helvetica", "same commands."),
         ("Helvetica", ""),
-        ("Helvetica", "Only D8 TX differs: each radio talks"),
-        ("Helvetica", "back on its own ESP32 RX pin, and"),
-        ("Helvetica", "that pin is the sector. More radios ="),
-        ("Helvetica", "one more JST pair, bus column and ESP"),
-        ("Helvetica", "RX each. The ESP32-S3's 3 hardware"),
-        ("Helvetica", "UARTs are all used: a 4th radio needs"),
-        ("Helvetica", "another UART or a second gateway."),
+        ("Helvetica", "DATA: S1 and S2 send to the head, the"),
+        ("Helvetica", "head relays all three to one ESP32 RX."),
+        ("Helvetica", "S1 D10 (11) -> head D0 (1), S2 D10 (11)"),
+        ("Helvetica", "-> head D1 (2): one wire each, soldered"),
+        ("Helvetica", "pad to pad, no connector. Their JST pin 3"),
+        ("Helvetica", "stays empty. Sector = gateway pin and"),
+        ("Helvetica", "the head port (D0 / D1) the data came in."),
     ]
     # bottom view of the same XIAO: no wires, flipped over its long axis (USB-C stays on the right)
     yb = BOTTOM_VIEW_TOP - XIAO_W / 2
@@ -557,7 +572,7 @@ def wiring_page(c):
     c.setFont("Helvetica", 8.5)
     ny = oy + sc * vy0 - 9
     notes = [
-        "D8 TX -> its own ESP RX (the pin is the sector): S0 GPIO17 (34), S1 GPIO16 (32), S2 GPIO18 (31).",
+        "Head S0 D10 DATA -> ESP RX GPIO17 (34) (gateway pin 0). GPIO16 (32) and GPIO18 (31) stay free for 2 more heads.",
         "ESP TX GPIO21 (35) -> bus TX row -> every D7. Feed: TX (35) -> TX row, VBUS (40) -> 5V row, GND (38) -> GND row.",
         "Bus: hole end up, rows bridged, 3rd row spare. ESP32 as drawn (RJ45 side up): VBUS (40) is the top right header pin.",
     ]
@@ -603,12 +618,11 @@ def jst_head(c, x0, top):
     tx = x0 + hw + 7
     c.setFont("Helvetica", 8.5)
     for n, s in enumerate((
-        "Pins left to right: 1 red 5V, 2 black GND, 3 yellow D8 TX, 4 green D7 RX.",
-        "Male and female halves carry the same colours in the same order on the crimp side,",
-        "so the XIAO tail and the far tail match colour for colour through the joint.",
-        "XIAO tail: red -> 5V (14), black -> GND (13), yellow -> D8 (9), green -> D7 (8).",
-        "Far tail: red -> bus 5V row, black -> bus GND row, green -> bus TX row, yellow -> that",
-        "sector's ESP RX pin (labels on the drawing). Female half on the far tail keeps 5V covered.",
+        "Pins left to right: 1 red 5V, 2 black GND, 3 yellow DATA, 4 green CMD (as the carrier",
+        "Up port). Both halves carry the same colours in the same order on the crimp side.",
+        "XIAO tail: red -> 5V (14), black -> GND (13), green -> D7 (8); head only: yellow -> D10 (11).",
+        "Far tail: red -> bus 5V row, black -> bus GND row, green -> bus TX row; head only: yellow",
+        "-> ESP RX GPIO17 (34). Branches: pin 3 empty. Female half on the far tail keeps 5V covered.",
     )):
         c.drawString(tx * mm, (top - 7 - n * 4) * mm, s)
 
@@ -1072,8 +1086,8 @@ def uni_page(c):
         y -= 3.4
     y -= 1.5
     c.setFont("Helvetica-Oblique", 6.8)
-    for line in ("Each XIAO's yellow D8 TX does not touch this board: it still runs to its sector's ESP32",
-                 "RX pin (page 6). The ESP32 VBUS (pin 40) wire is not used: the XIAOs are on the splitter rail."):
+    for line in ("The yellow DATA wires don't touch this board: head S0 D10 runs to ESP32 GPIO17, S1 / S2 D10 to the",
+                 "head's D0 / D1 (page 6). The ESP32 VBUS (pin 40) wire is not used: the XIAOs are on the splitter rail."):
         c.drawString(lx * mm, y * mm, line)
         y -= 3.3
 
@@ -1216,17 +1230,9 @@ def alt_plate_page(c):
     c.setFillGray(0.55)
     c.setFont("Helvetica", 5.5)
     c.setDash(0.6, 1.2)
-    letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
-    turn = math.radians(PLATE_TURN)
-    for d, x, y, lab in g.holes:
-        if lab in ("via", "M4 mount", "core feed") or d == 6.5:   # 6.5 mm jacks are drawn below (dotted, reference)
-            continue
-        dx, dy = x - g.CX, y - g.CY
-        px, py = dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn)
-        c.circle(*P(px, py), ALT_DECK_JACK / 2 * mm)
-        c.drawCentredString(*P(px, py - 1), f"{lab[:2]} {letters[lab.split(' ', 1)[1]]}")
-    c.circle(*P(0, 0), ALT_CORE_HOLE / 2 * mm)
-    c.drawCentredString(*P(0, -ALT_CORE_HOLE / 2 + 2), "deck centre 10 mm")
+    for d, x, y, lab in deck_refs():
+        c.circle(*P(x, y), d / 2 * mm)
+        c.drawCentredString(*P(x, y + (d / 2 - 2.5 if lab.startswith("deck centre") else -1)), lab)
     c.setDash()
 
     # underside: ESP32 and bus board (dashed, seen through the plate)
@@ -1317,7 +1323,7 @@ def alt_plate_page(c):
             c.drawCentredString(*P(x * k, y * k - 1), f"{tag.split()[0]} wires {d:g}")
         elif tag.endswith(" ant"):             # antenna jack holes: name + size, above
             c.setFont("Helvetica", 6)
-            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g} ref")
+            ant_label(c, P, x, y, d, tag)
         elif tag.endswith("tie"):              # every tie hole: its size just outward of it
             c.setFont("Helvetica", 5.5)
             r = math.hypot(x, y)
@@ -1339,7 +1345,7 @@ def alt_plate_page(c):
         "ESP32: across the middle, RJ45 / USB-C end toward 10 o'clock, hung RJ45 side down; USB-C then faces the plate: standoffs or a",
         "slim right-angle plug. A 90 deg adapter turns the RJ45 sideways; patch + USB-C lead to the PoE splitter's 4\" box.",
         "Bus by the ESP32's RJ45 end (VBUS 40). Spacers 25-30 mm. Clearances are tight (~2-3 mm): check with the real parts.",
-        "Positions: parameters.csv (lay out in plate_layout.svg). The ESP32 only clears the deck's 10 mm centre hole: no hole saw.",
+        "Positions: parameters.csv (lay out in plate_layout.svg). The ESP32 clears the deck's centre hole and M3 bolts (grey).",
         "OPTIONS (builder's choice): this no-pipe split plate or the pipe plate (page 2). Wiring: page 6.",
     ]
     for n, t in enumerate(notes):
@@ -1374,28 +1380,56 @@ def fl_xiaos():
     return out
 
 
-def ant_label_y(x, y, d, holes):
-    """Antenna hole label above the hole, or below it when another hole sits on the label."""
-    up = y + d / 2 + 3.2
-    if any(abs(hx - x) < 8 and 0 < hy - y < d / 2 + 6 + hd / 2 for hd, hx, hy, _ in holes):
-        return y - d / 2 - 4.6
-    return up
+def deck_refs():
+    """Deck parts under the no-pipe plate, plate frame, drawn for reference (2026-11-24, page 1's deck): the centre
+    hole and the M3 collar bolts with their washer keep-out. [(diameter, x, y, label)]"""
+    L = layout.Layout(layout.VARIANTS[0])
+    out = [(L.pipe_d, 0.0, 0.0, f"deck centre {L.pipe_d:g} mm")]
+    return out + [(M3_KEEPOUT, *to_plate(x, y), "deck M3") for x, y in L.m3()]
+
+
+def ant_label(c, P, x, y, d, tag):
+    """Antenna reference hole label beside the hole, across its sector axis (D / P / D15 sit in a row along it): to
+    alternating sides so neighbours' labels don't meet: P and the outer D on the clockwise side, the inner D on the
+    other, P2 on its far side, away from the axis."""
+    i = int(tag[1])
+    kind = tag.split()[1]
+    nx, ny = to_plate(*layout.xy(layout.SECTORS[i], 1.0, 0.0))
+    if kind == "P2" or kind == f"D{layout.VARIANTS[0]:g}":
+        nx, ny = -nx, -ny
+    k = d / 2 + (1.5 if abs(nx) > 0.5 else 3.2)
+    px, py = P(x + nx * k, y + ny * k - 1)
+    text = f"{tag[:-4]} ref"
+    if abs(nx) <= 0.5:
+        c.drawCentredString(px, py, text)
+    elif nx > 0:
+        c.drawString(px, py, text)
+    else:
+        c.drawRightString(px, py, text)
 
 
 def plate_antenna_holes():
     """The deck's 6.5 mm antenna jack holes (D, P, P2) in the plate frame, drawn dotted on both plates for reference
-    so deck, plate and every page line up; they can be drilled but are not by design (user, 2026-11-10)."""
-    letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2"}
-    turn = math.radians(PLATE_TURN)
+    so deck, plate and every page line up; they can be drilled but are not by design (user, 2026-11-10).
+    Both duck spacings (2026-11-24): D15 (closer to the face) and D31, from layout.py like the deck page."""
     out = []
-    for d, x, y, lab in g.holes:
-        sector, kind = lab.split(" ", 1) if " " in lab else (lab, "")
-        if kind not in letters:
-            continue
-        dx, dy = x - g.CX, y - g.CY
-        out.append((d, dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn),
-                    f"{sector} {letters[kind]} ant"))
+    for i, s in enumerate(layout.SECTORS):
+        for kind, x, y in deck_antenna_holes(s):
+            out.append((HOLE_RPSMA, *to_plate(x, y), f"S{i} {kind} ant"))
     return out
+
+
+def deck_antenna_holes(s):
+    """[(kind, x, y)] deck top view, for sector angle s: D for every duck spacing (D15, D31), then P and P2."""
+    out = [(f"D{v:g}", *layout.Layout(v).hole("D", s)) for v in layout.VARIANTS]
+    L = layout.Layout(layout.VARIANTS[0])
+    return out + [(k, *L.hole(k, s)) for k in ("P", "P2")]
+
+
+def to_plate(x, y):
+    """Deck top view (S0 up) -> plate frame (plate 12 o'clock up, S0 PLATE_TURN deg clockwise of it)."""
+    t = math.radians(PLATE_TURN)
+    return x * math.cos(t) + y * math.sin(t), -x * math.sin(t) + y * math.cos(t)
 
 
 def fl_plate_holes():
@@ -1521,7 +1555,7 @@ def fl_plate_page(c):
             c.drawCentredString(*P(x * (r + 8) / r, y * (r + 8) / r - 1), f"M4 {d:g}")
         elif tag.endswith(" ant"):             # antenna jack holes: name + size, above
             c.setFont("Helvetica", 6)
-            c.drawCentredString(*P(x, ant_label_y(x, y, d, holes)), f"{tag[:-4]} {d:g} ref")
+            ant_label(c, P, x, y, d, tag)
         elif tag.endswith("tie"):                     # every tie hole: its size beside it
             c.setFont("Helvetica", 5.5)
             c.drawString(*P(x + d / 2 + 0.5, y + d / 2), f"tie {d:g}")
@@ -1540,8 +1574,9 @@ def fl_plate_page(c):
         "EU: a 20 mm x 1/2\" BSP male adaptor (R 1/2, 21 mm thread) fits the same 22 mm hole, held by a 1/2\" BSP backnut.",
         "Each XIAO (under the plate, component side down, beside its own sector): IPEX4 dot -> orange flat coax run ->",
         "1/2\" HS-100 tie mount (grey), which clamps it, then (dashed orange) down to whichever of its sector's D / P / P2",
-        "jacks is in use, straight below its hole. 5V, GND, D7 to the bus beside them; D8 TX through the deck's centre hole to",
-        "its ESP32 RX pin, beside TX, GND, VBUS coming up. Seen from the top the IPEX4 is on the left (the board is flipped).",
+        "jacks is in use, straight below its hole. 5V, GND, D7 to the bus beside them; star wiring (page 6): head S0 D10 down",
+        "the deck's centre hole to ESP32 GPIO17 beside TX, GND, VBUS coming up; S1 / S2 D10 soldered to the head's D0 / D1.",
+        "Seen from the top the IPEX4 is on the left (the board is flipped).",
         "OPTIONS (builder's choice): this pipe plate or the no-pipe split plate (page 3); bus board under the plate by the adapter,",
         "or on the pipe inside the core (page 5: then skip the bus M3).",
     ]
@@ -1841,158 +1876,122 @@ def _poly(c, pts, close=True):
     c.drawPath(path)
 
 
-def deck_page_for(spacing):
-    """Deck drill template for one duck spacing, from layout.py: the same holes and outline as the PCB deck of
-    that spacing (pcb/out/deck_d<spacing>), plus where the parts go if the electronics sit on the deck."""
-    L = layout.Layout(spacing)
+def deck_page(c):
+    """Deck drill template, both duck spacings on one page (user, 2026-11-24: pages for d15 / d31 merged, no radio
+    placement). Drawn in the plate frame (plate 12 o'clock up, S0 PLATE_TURN deg clockwise of it), so every hole lines
+    up with the plates' dotted reference holes. Holes and outlines from layout.py, as the PCB decks."""
+    Ls = [layout.Layout(v) for v in layout.VARIANTS]
+    L = Ls[0]
+    big = max(Ls, key=lambda x: x.deck_d)
+    cx, cy = PAGE_W / mm / 2, 140.0                    # deck centre on the page
 
-    def page(c):
-        cx, cy = PAGE_W / mm / 2, 140.0               # deck centre on the page
+    def Q(x, y):                                       # deck top view -> page
+        px, py = to_plate(x, y)
+        return cx + px, cy + py
 
-        def Q(x, y):
-            return cx + x, cy + y
+    def F(t, u, v):                                    # corner / sector frame -> page
+        return Q(*layout.xy(t, u, v))
 
-        def F(t, u, v):                                # corner / sector frame -> page
-            return Q(*layout.xy(t, u, v))
-
-        c.setFont("Helvetica-Bold", 13)
-        c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
-                     f"Deck drill template - {spacing:g} mm ducks - {L.deck_d:g} mm disc - PRINT AT 100% (Actual size)")
-        c.setFont("Helvetica", 9)
-        c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                     "Viewed from the TOP (electronics side), S0 up. Tape to the board, centre-punch each crosshair, "
-                     "then drill. Same layout as the PCB deck.")
-        scale_bar(c, 15, PAGE_H / mm - 32)
-
-        c.setLineWidth(0.8)
-        c.circle(cx * mm, cy * mm, L.deck_r * mm)                       # cut line
+    def hole(x, y, d):
+        px, py = Q(x, y)
         c.setLineWidth(0.5)
-        c.circle(cx * mm, cy * mm, L.pipe_d / 2 * mm)                   # pipe hole
+        c.circle(px * mm, py * mm, d / 2 * mm)
         c.setLineWidth(0.2)
-        crosshair(c, cx, cy, L.pipe_d / 2)
-        c.setFont("Helvetica-Bold", 6.5)
-        c.drawCentredString(cx * mm, (cy - L.pipe_d / 2 - 3.5) * mm, f"pipe {L.pipe_d:g} (7/8 in)")
+        crosshair(c, px, py, d / 2)
+        return px, py
 
-        # faces: copper side out on this line (butt joints, solder or copper tape along it)
-        c.saveState()
-        c.setStrokeColorRGB(*COPPER_INK)
-        c.setLineWidth(1.0)
-        _poly(c, [Q(*layout.pol(L.r_c, v)) for v in layout.VERTICES])
-        # core limit: on-deck parts and wiring stay inside it (1 mm clear of the seam)
-        c.setLineWidth(0.3)
-        c.setDash(1, 1.5)
-        _poly(c, [Q(*layout.pol(2 * L.core_lim, v)) for v in layout.VERTICES])
-        c.restoreState()
+    c.setFont("Helvetica-Bold", 13)
+    c.drawString(15 * mm, (PAGE_H / mm - 15) * mm,
+                 f"Deck drill template - {' / '.join(f'{v:g}' for v in layout.VARIANTS)} mm ducks - "
+                 "PRINT AT 100% (Actual size)")
+    c.setFont("Helvetica", 9)
+    c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
+                 "Viewed from the TOP. Tape to the board, centre-punch each crosshair you need, then drill. "
+                 "Same frame as the plates (pages 2 and 3).")
+    scale_bar(c, 15, PAGE_H / mm - 32)
 
-        # antenna holes
-        for kind, i, x, y in L.holes():
-            px, py = Q(x, y)
-            c.setLineWidth(0.5)
-            c.circle(px * mm, py * mm, HOLE_RPSMA / 2 * mm)
-            c.setLineWidth(0.2)
-            crosshair(c, px, py, HOLE_RPSMA / 2)
-            c.setFont("Helvetica-Bold", 7)
-            s = layout.SECTORS[i]
-            lx, ly = F(s, -9.0 if kind != "P2" else 0.0, (L.r_D if kind == "D" else L.r_P) + (9.0 if kind == "P2" else 0))
-            c.drawCentredString(lx * mm, (ly - 1) * mm, kind)
-        for i, s in enumerate(layout.SECTORS):
-            lx, ly = F(s, 10.5, L.r_P)
-            c.setFont("Helvetica-Bold", 11)
-            c.drawCentredString(lx * mm, (ly - 1.5) * mm, f"S{i}")
-        # M3 registration holes, washer keep-out dashed
-        for x, y in L.m3():
-            px, py = Q(x, y)
-            c.setLineWidth(0.5)
-            c.circle(px * mm, py * mm, COLLAR_HOLE / 2 * mm)
-            c.setLineWidth(0.2)
-            crosshair(c, px, py, COLLAR_HOLE / 2)
-            c.setDash(1.5, 1.5)
-            c.circle(px * mm, py * mm, M3_KEEPOUT / 2 * mm)
-            c.setDash()
-            c.setFont("Helvetica-Bold", 6)
-            c.drawCentredString(px * mm, (py + M3_KEEPOUT / 2 + 1) * mm, f"M3 {COLLAR_HOLE:g}")
+    for Lv in sorted(Ls, key=lambda x: -x.deck_d):     # cut lines: largest solid, the others dashed
+        c.setLineWidth(0.8 if Lv is big else 0.5)
+        if Lv is not big:
+            c.setDash(4, 2)
+        c.circle(cx * mm, cy * mm, Lv.deck_r * mm)
+        c.setDash()
+    lab = [f"{Lv.deck_d:g} mm ({Lv.spacing:g} mm ducks)" for Lv in sorted(Ls, key=lambda x: -x.deck_d)]
+    c.setFont("Helvetica", 6.5)
+    lx, ly = cx + big.deck_r * math.sin(math.radians(205)), cy + big.deck_r * math.cos(math.radians(205))
+    c.drawRightString((lx - 2) * mm, (ly - 1) * mm, "cut: " + " / ".join(lab))
 
-        # acrylic plate option: M4 bolts in the core corners hold the plate's spacers (nut flush in the corner,
-        # dashed hex); they sit in the on-deck XIAOs' USB-C plug path, so drill them only for the plate option
-        hr = g.NUT_AF / math.sqrt(3)
-        for t in layout.VERTICES:
-            px, py = Q(*layout.pol(g.MOUNT_RADIUS, t))
-            c.setLineWidth(0.5)
-            c.circle(px * mm, py * mm, g.HOLE_M4 / 2 * mm)
-            c.setLineWidth(0.2)
-            crosshair(c, px, py, g.HOLE_M4 / 2)
-            c.setDash(1.5, 1.5)
-            _poly(c, [(px + hr * math.sin(math.radians(a)), py + hr * math.cos(math.radians(a)))
-                      for a in range(30, 390, 60)])
-            c.setDash()
-            lx, ly = F(t, 7.0, g.MOUNT_RADIUS)
-            c.setFont("Helvetica-Bold", 6)
-            c.drawCentredString(lx * mm, (ly - 1) * mm, f"M4 {g.HOLE_M4:g}")
-        # on-deck electronics (grey, not drilled): XIAOs, USB-C plug paths, tie squares, J1 / J2
-        c.saveState()
-        c.setStrokeGray(0.45)
-        c.setFillGray(0.45)
-        c.setLineWidth(0.3)
-        hl, hw = XIAO_L / 2, XIAO_W / 2
-        for k, t in enumerate(layout.VERTICES):
-            _poly(c, [F(t, u, v) for u, v in ((-hw, L.xiao_v - hl), (hw, L.xiao_v - hl), (hw, L.xiao_v + hl),
-                                                 (-hw, L.xiao_v + hl))])
-            c.setDash(2, 1.5)
-            _poly(c, [F(t, u, v) for u, v in ((-6.5, L.xiao_v + hl), (6.5, L.xiao_v + hl), (6.5, 70.0),
-                                                 (-6.5, 70.0))])
-            c.setDash()
-            ip = F(t, *L.ipex)
-            c.circle(ip[0] * mm, ip[1] * mm, 1.3 * mm)
-            _, tc, _, sq = L.tie(t)
-            _poly(c, [F(t, *q) for q in sq])
-            tx, ty = F(t, *tc)
-            c.setFont("Helvetica", 5)
-            c.drawCentredString(tx * mm, (ty - 0.8) * mm, "TIE")
-            lx, ly = F(t, 0, L.xiao_v)
-            c.setFont("Helvetica-Bold", 6)
-            c.drawCentredString(lx * mm, (ly - 1) * mm, ("U2 HEAD", "U3", "U4")[k])
-        for (r, a), lab in ((L.j1, "J1"), (L.j2, "J2")):
-            n = 4 if lab == "J1" else 2
-            w = 2 * (n - 1) + 3.9
-            _poly(c, [F(a, u, v) for u, v in ((-w / 2, r - 1.7), (w / 2, r - 1.7), (w / 2, r + 2.8), (-w / 2, r + 2.8))])
-            lx, ly = F(a, 0, r + 4.8)
-            c.setFont("Helvetica-Bold", 5.5)
-            c.drawCentredString(lx * mm, (ly - 0.8) * mm, lab)
-        c.restoreState()
-        arrow = [Q(dx, L.r_D + 9.5 + dy) for dx, dy in ((-3, -3), (0, 3), (3, -3))]
+    hole(0, 0, L.pipe_d)                               # pipe hole
+    c.setFont("Helvetica-Bold", 6.5)
+    c.drawCentredString(cx * mm, (cy - L.pipe_d / 2 - 3.5) * mm, f"pipe {L.pipe_d:g} (7/8 in)")
+
+    c.saveState()                                      # faces: copper side out on this line
+    c.setStrokeColorRGB(*COPPER_INK)
+    c.setLineWidth(1.0)
+    _poly(c, [Q(*layout.pol(L.r_c, v)) for v in layout.VERTICES])
+    c.restoreState()
+
+    for i, s in enumerate(layout.SECTORS):             # antenna jacks: D per duck spacing, P, P2
+        for kind, x, y in deck_antenna_holes(s):
+            hole(x, y, HOLE_RPSMA)
+            u, v = layout.frame(s, x, y)
+            px, py = F(s, u - 6.0, v) if kind != "P2" else F(s, u, v + 6.0)
+            c.setFont("Helvetica-Bold", 6.5)
+            if kind == "P2":
+                c.drawCentredString(px * mm, (py - 1) * mm, kind)
+            else:
+                c.drawRightString((px + 1.5) * mm, (py - 1) * mm, kind)
+        lx, ly = F(s, 11.0, L.r_P + 4)
+        c.setFont("Helvetica-Bold", 11)
+        c.drawCentredString(lx * mm, (ly - 1.5) * mm, f"S{i}")
+        arrow = [F(s, dx, L.r_in - 14 + dy) for dx, dy in ((-3, -3), (0, 3), (3, -3))]   # S0 arrow, pointing out
         c.setLineWidth(0.6)
         for (x0, y0), (x1, y1) in zip(arrow, arrow[1:]):
-            c.line(x0 * mm, y0 * mm, x1 * mm, y1 * mm)
+            if i == 0:                                 # S0 arrow only
+                c.line(x0 * mm, y0 * mm, x1 * mm, y1 * mm)
 
-        c.setFont("Helvetica", 8.5)
-        lines = [
-            f"Solid circle = cut line ({L.deck_d:g} mm). Copper triangle = the faces' outer (copper) surface: stand each "
-            f"{FACE_WIDTH:g} x {FACE_H:g} mm face",
-            "on its line, copper out, butt the corners together and solder or copper-tape the seams.",
-            f"D / P / P2 {HOLE_RPSMA:g} mm = RP-SMA antenna jacks, one antenna per sector: D = duck {spacing:g} mm in "
-            f"front of the face, P / P2 = patch",
-            f"{PATCH_OFFSET:g} mm in front (P2 {L.s_P2:g} mm along the face).  Centre {L.pipe_d:g} mm = the pipe "
-            f"(1/2 in PVC adapter).",
-            f"M3 {COLLAR_HOLE:g} mm x3 = registration to the collar (dashed: {M3_KEEPOUT:g} mm washer keep-out), "
-            "as on the PCB deck.",
-            "Grey = where the parts go with the electronics ON the deck (as on the PCB): XIAOs on the corner axes, "
-            "USB-C out (dashed",
-            "= plug path), antenna strain relief tie squares, J1 / J2. Insulate the deck under them (Kapton). Dotted "
-            "triangle = keep parts",
-            "and wiring inside it (1 mm clear of the seams). Every number: layout.py / parameters.csv (formulas page).",
-            f"M4 {g.HOLE_M4:g} mm x3 in the corners = ACRYLIC PLATE OPTION ONLY: bolts + spacers hold the plate (radios "
-            "near the deck), nut flush in the corner",
-            "(dashed hex). They sit in the on-deck XIAOs' USB-C plug path: drill them OR use the grey on-deck layout, "
-            "not both.",
-        ]
-        for n, t in enumerate(lines):
-            c.drawString(15 * mm, (58 - n * 4.4) * mm, t)
+    for x, y in L.m3():                                # M3 collar registration, washer keep-out dashed
+        px, py = hole(x, y, COLLAR_HOLE)
+        c.setDash(1.5, 1.5)
+        c.circle(px * mm, py * mm, M3_KEEPOUT / 2 * mm)
+        c.setDash()
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(px * mm, (py + M3_KEEPOUT / 2 + 1) * mm, f"M3 {COLLAR_HOLE:g}")
 
-    page.__name__ = f"deck_d{spacing:g}_page"
-    return page
+    hr = g.NUT_AF / math.sqrt(3)                       # core-corner M4: the plate's bolts, nut in the corner
+    for t in layout.VERTICES:
+        px, py = hole(*layout.pol(L.m4_r, t), g.HOLE_M4)
+        c.setDash(1.5, 1.5)
+        _poly(c, [(px + hr * math.sin(math.radians(a)), py + hr * math.cos(math.radians(a)))
+                  for a in range(30, 390, 60)])
+        c.setDash()
+        lx, ly = F(t, 0, L.m4_r - 9.0)
+        c.setFont("Helvetica-Bold", 6)
+        c.drawCentredString(lx * mm, (ly - 1) * mm, f"M4 {g.HOLE_M4:g}")
 
-
-DECK_PAGES = [deck_page_for(s) for s in layout.VARIANTS]
+    c.setFont("Helvetica", 8.5)
+    ducks = " / ".join(f"D{Lv.spacing:g} = duck {Lv.spacing:g} mm" for Lv in Ls)
+    lines = [
+        "Solid circle = cut line " + f"({big.deck_d:g} mm, fits both duck spacings); dashed = " +
+        ", ".join(f"{Lv.deck_d:g} mm" for Lv in Ls if Lv is not big) + " if you only use the "
+        + ", ".join(f"{Lv.spacing:g}" for Lv in Ls if Lv is not big) + " mm ducks.",
+        f"Copper triangle = the faces' outer (copper) surface: stand each {FACE_WIDTH:g} x {FACE_H:g} mm face on its "
+        "line, copper out, butt the",
+        "corners together and solder or copper-tape the seams.",
+        f"Antenna jacks, RP-SMA {HOLE_RPSMA:g} mm, drill ONE per sector for the antenna you fit: {ducks} in front of "
+        "the face,",
+        f"P / P2 = patch {PATCH_OFFSET:g} mm in front (P2 {L.s_P2:g} mm along the face). D{layout.VARIANTS[0]:g} and "
+        "P are close: never drill both.",
+        f"Centre {L.pipe_d:g} mm = the pipe (1/2 in PVC adapter).  M3 {COLLAR_HOLE:g} mm x3 = registration to the "
+        f"collar (dashed: {M3_KEEPOUT:g} mm washer keep-out).",
+        f"M4 {g.HOLE_M4:g} mm x3 in the core corners = bolts + spacers for the electronics plate (pages 2 and 3), nut "
+        "in the corner (dashed hex).",
+        f"Turned like the plates: plate 12 o'clock up, S0 arrow {PLATE_TURN:g} deg clockwise of it, so the plates' "
+        "dotted holes sit on these.",
+        "Every number: common/layout.py and parameters.csv (formulas page).",
+    ]
+    for n, t in enumerate(lines):
+        c.drawString(15 * mm, (58 - n * 4.4) * mm, t)
 
 
 def face_page(c):
@@ -2043,7 +2042,7 @@ def face_page(c):
         "Plain butt joints: the three faces stand on the deck's copper triangle, corners touching, and are soldered or",
         "copper-taped along each seam (inside, outside or both; tack-solder tape every 10-15 mm). The PCB faces have",
         "tabs; this cut-by-hand face doesn't need them, the finished triangle is the same.",
-        f"Whips hang on the deck's D holes in front of the face (page 1 / 2); P / P2 hold a patch {PATCH_OFFSET:g} mm "
+        f"Whips hang on the deck's D holes in front of the face (page 1); P / P2 hold a patch {PATCH_OFFSET:g} mm "
         "in front of it.",
         f"Centre {DIPOLE_HOLE:g} mm hole: RP-SMA bulkhead for an antenna on the face (dipole or the printed fin); the nut",
         "goes on the inside, so keep it clear of anything mounted inside the core. No other holes in the face.",
@@ -2228,7 +2227,7 @@ def formulas_page(c):
 
 
 BUILD_TAGS = {           # which build type each page belongs to (user, 2026-11-10): builders pick one, alt or pipe
-    **{p: ("BOTH BUILDS", "pick the deck for your duck spacing", (0.3, 0.3, 0.3)) for p in DECK_PAGES},
+    deck_page: ("BOTH BUILDS", "pipe and no pipe, both duck spacings", (0.3, 0.3, 0.3)),
     alt_plate_page: ("NO PIPE", "pick one: pipe or no pipe", (0.1, 0.35, 0.7)),
     fl_plate_page: ("PIPE BUILD ONLY", "pick one: pipe or no pipe", (0.1, 0.5, 0.25)),
     face_page: ("BOTH BUILDS", "pipe and no pipe", (0.3, 0.3, 0.3)),
@@ -2274,7 +2273,7 @@ def main():
     # the LED direction ring option after the wiring it adds to (2026-11-16), then the unified power + LED board
     # option that can replace the bus and LED boards (2026-11-20), design formulas at the very end as a
     # reference page (2026-11-12)
-    pages = (*DECK_PAGES, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, uni_page,
+    pages = (deck_page, fl_plate_page, alt_plate_page, face_page, stack_page, wiring_page, led_page, uni_page,
              formulas_page)
     for n, page in enumerate(pages, 1):
         page(c)

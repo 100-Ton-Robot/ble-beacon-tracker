@@ -6,6 +6,18 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Hand build templates (2026-11-24)
+
+- `builds/hand/shield_deck_templates.pdf` is 9 pages. Page 1 is one deck drill template for both duck spacings
+  (D15 and D31 holes, 146.3 mm cut line, 144 mm dashed), with no part positions, drawn in the plates' frame so its
+  holes sit under the plates' dotted reference holes. The two per-spacing deck pages are gone.
+- Plates (pages 2-3): dotted D15 and D31 reference holes; the no-pipe plate shows the deck's 22.2 mm centre hole and
+  M3 bolts instead of the old C holes. `ALT_CORE_HOLE` / `ALT_DECK_JACK` retired. `read_plate_svg.py` no longer
+  checks the gap between two antenna reference holes (only one per sector is drilled).
+- Wiring (page 6): star wiring (relay protocol 4, as PCB rev 3). Head S0 D10 to ESP32 GPIO17 (gateway pin 0); S1 /
+  S2 D10 soldered to the head's D0 / D1; 5V, GND and CMD (D7) on the bus. Needs protocol 4 firmware.
+- Hand build README: status, pins, page list, deck drill rows and a BOM.
+
 ### Repo layout
 
 - Split (2026-11-23): `shield_deck/` is now two builds of the same mast plus their shared geometry.

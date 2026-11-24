@@ -38,7 +38,7 @@ XIAO_TIE_DX,4.0 -4.0 4.0,mm,design,plate,retired plate page: tie offset along ea
 JST_L,15.0,mm,estimated,plate,mated inline JST pair length
 JST_W,12.0,mm,estimated,plate,mated inline JST pair width
 JST_PITCH,2.5,mm,estimated,plate,"pin rows inside the mated pair, pin 1 at the top"
-SECTOR_RX_PINS,34 32 31,pin,design,wiring,"ESP32 header pin receiving each sector's D8 (TX), S0-S2"
+SECTOR_RX_PINS,34 32 31,pin,design,wiring,"ESP32 header pins for gateway pins 0-2 (one head radio each, star wiring 2026-11-24; was each sector's D8). The wiring page uses pin 0 for head S0"
 SECTOR_RX_GPIOS,17 16 18,pin,design,wiring,the same pins as GPIO numbers
 ESP_TX,35 21,pin,design,wiring,"ESP32 TX to the bus TX row (every XIAO's D7): header pin, GPIO"
 XIAO_ROW,7.6,mm,estimated,wiring,XIAO pad rows +- this from the centre line
@@ -73,8 +73,8 @@ ALT_ESP32_TIES,-15.0 15.0,mm,design,alt,ties across the ESP32 at these distances
 ALT_BUS,-28.0 16.0,mm,design,alt,"bus board centre, ~19 mm from the ESP32's RJ45 end (VBUS 40)"
 ALT_BUS_ANGLE,150.0,deg,design,alt,bus long axis; its M3 hole is this way along it
 ALT_BUS_HOLE_S,5.8,mm,design,alt,bus M3 hole along its axis from its centre (alt and pipe plates)
-ALT_CORE_HOLE,10.0,mm,design,alt,"the deck's centre hole, kept clear (30 mm hole-saw keep-out dropped 2026-11-10)"
-ALT_DECK_JACK,9.2,mm,spec,alt,"RP-SMA bulkhead hex across corners, drawn where each C jack sits under the plate"
+ALT_CORE_HOLE,10.0,mm,design,retired,"retired 2026-11-24 (deck page 1 has a 22.2 mm centre hole, drawn from layout.py): the deck's centre hole, kept clear (30 mm hole-saw keep-out dropped 2026-11-10)"
+ALT_DECK_JACK,9.2,mm,spec,retired,"retired 2026-11-24 (the deck has no C holes): RP-SMA bulkhead hex across corners, drawn where each C jack sits under the plate"
 PIPE_SAW,2.25,in,spec,pipe,deck centre hole for the pipe layout: 2-1/4 in hole saw (EU: 57 mm)
 NUT_OD,34.0,mm,estimated,pipe,adapter nut across corners; keep parts clear of it
 FL_XIAO_R,57.0,mm,design,pipe,XIAO centre radius. The three XIAOs are one part turned 120 deg: move S0 in Inkscape
@@ -132,3 +132,4 @@ UNI_PAGE,22.0 236.0 5.2,mm,drawing,uni,"Unified power + LED board page: top-left
 UNI_PITCH,2.54,mm,spec,uni,stripboard hole pitch (0.1 in)
 UNI_SIZE,10 23,count,design,uni,Unified board: strips (A-J) x holes per strip (rows 0-22); rows 0 and 22 are left empty for the two pipe ties (2026-11-20)
 UNI_PULLDOWN_OHM,10000,ohm,design,uni,"R2, pull-down on U1 1A (GPIO1 side) to GND so the strip stays dark while the ESP32 boots and GPIO1 floats (user, 2026-11-20)"
+BRANCH_STUB_X,57.0,mm,drawing,wiring,"star wiring (2026-11-24): the head's D0 / D1 branch wires end here, right of its USB end, labelled with the branch radio"

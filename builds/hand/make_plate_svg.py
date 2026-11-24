@@ -146,18 +146,10 @@ def m4_and_antennas():
 
 
 def deck_jacks(centre):
-    letters = {"duck/monopole": "D", "patch": "P", "patch end": "P2", "dipole coax": "C"}
-    turn = math.radians(t.PLATE_TURN)
     b = ""
-    if centre == "alt":                       # the pipe layout's hole saw removes the C holes
-        for d, x, y, lab in g.holes:
-            if lab in ("via", "M4 mount", "core feed") or d == g.HOLE_RPSMA:   # 6.5 mm jacks: drilled, M4 layer
-                continue
-            dx, dy = x - g.CX, y - g.CY
-            px, py = dx * math.cos(turn) + dy * math.sin(turn), -dx * math.sin(turn) + dy * math.cos(turn)
-            b += f'<circle cx="{px:.2f}" cy="{-py:.2f}" r="{t.ALT_DECK_JACK / 2}" {REF}/>'
-            b += text(px, -py + 0.8, f"{lab[:2]} {letters[lab.split(' ', 1)[1]]}", 2, "#999")
-        b += f'<circle r="{t.ALT_CORE_HOLE / 2}" {REF}/>' + text(0, -t.ALT_CORE_HOLE / 2 - 1, "deck core 10", 2, "#999")
+    if centre == "alt":                       # the deck's centre hole and M3 collar bolts (page 1)
+        for d, x, y, lab in t.deck_refs():
+            b += f'<circle cx="{x:.2f}" cy="{-y:.2f}" r="{d / 2:.2f}" {REF}/>' + text(x, -y + 0.8, lab, 2, "#999")
     else:
         b += f'<circle r="{t.PIPE_SAW / 2:.2f}" {REF}/>' + text(0, t.PIPE_SAW / 2 - 1.5, "deck hole saw", 2, "#999")
     return layer("layer_jacks", "Deck jacks below (reference, locked)", b, locked=True)
