@@ -6,6 +6,14 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Template PDFs (2026-11-24)
+
+- Changed: the hand build's PDF is now `builds/hand/hand_build_shield_deck_templates.pdf` (was
+  `shield_deck_templates.pdf`). Its design formulas page no longer shows the PCB deck's radio placement (the RADIOS
+  rows, the XIAOs and tie squares in the top view); the same page with the radios is the last page of
+  `builds/pcb/out/pcb_print_1to1.pdf`. The page is drawn by `common/formulas_page.py` for both; `FORMULA_SCALE`
+  moved to `common/parameters.csv`.
+
 ### Antenna selection doc (2026-11-24)
 
 - Added (2026-11-24): `docs/ANTENNA_SELECTION.md`, the antenna and spacing choice with formulas and RF results,

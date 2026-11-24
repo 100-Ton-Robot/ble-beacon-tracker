@@ -1037,6 +1037,13 @@ if __name__ == "__main__":
         pages = [f"{n}_print_{side}.pdf" for n, _ in decks for side in ("top", "bottom")]
         pages += ["face_pcb_print_top.pdf", "endplate_pcb_print_top.pdf", "endplate_pcb_print_bottom.pdf",
                   "gusset_pcb_print_top.pdf"]
+        try:   # last page: the design formulas with the radio placement (the hand PDF prints it without)
+            from formulas_page import page as formulas_pdf
+            formulas_pdf(os.path.join(OUT, "pcb_formulas.pdf"), True,
+                         "Design formulas - PCB build, with radio placement (NOT to size)")
+            pages.append("pcb_formulas.pdf")
+        except ImportError:
+            print("reportlab not installed: no formulas page in the print PDF")
         for f in pages:
             p = os.path.join(OUT, f)
             w.add_page(PdfReader(p).pages[0])

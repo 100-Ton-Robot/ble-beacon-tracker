@@ -115,7 +115,6 @@ RULE_PART_GAP,1.5,mm,rule,rules,between parts (a XIAO and its own tie mount exce
 RULE_HOLE_GAP,2.0,mm,rule,rules,edge to edge between drilled plate holes
 RULE_RIM_HOLE,3.0,mm,rule,rules,hole edge -> plate rim
 RULE_RIM_PART,3.0,mm,rule,rules,part outline -> plate rim
-FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page drawing scale
 LED_PIXELS,24,count,design,led,LED direction ring option: pixels in the ring (2026-11-16). At LED_PER_M this sets the ring's diameter; keep it inside the deck (DISC_DIAMETER)
 LED_PER_M,60,count,spec,led,strip pixels per metre
 LED_DATA_GPIO,1,pin,design,led,ESP32 GPIO driving the strip's data in (GPIO1 and GPIO2 are the free pins)

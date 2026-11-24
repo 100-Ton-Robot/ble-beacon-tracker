@@ -81,7 +81,7 @@ one pin row on its D7-5V edge (scanner firmware 0.8.0 and later; before that TX 
 | 5V (14) ← bus 5V row | 1 | VBUS (40) | VBUS (40) | VBUS (40) |
 | GND (13) ← bus GND row | 2 | GND (38) | GND (38) | GND (38) |
 
-JST = pin of the per-sector inline 4-wire connector (drawing: `../builds/hand/shield_deck_templates.pdf`, wiring page).
+JST = pin of the per-sector inline 4-wire connector (drawing: `../builds/hand/hand_build_shield_deck_templates.pdf`, wiring page).
 
 VBUS is the USB-C 5 V, which is where the PoE splitter feeds the board. Kept clear: GPIO 4-7
 (TF card), 9-14 (W5500), 0/3/45/46 (strapping), 19/20 (USB), 33-37 (octal PSRAM), 43/44.

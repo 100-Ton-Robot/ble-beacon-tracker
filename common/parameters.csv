@@ -49,3 +49,4 @@ ANT_DUCK_GAIN,2.0,dBi,spec,antenna,"HiRO H50327 rated gain"
 ANT_STUBBY_LENGTH,28.4,mm,spec,antenna,"2.4 GHz stubby (OL-3464-2X, owner's candidate 2026-11-24): end to end, RP-SMA male, 2 dBi, a shortened quarter-wave monopole; modelled as a straight monopole this long"
 ANT_STUBBY_RADOME,20.3,mm,spec,antenna,"stubby radome length below the connector (the element is inside it)"
 ANT_STUBBY_GAIN,2.0,dBi,spec,antenna,"stubby rated gain"
+FORMULA_SCALE,0.7,ratio,drawing,formulas,formulas page top-view scale (common/formulas_page.py: hand build templates and the PCB print PDF)ing scale

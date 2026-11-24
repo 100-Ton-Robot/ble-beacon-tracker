@@ -37,7 +37,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 | 6 | Wiring diagram (star wiring) | updated |
 | 7 | Option: LED direction ring, its power board and strip wiring | older layout |
 | 8 | Option: unified power + LED board | older wiring |
-| 9 | Design formulas (reference, no need to print) | updated |
+| 9 | Design formulas (reference, no need to print), without the PCB deck's radio placement | updated |
 
 - **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; the pipe passes the deck's 22.2 mm centre hole.
 - **No pipe:** pages 1, 3, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
@@ -50,7 +50,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 - **Bonding:** bond the tube to the deck all round where it passes through: a copper collar, a ground clamp and braid, or conductive copper tape. Solder won't take on galvanized steel. Outdoors, seal the joint against zinc-copper corrosion.
 - **ESP32 antenna:** mount it in a plastic cap or insulating bushing, not on the bare steel end.
 
-1. Print your pages of `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
+1. Print your pages of `hand_build_shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
 2. Make the deck: drill copper-clad board from the deck template (page 1): only the antenna jack you use in each sector (D15 for ducks, the recommended spacing; D31 for a 31 mm build; P or P2 for a patch), or order a PCB deck ([../pcb/README.md](../pcb/README.md)). The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
 3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
 4. Drill the plate and the faces (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). The plates' dotted antenna holes sit over the deck's (page 1) when the M4 holes line up.
@@ -74,7 +74,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 - **Accepted risk (user, 2026-11-20): a strip short reboots the mast.** The PoE splitter current-limits (about 2.6 A, estimated) before the 2 A fuse opens: the fuse carries about 115% of its rating, where the 251 series has no maximum opening time, and the shared 5 V rail falls to about 0.35 V, so the ESP32 and XIAOs reset until the short is cleared. See `sim/` (case `strip_short`). If it starts to matter: a 1 A fuse with a 0.8 A firmware cap (a short is then 260%, opening within 1 s, still with a brief reboot) or an eFuse / high-side switch on the strip feed. Measuring the splitter's real limit may also change the picture.
 - **Status:** drawn only, not built. The layout is a table in `make_templates.py` (`UNI_*`), sizes in `parameters.csv` (group `uni`).
 
-Page 9 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values.
+Page 9 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values. It leaves out the PCB deck's radio placement (XIAOs, IPEX4, tie squares, J1 / J2): the same page with the radios is the last page of `../pcb/out/pcb_print_1to1.pdf`. Both come from `common/formulas_page.py`.
 
 ### Drill sizes and zip ties
 
@@ -160,13 +160,13 @@ Everything here is generated from two files of numbers: this build's [`parameter
 | `../../common/parameters.csv` | Shared with the PCB build: faces and core, duck spacing, pipe, XIAO and radio positions, enclosure, RF | You |
 | `../../common/params.py`, `../../common/layout.py` | Load the CSVs; derive the shared layout (deck size, holes, core limit) | - |
 | `shield_deck_gerbers.zip`, `shield_deck_preview.svg`, `hole_table.csv` | Deck PCB Gerbers (any fab), a picture of it, hole coordinates | `make_shield_deck.py` |
-| `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, unified board option, design formulas | `make_templates.py` |
+| `hand_build_shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, unified board option, design formulas | `make_templates.py` |
 | `plate_layout.svg`, `pipe_plate_layout.svg` | No-pipe (alt) and pipe plates for laying out in Inkscape | `make_plate_svg.py` |
 
 ### Print the templates
 
 1. `python make_templates.py`
-2. Print `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page").
+2. Print `hand_build_shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page").
 3. Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
 
 The pages, in order (pick one build type, pipe or no pipe, and print only its pages: [which pages](#quick-start-files-in-the-repo-no-software)):
@@ -179,7 +179,7 @@ The pages, in order (pick one build type, pipe or no pipe, and print only its pa
 6. Wiring diagram (both)
 7. Option: LED direction ring (both, only if you add the ring)
 8. Option: unified power + LED board (pipe, only if you use it instead of the bus and LED boards)
-9. Design formulas (reference, not to size)
+9. Design formulas (reference, not to size; radio placement is in the PCB print PDF)
 
 ### Change a measurement or size
 
