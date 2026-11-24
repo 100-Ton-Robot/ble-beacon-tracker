@@ -350,7 +350,10 @@ shortened, probably helical element inside a 20.3 mm radome, so the match below 
 the pattern is a monopole's either way). Peak 3.9 dBi at el -25 deg, isolation -29 dB (ducks -49 to -57). Bearing
 (`out/bearing_rev3_d31_stubby`): 36 / 105 deg median / 90%, right sector 66%, against 15 / 40 deg and 81% for the
 ducks on the same deck, and about the same as the 2026-11-12 monopole on the old mast (34 / 101). With the deck as
-its ground plane a short monopole's beam stays broad; the face behind it does little.
+its ground plane a short monopole's beam stays broad; the face behind it does little. The same stubby on the 15 mm deck
+(`out/rev3_d15_copper_stubby`, `out/bearing_rev3_stubby_d15_d31`): 29 / 89 deg, right sector 75%, peak 5.0 dBi at
+az 0, el -25, isolation -34 dB. Closer to the face helps (the face starts to act as a reflector) but it stays about
+twice the ducks' error (15 / 38 deg, 84%); the model's match drops to about 21 ohm there (S11 -5 dB).
 
 - **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
   median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,

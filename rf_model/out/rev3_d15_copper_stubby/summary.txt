@@ -1,0 +1,24 @@
+command: python3 sector_model.py --antenna monopole --length 28.4 --deck d15 --end-plate --copper --out out/rev3_d15_copper_stubby
+date: 2026-11-24 12:29 UTC
+PCBs (rev 3): deck d15, 144.0 mm, real copper, hollow face-board core, end plate
+3 sectors, faces 120 x 120 mm
+antenna: monopole, element 28.4 mm, 15 mm in front of the face, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [61, 64, 54] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11   -5.8 dB  Zin   20.5  +24.3j ohm
+  2440 MHz  S11   -5.3 dB  Zin   21.8  +31.9j ohm
+  2480 MHz  S11   -4.7 dB  Zin   22.9  +39.9j ohm
+
+peak 5.0 dBi at az 0, el -25 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         4.8       0      105 deg       25.4 dB
+   -15         4.8       0      125 deg       11.6 dB
+   -30         4.9       0      115 deg       20.3 dB
+   -45         3.6       0      130 deg        8.7 dB
+   -60         2.0       0      155 deg        3.2 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -33.9 dB
+  S2: -33.8 dB

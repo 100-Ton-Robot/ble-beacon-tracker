@@ -1,0 +1,12 @@
+{
+ "sectors": 3,
+ "face_width": 120.0,
+ "face_h": 120.0,
+ "deck_diameter": 144.0,
+ "end_plate": "plate",
+ "spacing": 15,
+ "antenna": "monopole",
+ "length": 28.4,
+ "feed_depth": null,
+ "overrides": {}
+}
