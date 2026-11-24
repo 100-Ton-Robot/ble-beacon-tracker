@@ -1,0 +1,50 @@
+mesh [55, 90, 155] = 0.77 M cells
+ ---------------------------------------------------------------------- 
+ | openEMS 64bit -- version 305df56
+ | (C) 2010-2026 Thorsten Liebig <thorsten.liebig@gmx.de>  GPL license
+ ---------------------------------------------------------------------- 
+	Used external libraries:
+		CSXCAD -- Version: c46e320
+		hdf5   -- Version: 1.10.10
+		          compiled against: HDF5 library version: 1.10.10
+		tinyxml -- compiled against: 2.6.2
+		fparser
+		boost  -- compiled against: 1_83
+		vtk -- Version: 9.1.0
+		       compiled against: 9.1.0
+
+Create FDTD operator (compressed SSE + multi-threading)
+FDTD simulation size: 55x90x155 --> 767250 FDTD cells 
+FDTD timestep is: 4.86726e-13 s; Nyquist rate: 337 timesteps @3.04828e+09 Hz
+Excitation signal length is: 9810 timesteps (4.77479e-09s)
+Max. number of timesteps: 80000 ( --> 8.15494 * Excitation signal length)
+Create FDTD engine (compressed SSE + multi-threading)
+Running FDTD engine... this may take a while... grab a cup of coffee?!?
+[@        4s] Timestep:          336 || Speed:   56.5 MC/s (1.358e-02 s/TS) || Energy: ~4.38e-22 (- 0.00dB)
+[@        9s] Timestep:          924 || Speed:   98.1 MC/s (7.821e-03 s/TS) || Energy: ~1.34e-20 (- 0.00dB)
+[@       13s] Timestep:         1512 || Speed:  100.3 MC/s (7.650e-03 s/TS) || Energy: ~5.79e-19 (- 0.00dB)
+[@       17s] Timestep:         2016 || Speed:   94.5 MC/s (8.123e-03 s/TS) || Energy: ~7.48e-18 (- 0.00dB)
+[@       22s] Timestep:         2604 || Speed:   97.8 MC/s (7.847e-03 s/TS) || Energy: ~7.66e-17 (- 0.00dB)
+[@       26s] Timestep:         3108 || Speed:   89.2 MC/s (8.597e-03 s/TS) || Energy: ~5.15e-16 (- 0.00dB)
+[@       31s] Timestep:         3612 || Speed:   88.3 MC/s (8.686e-03 s/TS) || Energy: ~2.18e-15 (- 0.00dB)
+[@       35s] Timestep:         4200 || Speed:  103.5 MC/s (7.416e-03 s/TS) || Energy: ~6.34e-15 (- 0.00dB)
+[@       40s] Timestep:         4788 || Speed:   96.9 MC/s (7.922e-03 s/TS) || Energy: ~2.00e-14 (- 0.00dB)
+[@       44s] Timestep:         5376 || Speed:   96.0 MC/s (7.993e-03 s/TS) || Energy: ~2.44e-14 (- 0.00dB)
+[@       48s] Timestep:         5880 || Speed:   94.9 MC/s (8.082e-03 s/TS) || Energy: ~2.95e-14 (- 0.00dB)
+[@       53s] Timestep:         6384 || Speed:   91.7 MC/s (8.364e-03 s/TS) || Energy: ~3.06e-14 (- 0.00dB)
+[@       57s] Timestep:         6888 || Speed:   92.0 MC/s (8.342e-03 s/TS) || Energy: ~2.35e-14 (- 1.16dB)
+[@     1m01s] Timestep:         7392 || Speed:   96.5 MC/s (7.952e-03 s/TS) || Energy: ~1.52e-14 (- 3.06dB)
+[@     1m05s] Timestep:         7980 || Speed:   98.8 MC/s (7.766e-03 s/TS) || Energy: ~7.56e-15 (- 6.08dB)
+[@     1m10s] Timestep:         8568 || Speed:   99.9 MC/s (7.677e-03 s/TS) || Energy: ~3.06e-15 (-10.00dB)
+[@     1m15s] Timestep:         9072 || Speed:   82.4 MC/s (9.314e-03 s/TS) || Energy: ~1.40e-15 (-13.39dB)
+[@     1m19s] Timestep:         9576 || Speed:   86.4 MC/s (8.882e-03 s/TS) || Energy: ~6.20e-16 (-16.94dB)
+[@     1m23s] Timestep:        10080 || Speed:   93.0 MC/s (8.251e-03 s/TS) || Energy: ~2.75e-16 (-20.47dB)
+[@     1m28s] Timestep:        10584 || Speed:   88.4 MC/s (8.681e-03 s/TS) || Energy: ~1.12e-16 (-24.38dB)
+[@     1m32s] Timestep:        11088 || Speed:   92.4 MC/s (8.307e-03 s/TS) || Energy: ~4.01e-17 (-28.83dB)
+[@     1m36s] Timestep:        11592 || Speed:   93.9 MC/s (8.175e-03 s/TS) || Energy: ~1.66e-17 (-32.66dB)
+[@     1m40s] Timestep:        12096 || Speed:   95.7 MC/s (8.018e-03 s/TS) || Energy: ~8.48e-18 (-35.58dB)
+[@     1m44s] Timestep:        12684 || Speed:   99.1 MC/s (7.741e-03 s/TS) || Energy: ~2.99e-18 (-40.11dB)
+RunFDTD: end-criteria of -40.00dB reached after 12684 timesteps (-40.11dB)
+Time for 12684 iterations with 767250.00 cells : 104.98 sec
+Speed: 92.70 MCells/s 
+{"worst_band_db": -8.952883467700968, "f_min_mhz": 2496.0, "min_db": -13.019476660493678, "s11_db": {"2400": -8.952883467700968, "2440": -11.212083446834093, "2483": -12.911493081944696}, "zin_2440": [43.81456298928384, 26.05527988046021], "cells": [55, 90, 155]}
