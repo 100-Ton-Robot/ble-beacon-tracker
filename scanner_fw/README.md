@@ -1,5 +1,7 @@
 # Scanner firmware (XIAO nRF54L15)
 
+> **Wiring is changing.** D8 has no UART on the nRF54L15, so the per-radio D8 TX wiring on this page (scanner firmware 0.8.0) can't carry the stream. Both builds are now drawn for relay protocol 4 star wiring (D10 uplink TX, D7 command RX, head radio D0 / D1 branch RX): see [Firmware and pins](../builds/hand/README.md#firmware-and-pins-both-builds). That firmware isn't written yet; this page describes the code as it is today.
+
 nRF Connect SDK (Zephyr) app behind MCUboot. It scans (passive, or active on command), controls
 the RF switch and every 200 ms sends the gateway a protobuf bucket on the header UART: RSSI per
 address, and optionally each address's raw advert and scan response bytes, plus status, events

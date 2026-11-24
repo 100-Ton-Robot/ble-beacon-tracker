@@ -4,7 +4,8 @@ Needs `pip install protobuf pyserial`. bletracker_pb2.py next to this script is 
     protoc -I../proto --python_out=. ../proto/bletracker.proto
 (the NCS toolchain has protoc in opt/nanopb/generator-bin).
 
-Reads either the header UART itself through a 3.3 V USB-serial adapter on D8:
+Reads either the header UART itself through a 3.3 V USB-serial adapter on the scanner's TX pin
+(D8 in fw 0.8.0, which has no UART there: see builds/hand/README.md, Firmware and pins):
     python decode_frames.py --port COM5
 or the hex printed by the console's `stream dump` command, pasted or saved:
     python decode_frames.py --hex dump.txt      (or --hex - for stdin)
@@ -265,7 +266,7 @@ def frames_in(stream):
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     src = ap.add_mutually_exclusive_group()
-    src.add_argument("--port", help="serial port wired to D8 (TX) and D7 (RX), 115200 8N1")
+    src.add_argument("--port", help="serial port wired to the scanner TX and D7 (RX), 115200 8N1")
     src.add_argument("--hex", help="file with `stream dump` output, or - for stdin")
     ap.add_argument("--json", action="store_true", help="one JSON object per bucket")
     ap.add_argument("--cmd", help='command to send, e.g. "flash on"; prints inject hex without --port')

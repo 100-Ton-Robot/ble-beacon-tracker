@@ -32,8 +32,10 @@ MCUboot was built with the same signing key, so build your own from source with 
 
 Work in progress:
 - Scanner firmware 0.7.0 (protocol 3) runs on three boards, checked over the USB console.
-  0.8.0 (gateway TX moved from D6 to D8, so all four harness wires leave the XIAO from one pin
-  row) is built but not flashed yet. Its D8 output and BLE update path haven't been tested.
+  0.8.0 (gateway TX moved from D6 to D8) is built but won't be flashed: D8 has no UART on the
+  nRF54L15, so it can't carry the stream. Both builds are now drawn for relay protocol 4 star
+  wiring (D10 uplink, D7 command RX, head D0 / D1 branch RX; see
+  [Firmware and pins](builds/hand/README.md#firmware-and-pins-both-builds)). That firmware isn't written yet.
 - The gateway (protocol 3, needs scanner firmware 0.5.0 or later) passes its boot self-test on
   a board, but hasn't received scanner data on real wiring yet.
 - The Home Assistant tracker isn't written yet.

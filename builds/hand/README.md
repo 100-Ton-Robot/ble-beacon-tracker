@@ -15,7 +15,7 @@ Both builds run the same scanner firmware ([`scanner_fw/`](../../scanner_fw/READ
 | | Uplink TX (to the gateway or the head radio) | Command RX | Branch RX |
 | --- | --- | --- | --- |
 | Hand build, templates page 6 (2026-11-24, relay protocol 4) | D10 (head S0 to the ESP32, S1 / S2 to the head) | D7 | head D0 (S1) / D1 (S2) |
-| Hand build, masts wired before 2026-11-24 | D6 on older masts, D8 since issue #1 | D7 | - |
+| Hand build, masts wired before 2026-11-24 | D6 (issue #1's move to D8 is cancelled) | D7 | - |
 | Scanner firmware 0.8.0 (`scanner_fw/app.overlay`) | D8 | D7 | - |
 | PCB deck rev 3 (relay protocol 4) | D10 (head to J1 DATA, the other two to the head) | D7 | head D0 / D1 |
 

@@ -68,11 +68,13 @@ first check once it does.
 
 ## Wiring
 
+> **Wiring is changing.** D8 has no UART on the nRF54L15, so the per-radio D8 TX wiring on this page (scanner firmware 0.8.0) can't carry the stream. Both builds are now drawn for relay protocol 4 star wiring (D10 uplink TX, D7 command RX, head radio D0 / D1 branch RX): see [Firmware and pins](../builds/hand/README.md#firmware-and-pins-both-builds). That firmware isn't written yet; this page describes the code as it is today.
+
 All gateway wiring is on header pins 31-40 (pin numbers as printed on Waveshare's pinout).
 Each scanner's D8 (TX) has its own gateway RX pin, and that pin is its sector. The gateway has one
 TX that goes to every scanner's D7 through the bus board's TX row; commands carry the target
 scanner's chip ID, so only that scanner acts on them. All four wires leave the XIAO from the
-one pin row on its D7-5V edge (scanner firmware 0.8.0 and later; before that TX was D6, pin 7).
+one pin row on its D7-5V edge (scanner firmware 0.8.0; before that TX was D6, pin 7, and masts wired so far still use D6).
 
 | XIAO (pin) | JST | Sector 0 | Sector 1 | Sector 2 |
 | --- | --- | --- | --- | --- |
@@ -89,6 +91,8 @@ GPIO1 and GPIO2 are free. Logs come out on the S3's native USB-C (all three hard
 used by the scanners).
 
 ## Sectors
+
+> **Wiring is changing.** D8 has no UART on the nRF54L15, so the per-radio D8 TX wiring on this page (scanner firmware 0.8.0) can't carry the stream. Both builds are now drawn for relay protocol 4 star wiring (D10 uplink TX, D7 command RX, head radio D0 / D1 branch RX): see [Firmware and pins](../builds/hand/README.md#firmware-and-pins-both-builds). That firmware isn't written yet; this page describes the code as it is today.
 
 A scanner doesn't know its sector: the sector is the gateway RX pin its D8 is wired to, so
 wiring is the only source of truth. (Scanners before 0.5.0 also sent a saved sector claim; the

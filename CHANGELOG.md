@@ -6,6 +6,17 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Wiring docs (2026-11-24)
+
+- Changed: docs that still showed per-radio D8 TX wiring now say D8 has no UART on the nRF54L15 and point to the
+  relay protocol 4 star wiring in `builds/hand/README.md` (Firmware and pins): `README.md` status,
+  `gateway/README.md` (Wiring, Sectors), `scanner_fw/README.md`, `scanner_fw/PROTOCOL.md`, `decode_frames.py`
+  help and the gateway package's RX pin comments. Protocol 3 and fw 0.8.0 are still described as the code is.
+- Changed: build README pin tables: masts wired so far are D6; issue #1's move to D8 is cancelled. The PCB README
+  table gains the hand build's protocol 4 row.
+- Removed: `make_templates.py`'s unused `plate_page()` (the old strip plate page, D8 caption); plate layout
+  comments now describe star wiring. The PDF is unchanged.
+
 ### Template PDFs (2026-11-24)
 
 - Changed: the hand build's PDF is now `builds/hand/hand_build_shield_deck_templates.pdf` (was

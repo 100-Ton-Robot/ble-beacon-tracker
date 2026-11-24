@@ -24,11 +24,12 @@ Both builds run the same scanner firmware ([`scanner_fw/`](../../scanner_fw/READ
 
 | | Uplink TX (to the gateway or the head radio) | Command RX | Branch RX |
 | --- | --- | --- | --- |
-| Hand build, as wired so far | D6 on older masts, D8 since issue #1 | D7 | - |
+| Hand build, templates page 6 (2026-11-24, relay protocol 4) | D10 (head S0 to the ESP32, S1 / S2 to the head) | D7 | head D0 (S1) / D1 (S2) |
+| Hand build, masts wired before 2026-11-24 | D6 (issue #1's move to D8 is cancelled) | D7 | - |
 | Scanner firmware 0.8.0 (`scanner_fw/app.overlay`) | D8 | D7 | - |
 | PCB deck rev 3 (relay protocol 4) | D10 (head to J1 DATA, the other two to the head) | D7 | head D0 / D1 |
 
-D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 can't carry the stream. The plan is one firmware for both builds on the protocol 4 pins (D10, D7, D0 / D1); that firmware isn't written yet. This is recorded here, not fixed: no pins or firmware changed with the split into builds.
+D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 can't carry the stream. Both builds are now drawn on the protocol 4 pins (D10, D7, D0 / D1), the one firmware for both; it isn't in `scanner_fw/` yet (0.8.0 is still per-radio D8).
 
 ## Build order
 

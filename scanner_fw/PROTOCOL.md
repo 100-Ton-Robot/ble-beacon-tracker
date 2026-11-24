@@ -10,6 +10,8 @@ v2 gateway can't read it.
 
 ## Wiring and framing
 
+> **Wiring is changing.** D8 has no UART on the nRF54L15, so the per-radio D8 TX wiring on this page (scanner firmware 0.8.0) can't carry the stream. Both builds are now drawn for relay protocol 4 star wiring (D10 uplink TX, D7 command RX, head radio D0 / D1 branch RX): see [Firmware and pins](../builds/hand/README.md#firmware-and-pins-both-builds). That firmware isn't written yet; this page describes the code as it is today.
+
 - `uart21`: **D8 = TX** to the gateway, **D7 = RX** from it, 115200 8N1, 3.3 V. Each scanner's
   D8 has its own gateway RX pin. One gateway TX drives every scanner's D7.
 - Every message, in both directions: protobuf bytes, then a CRC-16/CCITT-FALSE of those bytes
