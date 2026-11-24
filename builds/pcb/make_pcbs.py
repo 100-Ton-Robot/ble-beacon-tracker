@@ -4,8 +4,9 @@
                                     # runs DRC, exports Gerber + drill zips, SVG previews, the 1:1 print PDF and
                                     # pcb_preview.png into out/ (preview one level up)
 
-Sizes and rules come from parameters.csv here and ../../common/parameters.csv (groups deck, pcb, face, endplate). Part placement and track routes are the
-tables below, in each core corner's local frame (u along the rim clockwise, v out from the centre; see kicad_lib.py).
+Sizes and rules come from parameters.csv here and ../../common/parameters.csv (groups deck, pcb, face, endplate).
+Part placement and track routes are the tables below, in each core corner's local frame (u along the rim clockwise,
+v out from the centre; see ../../boards/lib/kicad_lib.py).
 Needs KiCad 7 or later (pcbnew Python module, kicad-cli).
 
 Deck (revision 3, spec REV3_PLAN.md): top = electronics side (bare except the +5V tracks, the parts and the GND rim
@@ -22,6 +23,7 @@ import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))   # params.py, layout.py
+sys.path.insert(0, os.path.join(HERE, "..", "..", "boards", "lib"))   # kicad_lib.py
 import params  # noqa: E402
 import kicad_lib as K  # noqa: E402
 import layout  # noqa: E402

@@ -18,6 +18,9 @@ when the image was built, where known.
   Files moved with `git mv`; every generator gives the same output as before (only the templates' formulas page
   names the new paths). `shield_deck/README.md` points to the new folders. Pins are unchanged: the hand build's
   wiring, firmware 0.8.0 and the PCB deck still disagree (see either build's README, Firmware and pins).
+  New `boards/` for module boards either build can use: `carrier/` (one radio, Up + two branch ports),
+  `radio3/` (three radios, one Up cable) and `led/` (LED add-on), README stubs with empty `parameters.csv`
+  so far, loaded with `params.load(boards=[...])`; `kicad_lib.py` moved to `boards/lib/`.
 
 ### Simulation
 

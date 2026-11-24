@@ -4,13 +4,16 @@
                                  RF, the derived layout's inputs)
     builds/pcb/parameters.csv    the PCB build only (make_pcbs.py)
     builds/hand/parameters.csv   the hand build only (templates, plate SVGs, copper deck, LED ring add-on)
+    boards/<board>/parameters.csv  one module board (carrier, radio3, led), usable by either build
 
     import params
     P = params.load(build="pcb")                  # common + the PCB build's file
     P = params.load(["deck", "pipe"], build="hand")
+    P = params.load(boards=["carrier"])           # common + one board's file
     P = params.load()                             # common only
 
-A name may appear in one file only: a name in two files is an error, never an override.
+A name may appear in one file only, across common, every build and every board: a name in two files is an error,
+never an override.
 
 Columns: name, value, unit, source, group, note.
 - value: one number, or several separated by spaces (a tuple, e.g. "33.0 5.0 -13.0"). Whole numbers written without a
@@ -33,6 +36,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 BUILDS = ("pcb", "hand")
+BOARDS_DIR = os.path.join(ROOT, "boards")
 CSV_PATH = os.path.join(HERE, "parameters.csv")
 FIELDS = ["name", "value", "unit", "source", "group", "note"]
 
@@ -44,6 +48,21 @@ def csv_path(build=None):
     if build not in BUILDS:
         raise ValueError(f"build {build!r}: expected one of {BUILDS}")
     return os.path.join(ROOT, "builds", build, "parameters.csv")
+
+
+def boards():
+    """Module boards that have a parameter file: the folder names under boards/."""
+    if not os.path.isdir(BOARDS_DIR):
+        return ()
+    return tuple(sorted(d for d in os.listdir(BOARDS_DIR)
+                        if os.path.isfile(os.path.join(BOARDS_DIR, d, "parameters.csv"))))
+
+
+def board_csv_path(board):
+    """boards/<board>/parameters.csv."""
+    if board not in boards():
+        raise ValueError(f"board {board!r}: expected one of {boards()}")
+    return os.path.join(BOARDS_DIR, board, "parameters.csv")
 
 
 def _num(tok, unit):
@@ -70,10 +89,11 @@ def rows(path=CSV_PATH):
 
 
 def _check_unique():
-    """Every name in exactly one file, across common and every build (so a value can't hide behind another)."""
+    """Every name in exactly one file, across common, every build and every board (so a value can't hide behind
+    another)."""
     seen = {}
-    for b in (None,) + BUILDS:
-        p = csv_path(b)
+    paths = [csv_path(b) for b in (None,) + BUILDS] + [board_csv_path(b) for b in boards()]
+    for p in paths:
         if not os.path.exists(p):
             continue
         for r in rows(p):
@@ -83,20 +103,24 @@ def _check_unique():
             seen[r["name"]] = p
 
 
-def build_rows(build=None):
-    """Rows of common/parameters.csv, then the build's own file."""
+def build_rows(build=None, boards=()):
+    """Rows of common/parameters.csv, then the build's own file, then each board's."""
     _check_unique()
     out = rows(CSV_PATH)
     if build is not None:
         out += rows(csv_path(build))
+    for b in boards:
+        out += rows(board_csv_path(b))
     return out
 
 
-def load(groups=None, exclude=(), build=None, path=None):
+def load(groups=None, exclude=(), build=None, boards=(), path=None):
     """{name: value} for the rows in `groups` (all when None), minus the groups in `exclude`, from common plus
-    `build`'s file (common only when build is None), or from the one file `path`."""
+    `build`'s file (none when build is None) plus each of `boards`' files, or from the one file `path`."""
+    if isinstance(boards, str):
+        boards = (boards,)
     out = {}
-    src = rows(path) if path else build_rows(build)
+    src = rows(path) if path else build_rows(build, boards)
     for r in src:
         if (groups is None or r["group"] in groups) and r["group"] not in exclude:
             try:

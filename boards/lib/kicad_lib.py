@@ -1,4 +1,5 @@
-"""Small helpers over KiCad 7's pcbnew API for the generated boards (deck and face).
+"""Small helpers over KiCad 7's pcbnew API for every generated board: the mast boards (builds/pcb/make_pcbs.py: deck,
+face, end plate) and the module boards under boards/.
 
 Coordinates are mm. Board centre is (100, 100) in KiCad's frame (y down).
 Angles are degrees clockwise from 12 o'clock (as in make_shield_deck.py): the deck's top view, Sector 0 up.

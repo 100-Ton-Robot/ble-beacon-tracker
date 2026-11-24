@@ -11,6 +11,7 @@ body:
         - Gateway (ESPHome)
         - Mast build: PCB (builds/pcb)
         - Mast build: hand / templates (builds/hand)
+        - Module boards (boards)
         - Docs
         - Not sure
     validations:
