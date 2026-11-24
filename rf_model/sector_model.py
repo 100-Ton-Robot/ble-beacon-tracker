@@ -1,7 +1,7 @@
 """openEMS (FDTD) model of one mast sector: the copper deck, the triangular core and the D-hole antennas.
 
-Geometry comes from shield_deck/parameters.csv (DISC_DIAMETER, FACE_WIDTH, FACE_H, DUCK_SPACING, RF_FREQ), so the
-model follows the deck. Sector 0's antenna is fed; the other two sectors' antennas are there too, ended in 50 ohm
+Geometry comes from the parameter files (common/parameters.csv plus the build's own, see --build: DISC_DIAMETER,
+FACE_WIDTH, FACE_H, DUCK_SPACING, RF_FREQ), so the model follows the deck. Sector 0's antenna is fed; the other two sectors' antennas are there too, ended in 50 ohm
 like their radios, so the pattern includes their coupling and the run also gives the isolation between sectors.
 
     python3 sector_model.py --antenna monopole            # quarter-wave whip straight down from the D jack
@@ -10,7 +10,8 @@ like their radios, so the pattern includes their coupling and the run also gives
     python3 sector_model.py --coarse                      # quick check: coarser mesh, about 5x faster
     python3 sector_model.py --sectors 4                   # square core, 4 sectors (any N >= 3)
     python3 sector_model.py --set FACE_WIDTH=80 --set DISC_DIAMETER=98   # any parameters.csv value, this run only
-    python3 sector_model.py --deck d15 --end-plate        # rev 3 PCBs as outlines: deck disc + pipe hole, end plate
+    python3 sector_model.py --build pcb --deck d15 --end-plate   # rev 3 PCBs as outlines: deck disc + pipe hole,
+                                                                 # end plate (--deck alone implies --build pcb)
     python3 sector_model.py --deck d15 --end-plate --copper   # rev 3 PCBs' real copper, hollow core of face boards
 
 Writes to out/<antenna>/ (or --out):
@@ -21,7 +22,7 @@ Writes to out/<antenna>/ (or --out):
   meta.json     sectors, face size, deck and end plate diameters, spacing, feed, overrides: bearing_sim.py reads
                 the sector count from it
 
-Every dimension comes from shield_deck/parameters.csv (FACE_WIDTH, FACE_H, DISC_DIAMETER, DUCK_SPACING,
+Every dimension comes from the parameter files (FACE_WIDTH, FACE_H, DISC_DIAMETER, DUCK_SPACING,
 ENDPLATE_DIAMETER, RF_SECTORS, RF_FEED_DEPTH, RF_FREQ, ...). --set NAME=VALUE overrides one for this run only
 (repeatable; the command, overrides included, is logged in out/runs.csv and summary.txt). size_sweep.py drives
 its sweeps this way.
@@ -35,13 +36,17 @@ h5py: on Windows, run it in the Docker image from this folder's Dockerfile (READ
 Not modelled: the enclosure, the electronics plate and its parts, the coax runs, the M4 bolts and spacers.
 The core is a solid copper prism (only its outside matters to the pattern), the whips are thin wires.
 
-PCB build (shield_deck/pcb, rev 3), two levels of detail to compare:
+Two builds (--build), the same core and antennas:
+  --build hand       the hand-built deck: a plain copper disc of DISC_DIAMETER (builds/hand/parameters.csv), the
+                     antennas DUCK_SPACING out. The default without --deck.
+  --build pcb        the rev 3 PCBs (builds/pcb), --deck d15 unless another is given. The default with --deck.
+PCB build (builds/pcb, rev 3), two levels of detail to compare:
   --deck d15|d31     the deck PCB for that duck spacing as an outline: a copper disc of its diameter
-                     (shield_deck/layout.py) with the 22.2 mm pipe hole, on the solid core; the antennas
+                     (common/layout.py) with the 22.2 mm pipe hole, on the solid core; the antennas
                      go to its D holes (--spacing defaults to 15 / 31)
   --end-plate        add the 144 mm end plate across the far end of the core (outline: a solid disc)
   --end-plate deck   with --copper: a second deck board turned over as the end plate, knockout left in
-  --copper           with --deck: the boards' real copper from shield_deck/pcb/out/*_copper.json (written by
+  --copper           with --deck: the boards' real copper from builds/pcb/out/*_copper.json (written by
                      make_pcbs.py): both deck layers 1.6 mm apart joined by the plated holes and vias, every hole,
                      slot and track gap, the end plate's copper, and a hollow core built from the three face
                      boards (1.6 mm slabs, tabs through the slots). The fed antennas' RP-SMA bodies fill their holes.
@@ -59,12 +64,12 @@ import json
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "shield_deck"))
+sys.path.insert(0, os.path.join(HERE, "..", "common"))
 import params  # noqa: E402
 import runlog  # noqa: E402
 import layout  # noqa: E402
 
-P = params.load()
+P = params.load()          # common only here; args_() adds the build's own file (--build)
 C0 = 299_792_458.0
 
 
@@ -94,7 +99,7 @@ def apply_overrides(pairs):
         done[name] = P[name]
     return done
 BAND = (2402e6, 2480e6)
-PCB_OUT = os.path.join(HERE, "..", "shield_deck", "pcb", "out")
+PCB_OUT = os.path.join(HERE, "..", "builds", "pcb", "out")
 DECKS = {f"d{s:g}": s for s in (P["DECK_VARIANTS"] if isinstance(P["DECK_VARIANTS"], tuple) else (P["DECK_VARIANTS"],))}
 
 
@@ -115,6 +120,9 @@ def args_():
                          "on the jack, its feed about a quarter wave down)")
     ap.add_argument("--spacing", type=float,
                     help="antenna axis -> copper face, mm (default DUCK_SPACING, the D hole; with --deck, its spacing)")
+    ap.add_argument("--build", choices=params.BUILDS,
+                    help="which mast: hand (plain DISC_DIAMETER disc; the default) or pcb (the rev 3 PCBs, --deck d15 "
+                         "unless given; the default with --deck)")
     ap.add_argument("--deck", choices=sorted(DECKS), help="rev 3 deck PCB for this duck spacing (outline, or "
                                                           "its real copper with --copper)")
     ap.add_argument("--end-plate", nargs="?", const="plate", choices=["plate", "deck"],
@@ -133,6 +141,13 @@ def args_():
     ap.add_argument("--out", help="output folder (default out/<antenna>)")
     ap.add_argument("--keep", action="store_true", help="keep the raw FDTD data (prints where)")
     a = ap.parse_args()
+    if a.build is None:
+        a.build = "pcb" if a.deck else "hand"
+    if a.build == "hand" and a.deck:
+        ap.error("--deck is a PCB build option: use --build pcb (or leave --build out)")
+    if a.build == "pcb" and not a.deck:
+        a.deck = min(DECKS, key=DECKS.get)
+    P.update(params.load(build=a.build))       # the build's own rows (names never repeat across files)
     a.overrides = apply_overrides(a.set)
     if a.sectors is None:
         a.sectors = int(P["RF_SECTORS"])

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Every simulation behind rf_model/README.md, in order. Re-run them all (about 4 min) after changing the model or
-# parameters.csv, from the project folder:
+# the parameter files (common/, builds/*/parameters.csv), from the project folder:
 #   docker run --rm -v "$(pwd):/work" -w /work/rf_model bletracker-openems sh run_all.sh
 # Each run writes its folder under out/ (summary.txt starts with the command and date) and adds a row to
 # out/runs.csv. Add new runs here, not only on the command line, so the set stays complete.
@@ -23,14 +23,15 @@ python3 sector_model.py --antenna dipole --centre 65 --spacing 15 --out out/h503
 python3 sector_model.py --antenna dipole --centre 65 --spacing 20 --out out/h50327_c65_s20
 python3 sector_model.py --antenna dipole --centre 65 --spacing 25 --out out/h50327_c65_s25
 python3 sector_model.py --antenna dipole --centre 65 --spacing 34 --out out/h50327_c65_s34
-# Rev 3 PCBs (shield_deck/pcb), H50327 at the middle depth, end plate fitted: each deck as an outline (disc + pipe
+# Runs without --deck model the hand build (--build hand, a plain DISC_DIAMETER disc).
+# Rev 3 PCBs (builds/pcb, --build pcb), H50327 at the middle depth, end plate fitted: each deck as an outline (disc + pipe
 # hole on the solid core) and as its real copper (both layers, holes, slots, hollow face-board core). Needs
-# shield_deck/pcb/out/*_copper.json from make_pcbs.py.
-python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate --out out/rev3_d15_outline
-python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate --copper --out out/rev3_d15_copper
-python3 sector_model.py --antenna dipole --centre 65 --deck d15 --end-plate deck --copper --out out/rev3_d15_copper_deckplate
-python3 sector_model.py --antenna dipole --centre 65 --deck d31 --end-plate --out out/rev3_d31_outline
-python3 sector_model.py --antenna dipole --centre 65 --deck d31 --end-plate --copper --out out/rev3_d31_copper
+# builds/pcb/out/*_copper.json from make_pcbs.py.
+python3 sector_model.py --build pcb --antenna dipole --centre 65 --deck d15 --end-plate --out out/rev3_d15_outline
+python3 sector_model.py --build pcb --antenna dipole --centre 65 --deck d15 --end-plate --copper --out out/rev3_d15_copper
+python3 sector_model.py --build pcb --antenna dipole --centre 65 --deck d15 --end-plate deck --copper --out out/rev3_d15_copper_deckplate
+python3 sector_model.py --build pcb --antenna dipole --centre 65 --deck d31 --end-plate --out out/rev3_d31_outline
+python3 sector_model.py --build pcb --antenna dipole --centre 65 --deck d31 --end-plate --copper --out out/rev3_d31_copper
 
 # bearing and range accuracy (bearing_sim.py)
 python3 bearing_sim.py out/monopole out/dipole --out out/bearing

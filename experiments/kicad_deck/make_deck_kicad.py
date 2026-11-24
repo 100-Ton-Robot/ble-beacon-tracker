@@ -2,9 +2,9 @@
 
 Writes shield_deck.kicad_pcb (plain s-expression text, no KiCad needed for this step). Then
 build.py runs kicad-cli to fill the copper zone, check DRC and export Gerbers + drill, and
-compare.py checks them against ../../shield_deck/shield_deck_gerbers.zip.
+compare.py checks them against ../../builds/hand/shield_deck_gerbers.zip.
 
-Nothing in shield_deck/ is changed; the geometry is imported from it.
+Nothing in builds/hand/ is changed; the geometry is imported from it.
 """
 import math
 import os
@@ -12,7 +12,7 @@ import sys
 import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "..", "..", "shield_deck"))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "builds", "hand"))
 import make_shield_deck as deck  # noqa: E402
 
 # KiCad's y axis points down. Put the deck's lower-left corner at (OX, OY) on the sheet and make

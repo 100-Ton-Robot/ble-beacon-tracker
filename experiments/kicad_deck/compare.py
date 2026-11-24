@@ -15,7 +15,7 @@ from gerbonara.graphic_primitives import Circle, Line, Arc, ArcPoly, Rectangle
 from gerbonara.utils import MM
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SCRIPT_ZIP = os.path.join(HERE, "..", "..", "shield_deck", "shield_deck_gerbers.zip")
+SCRIPT_ZIP = os.path.join(HERE, "..", "..", "builds", "hand", "shield_deck_gerbers.zip")
 KICAD_DIR = os.path.join(HERE, "out", "gerbers")
 OUT = os.path.join(HERE, "out")
 

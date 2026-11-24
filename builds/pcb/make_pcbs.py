@@ -4,7 +4,7 @@
                                     # runs DRC, exports Gerber + drill zips, SVG previews, the 1:1 print PDF and
                                     # pcb_preview.png into out/ (preview one level up)
 
-Sizes and rules come from ../parameters.csv (groups deck, pcb, face, endplate). Part placement and track routes are the
+Sizes and rules come from parameters.csv here and ../../common/parameters.csv (groups deck, pcb, face, endplate). Part placement and track routes are the
 tables below, in each core corner's local frame (u along the rim clockwise, v out from the centre; see kicad_lib.py).
 Needs KiCad 7 or later (pcbnew Python module, kicad-cli).
 
@@ -21,18 +21,18 @@ import zipfile
 import pcbnew
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))   # params.py, layout.py
 import params  # noqa: E402
 import kicad_lib as K  # noqa: E402
 import layout  # noqa: E402
 from kicad_lib import loc, pol  # noqa: E402
 
-P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate"])
+P = params.load(["deck", "pcb", "face", "panel", "plate", "endplate"], build="pcb")
 globals().update(P)
-ADAPTER_HOLE = params.load(["pipe"])["ADAPTER_HOLE"]
+ADAPTER_HOLE = params.load(["pipe"], build="pcb")["ADAPTER_HOLE"]
 OUT = os.path.join(HERE, "out")
 
-LAYOUT0 = layout.Layout(DECK_VARIANTS[0])     # spacing-independent values (shield_deck/layout.py)
+LAYOUT0 = layout.Layout(DECK_VARIANTS[0])     # spacing-independent values (common/layout.py)
 INRADIUS = LAYOUT0.r_in
 SECTORS = [0.0, 120.0, 240.0]
 VERTICES = [60.0, 180.0, 300.0]       # core corners; XIAO U2 (head) / U3 / U4 sit on these
@@ -43,7 +43,7 @@ CORE_LIM = LAYOUT0.core_lim
 
 
 def deck_diameter(spacing):
-    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN (shield_deck/layout.py)."""
+    """Larger of DECK_MIN_DIAMETER and the D hole's exposed pad + DECK_EDGE_MARGIN (common/layout.py)."""
     return layout.Layout(spacing).deck_d
 
 
@@ -175,7 +175,7 @@ def m3_fp(bd, ref, pos):
 
 def tie_geom(theta):
     """Tie square for the XIAO on corner theta: (IPEX4, centre, cable direction, corners) in the corner frame
-    (shield_deck/layout.py)."""
+    (common/layout.py)."""
     return LAYOUT0.tie(theta)
 
 

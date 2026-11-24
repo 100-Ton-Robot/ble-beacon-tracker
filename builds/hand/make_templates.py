@@ -3,23 +3,26 @@ round, plate 12 o'clock up), the plate wiring diagram, the pipe plate and its st
 (reflector face). After the wiring diagram: the LED direction ring option (its power board and strip wiring), then
 the unified power + LED stripboard option (pipe build).
 
-Uses the same geometry as make_shield_deck.py. Run:  python make_templates.py
+Uses the same geometry as make_shield_deck.py and ../../common/layout.py. Run:  python make_templates.py
 Print at 100% / "Actual size" and check the 100 mm scale bar with a ruler.
 """
 import math
 import os
+import sys
 
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
-import layout
-import make_shield_deck as g
-import params
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"))
+import layout  # noqa: E402
+import make_shield_deck as g  # noqa: E402
+import params  # noqa: E402
 
-# Every number lives in parameters.csv (all groups but "deck", which make_shield_deck.py reads). Only values derived
+# Every number lives in ../../common/parameters.csv or this build's parameters.csv (all groups but "deck", which
+# make_shield_deck.py reads). Only values derived
 # from others are computed here.
-globals().update(params.load(exclude=["deck"]))
+globals().update(params.load(exclude=["deck"], build="hand"))
 
 PAGE_W, PAGE_H = letter
 FACE_WIDTH, HOLE_RPSMA, PATCH_OFFSET = (layout.P[k] for k in ("FACE_WIDTH", "HOLE_RPSMA", "PATCH_OFFSET"))
@@ -2069,10 +2072,10 @@ def formulas_page(c):
     c.drawString(15 * mm, (PAGE_H / mm - 15) * mm, "Design formulas (NOT a template, not to size)")
     c.setFont("Helvetica", 8.5)
     c.drawString(15 * mm, (PAGE_H / mm - 21) * mm,
-                 "Printed from shield_deck/layout.py, the same code that places the PCB deck and these templates: each "
+                 "Printed from common/layout.py, the same code that places the PCB deck and these templates: each "
                  "value is computed once, next to its formula.")
     c.drawString(15 * mm, (PAGE_H / mm - 25.5) * mm,
-                 "Change parameters.csv, re-run make_templates.py and pcb/make_pcbs.py, and both builds follow. "
+                 "Change common/parameters.csv, re-run make_templates.py and builds/pcb/make_pcbs.py, and both builds follow. "
                  "Names in capitals are parameters.csv rows.")
 
     # ---- top view, first variant, S0 up

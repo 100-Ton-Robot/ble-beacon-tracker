@@ -1,11 +1,12 @@
 """How small can the mast get? Sweep the core's sector count, face size and antenna spacing, then score each pattern.
 
-Every dimension comes from ../shield_deck/parameters.csv. Each geometry is one sector_model.py run whose overrides
-are passed as --set NAME=VALUE, so the command logged in out/runs.csv and each summary.txt reproduces that run alone.
+Every dimension comes from the parameter files (../common and ../builds/hand: each run is a plain disc, --build hand).
+Each geometry is one sector_model.py run whose overrides are passed as --set NAME=VALUE, so the command logged in
+out/runs.csv and each summary.txt reproduces that run alone.
 
 For each sector count N (core = regular N-gon), face width W, face height (--heights; 0 = square faces), antenna
 spacing S off the face and element:
-  deck       the rev 3 rule (shield_deck/pcb/deck_size.py) scaled to the core: the larger of
+  deck       the rev 3 rule (../common/layout.py) scaled to the core: the larger of
              2 x (corners + DECK_MIN_DIAMETER's margin past today's corners) and
              2 x (inradius + S + PAD_EXPOSE / 2 + DECK_EDGE_MARGIN)
   end plate  with --end-plate: 2 x (corners + ENDPLATE_DIAMETER's margin past today's corners)
@@ -31,13 +32,13 @@ import os
 import sys
 
 import runlog
-import sector_model as sm                         # puts ../shield_deck on the path
+import sector_model as sm                         # puts ../common on the path
 import params  # noqa: E402
 import spec_sweep as ss
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "out", "size")
-BASE = params.load()                              # parameters.csv as it is: the margins come from today's boards
+BASE = params.load(build="hand")                  # the parameter files as they are: the margins come from today's boards
 C0 = 299_792_458.0
 
 
@@ -86,7 +87,7 @@ def configs(sectors, widths, spacings, elements, heights=(0,), ep=False):
 def run_one(c, coarse, fine=False):
     w, s, n, H = c["width"], c["spacing"], c["sectors"], c["height"]
     centre = BASE["DUCK_FEED_DEPTH"] if c["element"] == "h50327" else H / 2
-    argv = ["sector_model.py", "--antenna", "dipole", "--sectors", str(n), "--spacing", f"{s:g}",
+    argv = ["sector_model.py", "--build", "hand", "--antenna", "dipole", "--sectors", str(n), "--spacing", f"{s:g}",
             "--centre", f"{centre:g}"]
     if c["element"] == "short":
         argv += ["--length", f"{BASE['CHIP_STANDIN_LENGTH']:g}"]
@@ -100,7 +101,7 @@ def run_one(c, coarse, fine=False):
         argv.append("--fine")
     argv += ["--out", os.path.relpath(os.path.join(OUT, c["name"]), HERE)]
     sm.P.clear()
-    sm.P.update(params.load())                     # each run starts from parameters.csv
+    sm.P.update(params.load())                     # each run starts from the files (common; main() adds hand)
     sys.argv = argv
     os.chdir(HERE)                                 # openEMS leaves the working directory in its (deleted) temp folder
     sm.main()

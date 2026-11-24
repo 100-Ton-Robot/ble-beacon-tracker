@@ -1,5 +1,5 @@
 * Unified board power path (templates page 8). Values come from sim/parameters.csv and
-* shield_deck/parameters.csv through params.inc; run_sim.py sets the case parameters
+* the hand build's parameter files (common/, builds/hand/) through params.inc; run_sim.py sets the case parameters
 * (TRAMP, TPLUG, TLED, DUTY, TSHORT, RSHORT) and the outputs.
 .include params.inc
 * splitter: ramped source, current limit (ILIM pushed into the output, the excess returned through a

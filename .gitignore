@@ -22,7 +22,7 @@ experiments/*/out/
 sim/out/
 
 # Generated PCB intermediates (zips, boards, DRC reports and previews are kept)
-shield_deck/pcb/out/*_gerbers/
-shield_deck/pcb/out/*.svg
-shield_deck/pcb/out/*.png
-shield_deck/pcb/out/*-backups/
+builds/pcb/out/*_gerbers/
+builds/pcb/out/*.svg
+builds/pcb/out/*.png
+builds/pcb/out/*-backups/

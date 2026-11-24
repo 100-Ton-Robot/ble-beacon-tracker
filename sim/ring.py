@@ -13,10 +13,10 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shield_deck"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"))
 import params  # noqa: E402
 
-P = params.load(groups=("led",))
+P = params.load(groups=("led",), build="hand")
 NPIX = P["LED_PIXELS"]
 MA_WHITE, MA_DARK = P["LED_PIXEL_MA"]
 MA_CH = MA_WHITE / 3

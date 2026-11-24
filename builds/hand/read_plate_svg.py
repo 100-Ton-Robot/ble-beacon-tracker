@@ -1,4 +1,4 @@
-"""Read part placements back from the Inkscape plate layouts into parameters.csv, then check the clearance rules.
+"""Read part placements back from the Inkscape plate layouts into this build's parameters.csv, then check the clearance rules.
 
   python read_plate_svg.py            read plate_layout.svg + pipe_plate_layout.svg, update the CSV, check both
   python read_plate_svg.py alt        just the alt split plate (or: pipe)
@@ -7,7 +7,8 @@
 
 Positions come from each part group's transform (whatever Inkscape wrote: translate, rotate, matrix), so a part may
 be moved and rotated freely; scaling or flipping it is refused. Tie and M3 hole offsets come from their sub-groups.
-Exit status 1 when a rule fails. Rules are the "rules" rows of parameters.csv.
+Exit status 1 when a rule fails. Rules are the "rules" rows. Every position it writes is a hand-build row
+(builds/hand/parameters.csv); shared values in ../../common/parameters.csv are read, never written.
 """
 import argparse
 import math
@@ -16,7 +17,8 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-import params
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"))
+import params  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILES = {"alt": "plate_layout.svg", "pipe": "pipe_plate_layout.svg"}
@@ -279,7 +281,8 @@ def main():
     if set(which) - set(FILES):
         ap.error(f"unknown layout {sorted(set(which) - set(FILES))}: use alt and / or pipe")
 
-    p = params.load()
+    p = params.load(build="hand")
+    csv_path = params.csv_path("hand")   # every position this tool writes is a hand-build row
     if not args.check:
         changes = {}
         for w in which:
@@ -288,16 +291,16 @@ def main():
             for note in L.notes:
                 print(f"{FILES[w]}: note: {note}")
         if args.dry_run:
-            cur = {r["name"]: r["value"] for r in params.rows()}
+            cur = {r["name"]: r["value"] for r in params.rows(csv_path)}
             diff = {k: (cur[k], params.fmt(v)) for k, v in changes.items() if cur[k] != params.fmt(v)}
         else:
-            diff = params.update(changes)
+            diff = params.update(changes, csv_path)
         print("parameters.csv:", "no changes" if not diff else ("would change" if args.dry_run else "changed"))
         for k, (old, new) in diff.items():
             print(f"  {k:16s} {old:>22s} -> {new}")
         if args.dry_run:
             return
-    ok = all([check(w, params.load()) for w in which])
+    ok = all([check(w, params.load(build="hand")) for w in which])
     print("\nall rules pass" if ok else "\nsome rules FAIL: move the parts and run this again before printing")
     if not args.check:
         print("next: python make_templates.py  (PDF)   python make_plate_svg.py  (redraw the SVGs from the CSV)")

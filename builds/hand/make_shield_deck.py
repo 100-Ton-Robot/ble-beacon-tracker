@@ -1,17 +1,19 @@
 """Generate PCBWay-ready Gerber + Excellon files for the round copper shield deck.
 
-Edit the "deck" rows of parameters.csv and re-run:  python make_shield_deck.py
+Edit the "deck" rows (this build's parameters.csv, the shared ones in ../../common/parameters.csv) and re-run:  python make_shield_deck.py
 Output: shield_deck_gerbers.zip (upload to PCBWay) and shield_deck_preview.svg.
 """
 import math
 import os
+import sys
 import zipfile
 
-import params
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "common"))
+import params  # noqa: E402
 
-# Every number lives in parameters.csv (group "deck"): DISC_DIAMETER, FACE_WIDTH, DUCK_SPACING, PATCH_OFFSET,
+# Every number lives in the parameter files (group "deck"): DISC_DIAMETER, FACE_WIDTH, DUCK_SPACING, PATCH_OFFSET,
 # PATCH_END_INSET, COAX_PASS_RADIUS, HOLE_*, FACE_THICK, NUT_AF, NUT_GAP, NUT_PAD, mask / stitch sizes.
-globals().update(params.load(["deck"]))
+globals().update(params.load(["deck"], build="hand"))
 
 R = DISC_DIAMETER / 2
 CX = CY = R                     # board origin at lower-left of the bounding square

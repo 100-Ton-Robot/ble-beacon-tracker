@@ -1,7 +1,7 @@
-"""The mast's physical layout, shared by every build: the PCB generator (pcb/make_pcbs.py), the scratch-build
-templates (make_templates.py) and the RF model (../rf_model/sector_model.py). One number, one place: each derived
-value is computed here once, next to the formula that the templates' formulas page prints for it, so the page
-can't drift from what the boards and templates actually use.
+"""The mast's physical layout, shared by every build: the PCB generator (builds/pcb/make_pcbs.py), the
+scratch-build templates (builds/hand/make_templates.py) and the RF model (rf_model/sector_model.py). One number, one
+place: each derived value is computed here once, next to the formula that the templates' formulas page prints for it,
+so the page can't drift from what the boards and templates actually use.
 
     import layout
     L = layout.Layout(15)            # one duck spacing (a DECK_VARIANTS value)
@@ -9,7 +9,8 @@ can't drift from what the boards and templates actually use.
 
 Frames: top view, mm, centre at the origin, x right, y up (S0's face normal). Angles clockwise from +y. A corner
 or sector frame at angle t has v along t (out from the centre) and u at t + 90 (clockwise); xy(t, u, v) turns it
-into x, y. Every value comes from parameters.csv.
+into x, y. Every value comes from common/parameters.csv: layout.py reads no build's own file, so both builds get the
+same numbers.
 """
 import math
 
