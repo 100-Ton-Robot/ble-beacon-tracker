@@ -25,7 +25,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 
 ## Quick start (files in the repo, no software)
 
-**Pick your duck spacing and one plate (pipe or no pipe).** Print and use only the pages you need. (The electronics on the deck, inside the core, is the PCB build: [`../pcb/README.md`](../pcb/README.md).)
+**Use the 15 mm duck spacing (D15) and pick one plate (pipe or no pipe).** Print and use only the pages you need. 15 mm is the recommended spacing (2026-11-24): in the RF model it is as good or better than 31 mm for every antenna tried, about the same for the H50327 ducks (15 / 38 deg median / 90% bearing error against 15 / 40) and much better for a stubby monopole (29 / 89 against 36 / 105), and it lets the deck be 144 mm. D31 stays on the template for 31 mm builds; its one advantage is a better duck match (S11 about -5 dB against -3 dB in the model). See [`../../rf_model/README.md`](../../rf_model/README.md). (The electronics on the deck, inside the core, is the PCB build: [`../pcb/README.md`](../pcb/README.md).)
 
 | Page | What | Status |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 - **ESP32 antenna:** mount it in a plastic cap or insulating bushing, not on the bare steel end.
 
 1. Print your pages of `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
-2. Make the deck: drill copper-clad board from the deck template (page 1): only the antenna jack you use in each sector (D15 or D31 for ducks, P or P2 for a patch), or order a PCB deck ([../pcb/README.md](../pcb/README.md)). The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
+2. Make the deck: drill copper-clad board from the deck template (page 1): only the antenna jack you use in each sector (D15 for ducks, the recommended spacing; D31 for a 31 mm build; P or P2 for a patch), or order a PCB deck ([../pcb/README.md](../pcb/README.md)). The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
 3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
 4. Drill the plate and the faces (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). The plates' dotted antenna holes sit over the deck's (page 1) when the M4 holes line up.
 5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
@@ -118,7 +118,7 @@ Plate build, star wiring. Drill sizes and zip ties are in the tables above.
 | Seeed XIAO nRF54L15 | Radios S0 (head), S1, S2 | 3 | 3 |
 | Waveshare ESP32-S3-ETH | Gateway | 1 | 1 |
 | PoE splitter, 5 V USB-C out | Power | 1 | 1 |
-| Copper-clad FR-4, 1.6 mm, single or double sided | Deck (146.3 mm disc, or 144 mm for 15 mm ducks only) and 3 faces (120 x 120 mm) | 1 deck + 3 faces | 1 deck + 3 faces |
+| Copper-clad FR-4, 1.6 mm, single or double sided | Deck (144 mm disc for 15 mm ducks, recommended; 146.3 mm for 31 mm) and 3 faces (120 x 120 mm) | 1 deck + 3 faces | 1 deck + 3 faces |
 | Acrylic disc, 152 mm | Electronics plate (page 2 or 3) | 1 | 1 |
 | RP-SMA female bulkhead | Deck jacks, one per sector | 3 | 3 |
 | IPEX4 (MHF4) to RP-SMA bulkhead pigtail | Radio to its deck jack | 3 | 3 |
