@@ -1,0 +1,19 @@
+command: python3 bearing_sim.py out/rev3_d31_copper_gusset out/rev3_d31_copper_stubby out/monopole --out out/bearing_rev3_d31_stubby
+date: 2026-11-24 11:52 UTC
+fading 5.0 dB/advert, 3 adverts/s, room 3.0 dB, shadow 4.0 dB, window 1 s, mast 1.4 m above the beacon, beacons 1-15 m out, n 2.2
+
+pattern      |bearing error| deg: median  90%   rms   (<=5 m / >5 m median)   right sector   range error: median  90%
+rev3_d31_copper_gusset                        15    40    26      ( 17 /  13)              80.8%               57%  100%
+rev3_d31_copper_stubby                        36   105    61      ( 38 /  34)              66.3%               44%  100%
+monopole                            34   101    59      ( 35 /  34)              66.7%               45%  100%
+
+median |bearing error| deg, room reflections x tracker window (fading, adverts, shadow as above):
+  room dB  window s  rev3_d31_copper_gusset  rev3_d31_copper_stubby    monopole
+        0         1          12          29          27
+        0         5           6          13          13
+        2         1          13          32          31
+        2         5           9          21          21
+        3         1          15          37          34
+        3         5          12          30          29
+        5         1          20          45          43
+        5         5          18          42          40

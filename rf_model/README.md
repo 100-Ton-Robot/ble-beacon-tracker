@@ -343,6 +343,15 @@ and peak gain within 0.1 dBi of the earlier runs). Bearing: 15 mm deck 15 / 38 d
 31 mm deck 15 / 40 (14 / 39), right sector within 0.2 points: the layout changes and slots cost nothing measurable.
 Isolation below about -48 dB moves by several dB between runs and isn't a layout signal.
 
+Stubby monopole on the 31 mm deck (2026-11-24, owner's candidate: a 28.4 mm end-to-end, 2 dBi, RP-SMA 2.4 GHz
+stubby, sold as OL-3464-2X): modelled as a straight quarter-wave monopole of the stubby's full length
+(`--antenna monopole --length 28.4 --deck d31 --end-plate --copper`, `out/rev3_d31_copper_stubby`; the real part is a
+shortened, probably helical element inside a 20.3 mm radome, so the match below is the wire's, not the part's, but
+the pattern is a monopole's either way). Peak 3.9 dBi at el -25 deg, isolation -29 dB (ducks -49 to -57). Bearing
+(`out/bearing_rev3_d31_stubby`): 36 / 105 deg median / 90%, right sector 66%, against 15 / 40 deg and 81% for the
+ducks on the same deck, and about the same as the 2026-11-12 monopole on the old mast (34 / 101). With the deck as
+its ground plane a short monopole's beam stays broad; the face behind it does little.
+
 - **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
   median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,
   the hollow core, the layer-to-layer vias) doesn't change the result: the outline model is enough for size and
