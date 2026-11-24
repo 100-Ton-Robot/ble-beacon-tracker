@@ -36,3 +36,4 @@ KO_BRIDGE,2.5 4,mm count,design,endplate,"knockout bridges: width, count"
 MOUSE_BITE,0.5 0.75,mm,design,endplate,"mouse-bite holes across each knockout bridge, on the plate side of it: drill, pitch"
 SWITCH_HOLE,6.5,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped (end plate hole removed). Rev 2: 6.5 mm toggle hole
 SWITCH_R,45.0,mm,design,retired,Retired in rev 3 (2026-11-23): service switch dropped. Rev 2: toggle hole radius on the end plate
+DECK_CENTRE_CLEAR,39.0,mm,design,pcb,"deck top: no part, pad or tie square inside this diameter round the centre (the knockout aside), for a 1/2 in PVC pipe or threaded fitting / nut (~34 mm across corners, estimate; measure). Flat tracks may pass. Checked by centre_check in make_pcbs.py (2026-11-23)"

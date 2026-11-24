@@ -2,5 +2,5 @@ ref,value,pad_edge_to_seam_strip_mm,pad_edge_to_slot_mm
 U4,XIAO,1.0,7.0
 U3,XIAO,1.0,7.0
 U2,XIAO,1.0,7.0
-J2,B2B-PH-K-S,16.3,17.6
-J1,B4B-PH-K-S,16.4,17.8
+J1,B4B-PH-K-S,17.1,18.3
+J2,B2B-PH-K-S,18.8,20.0

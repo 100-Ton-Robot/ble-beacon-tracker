@@ -3,6 +3,10 @@ FACE_WIDTH,120.0,mm,design,deck,triangular reflector core face width
 PATCH_OFFSET,7.0,mm,measured,deck,"P / P2 holes: patch connector axis -> copper face. Measured panel: axis in line with the housing back, so the panel stands this far off the face (plug nut clearance)"
 PATCH_END_INSET,35.0,mm,design,deck,"P2 hole: same offset, this far in from the face's counter-clockwise end (top view), i.e. 25 mm off the face centre. Moved in from 14 on 2026-11-10 (user) so one coax length reaches from back-panel positions A and C (notch assumed centred on the board's long edge)"
 FACE_THICK,1.6,mm,spec,deck,core face board (copper clad) thickness: the M4 nuts sit against its inner side
+NUT_AF,7.0,mm,spec,deck,"M4 nut (or M4 hex standoff) across flats (3.2 mm thick). One per core corner, two flats flush against the faces: soldered to the faces, or trapped in a glued 3D-printed holder (2026-11-01; PCB service bolts 2026-11-23)"
+NUT_GAP,0.0,mm,design,deck,extra room per face (e.g. for a seam fillet in the corner)
+NUT_PAD,9.0,mm,design,deck,bottom mask opening round each M4 hole for the nut solder (nut across corners ~8.1 mm)
+HOLE_M4,4.8,mm,design,deck,"M4 bolt, slightly loose so it finds the nut. Core-corner bolts: acrylic plate option (hand build); deck and end plate service bolts (PCB, 2026-11-23)"
 EDGE_CLEAR,0.5,mm,design,deck,copper pull-back from the board edge
 RIM_MASK_WIDTH,4.0,mm,design,deck,exposed copper ring at the rim (copper-tape edge seal)
 SEAM_STRIP,6.0,mm,design,deck,exposed strip on the bottom for soldering the core seams
@@ -34,9 +38,9 @@ DECK_MIN_DIAMETER,144.0,mm,design,pcb,"smallest deck: face corners (r 69.3) + 2.
 DECK_EDGE_MARGIN,1.5,mm,design,pcb,board edge past the D hole's exposed pad
 XIAO_CENTRE_V,34.5,mm,design,pcb,"rev 3: XIAO centre this far out along its core corner axis, USB-C end out (v 45), antenna end in (v 24); outer pad corners ~0 mm inside CORE_MARGIN"
 TIE_FROM_IPEX,15.0,mm,design,pcb,"tie square centre this far from the IPEX4 along the pigtail (corner frame u -16.34 v 17.86). 15 (owner 2026-11-23, was 13 in the rev 3 spec): the square sits 3.3 mm clear of the XIAO so it stays visible and reachable once the XIAO is on; 3.1 mm from the M3 washer keep-out, 1.4 mm from the nearest slot"
-PIGTAIL_ANGLE,236.0,deg,design,pcb,"pigtail direction leaving the IPEX4, in the corner frame (clockwise from straight out): 56 deg off straight in, toward the radio's own sector. The tie square is turned square to it"
+PIGTAIL_ANGLE,248.0,deg,design,pcb,"pigtail direction leaving the IPEX4, in the corner frame (clockwise from straight out), toward the radio's own sector. 248 (2026-11-23, was 236): turns the tie square out of the centre clearance circle (inner edge r 17.4 -> 19.7); the square stays square to the IPEX4 -> tie line"
 M3_POS,25.75 342.0,mm deg,design,pcb,"rev 3 M3 registration holes: radius and first angle; the others at +120 and +240 (342 / 102 / 222), in the free ring between the radios"
 M3_KEEPOUT,10.0,mm,design,pcb,"washer keep-out round each M3 (no tracks or vias, both layers)"
-J1_POS,17.0 76.0,mm deg,design,pcb,"J1 (JST PH 4-pin vertical TH, 5V / GND / DATA / CMD like the carrier Up port) pin-row centre: radius, angle; row tangential, next to the head XIAO"
-J2_POS,17.5 322.0,mm deg,design,pcb,"J2 (5V in from the splitter, JST PH 2-pin vertical TH footprint): pin-row centre radius, angle"
+J1_POS,22.2 60.0,mm deg,design,pcb,"J1 (JST PH 4-pin vertical TH, 5V / GND / DATA / CMD like the carrier Up port) pin-row centre: radius, angle. 2026-11-23: on the head XIAO's axis just inside its antenna end, row parallel to that edge, housing on the bottom (inside the core) so only the pins are on top, outside DECK_CENTRE_CLEAR. Was r 17 at 76 deg"
+J2_POS,22.2 300.0,mm deg,design,pcb,"J2 (5V in, JST PH 2-pin vertical TH, housing on the bottom): pin-row centre radius, angle. 2026-11-23: on U4's axis just inside its antenna end, row parallel to that edge. Was r 17.5 at 322 deg"
 ENDPLATE_DIAMETER,144.0,mm,design,endplate,"end plate PCB across the far end of the triangle, FACE_H below the deck. Outer face corners at r 69.3: 144 leaves 2.7 mm of plate past them; under ~146 so it does not reach past the ducks. Not simulated (110 / 140 / 170 were) (2026-11-22)"

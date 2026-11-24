@@ -94,8 +94,8 @@ FACE_LANE_IN, FACE_LANE_OUT = 29.95, 30.45   # bottom branch lanes along face 0 
 FACE_LANE_240 = 30.2                  # U3's branch lane along face 240
 UNDER_U4_V = 30.7                     # U3's lane crosses under U4 here (between its D7 and D10 vias)
 HEAD_D0_VIA, HEAD_D1_VIA = (-12.6, 37.5), (-11.6, 39.58)
-HEAD_DATA = [(7.5, 30.0), (5.0, 22.0)]   # bottom: head D10 via -> J1 DATA
-GND_STUB_R = 21.0                     # J1 / J2 GND pins: bottom stub out past the 5V pin's pour back-off
+HEAD_DATA = [(7.5, 30.0), (1.0, 26.0)]   # bottom: head D10 via -> J1 DATA (J1 on the head axis, pin 3 at u +1)
+GND_STUB_OUT = 3.0                    # J1 / J2 GND pins: bottom stub this far out, past the 5V pin's pour back-off
 
 RIGHT = ["5V", "GND", "3V3", "D10", "D9", "D8", "D7"]   # from the USB-C end (top view, USB-C up)
 LEFT = [f"D{i}" for i in range(7)]
@@ -175,6 +175,17 @@ def m3_fp(bd, ref, pos):
     return fp
 
 
+def m4_fp(bd, ref, pos):
+    """Core-corner M4 service bolt: plated hole, NUT_PAD bare GND copper both sides (washer on top, nut or standoff
+    underneath)."""
+    fp = K.custom_fp(bd, ref, "M4")
+    K.th_pad(fp, "1", 0, 0, NUT_PAD, HOLE_M4, "GND", bd)
+    bd.add_fp(fp, ref, "M4", pos, 0)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
+    return fp
+
+
 def tie_geom(theta):
     """Tie square for the XIAO on corner theta: (IPEX4, centre, cable direction, corners) in the corner frame
     (common/layout.py)."""
@@ -199,7 +210,7 @@ def tie_fp(bd, ref, theta):
     a_cable = math.atan2(d[0], d[1])
     tang = (-(theta + math.degrees(a_cable)) + 90 + 90) % 180 - 90   # along the cable, never upside down
     off = MOUNT_SQ / 2 - 2.6                              # label beside the cable line, inside the square
-    n = (math.cos(a_cable), -math.sin(a_cable))
+    n = (-math.cos(a_cable), math.sin(a_cable))   # label on the side away from the bent pigtail path
     bd.text(FS, "ANT STRAIN\nRELIEF TIE", loc(theta, c[0] + off * n[0], c[1] + off * n[1]), 1.0, angle=tang)
     # dotted pigtail path: from the IPEX4 marker along the cable through the tie, then bent PIGTAIL_BEND toward
     # its sector, over the face line to the D / P / P2 holes; arrowhead before the slots
@@ -258,13 +269,51 @@ def tie_check(bd):
     pads = unary_union(pads)
     rows = []
     for k, th in enumerate(VERTICES):
-        _, c, _, sq = tie_geom(th)
+        ipex, c, d, sq = tie_geom(th)
+        # the square is square to the straight line from the IPEX4 centre to its own centre
+        line = (c[0] - ipex[0], c[1] - ipex[1])
+        for a, b in zip(sq, sq[1:] + sq[:1]):
+            side = (b[0] - a[0], b[1] - a[1])
+            dot = (line[0] * side[0] + line[1] * side[1]) / (math.hypot(*line) * math.hypot(*side))
+            assert abs(dot) < 1e-9 or abs(abs(dot) - 1) < 1e-9, f"TM{k + 1} not square to the IPEX4 line"
         poly = Polygon([loc(th, *p) for p in sq])
         row = (f"TM{k + 1}", poly.distance(pipe), poly.distance(slots), poly.distance(pads))
         if min(row[1:]) < MOUNT_GAP:
             raise RuntimeError(f"tie square {row[0]} too close: pipe {row[1]:.2f} slot {row[2]:.2f} pad {row[3]:.2f}")
         rows.append(row)
     return rows
+
+
+def centre_check(bd):
+    """Nothing tall inside DECK_CENTRE_CLEAR (the knockout aside): top pads and courtyards, the tie squares and the
+    bottom courtyards (J1 / J2 housings). Returns the clear diameter actually left, in mm, and what limits it."""
+    from shapely.geometry import Point, Polygon
+    centre = Point(K.CX, K.CY)
+    near = []
+    for fp in bd.b.GetFootprints():
+        ref = fp.GetReference()
+        if ref.startswith(("MB", "H")) or ref.startswith("TM"):
+            continue
+        for p in fp.Pads():
+            if p.IsOnLayer(F):
+                near.append((centre.distance(Polygon(pad_poly(p, 0.0))), ref + "." + p.GetNumber()))
+        cy = fp.GetCourtyard(pcbnew.F_CrtYd)
+        if cy.OutlineCount():
+            ol = cy.Outline(0)
+            near.append((centre.distance(Polygon([(pcbnew.ToMM(ol.CPoint(i).x), pcbnew.ToMM(ol.CPoint(i).y))
+                                                   for i in range(ol.PointCount())])), ref + " courtyard"))
+    for k, th in enumerate(VERTICES):
+        near.append((centre.distance(Polygon([loc(th, *p) for p in tie_geom(th)[3]])), f"TM{k + 1}"))
+    for fp in bd.b.GetFootprints():   # bottom too: the fitting's nut may sit inside the core
+        cy = fp.GetCourtyard(pcbnew.B_CrtYd)
+        if cy.OutlineCount() and not fp.GetReference().startswith(("MB", "H")):
+            ol = cy.Outline(0)
+            near.append((centre.distance(Polygon([(pcbnew.ToMM(ol.CPoint(i).x), pcbnew.ToMM(ol.CPoint(i).y))
+                                                   for i in range(ol.PointCount())])), fp.GetReference() + " bottom"))
+    d, what = min(near)
+    if 2 * d < DECK_CENTRE_CLEAR:
+        raise RuntimeError(f"{what} is {d:.2f} mm from the centre, inside DECK_CENTRE_CLEAR {DECK_CENTRE_CLEAR:g}")
+    return 2 * d, what
 
 
 def pad_poly(p, grow):
@@ -283,7 +332,8 @@ ASSEMBLY_STEPS = ("ASSEMBLY\n"
                   "2 FACES TO DECK + END PLATE\n"
                   "  FIRST, ON THE BARE BOARDS\n"
                   "3 CLEAN (IPA)\n"
-                  "4 J1 + J2, THEN THE XIAOS\n"
+                  "4 J1 + J2 ON THE BOTTOM,\n"
+                  "  THEN THE XIAOS\n"
                   "5 RP-SMAS, COAX, TIE MOUNTS\n"
                   "6 SPLITTER LEAD TO J2")
 REPO_URL = "github.com/100-Ton-Robot/ble-beacon-tracker"
@@ -308,24 +358,36 @@ def seam_guides(bd, layer, mirror, rmax=None, label_at=(0.0, 11.0), size=1.5):
 
 
 def jst_fp(bd, ref, lib_name, value, r, a, nets, label):
-    """JST PH vertical through-hole at radius r, angle a: pin row tangential, pin 1 at the clockwise end, housing
-    toward the rim. Housing outline on both sides (the builder fits it on either). Returns {pin: (u, v)} in frame a."""
+    """JST PH vertical through-hole, pin row centre at radius r, angle a, row tangential (parallel to the XIAO's
+    antenna-end edge). Fitted on the BOTTOM (inside the core) with the housing's deep side toward the rim, so the
+    deck top keeps only the pins and both sides stay clear round the centre. Mirrored on the bottom, pin 1 lands at
+    the counter-clockwise end (top view). Returns {pin: (u, v)} in frame a."""
     n = len(nets)
     fp = bd.lib_fp("Connector_JST", lib_name, ref, value, loc(a, (n - 1), r), K.fp_orient(a, 180), nets)
+    fp.Flip(fp.GetPosition(), False)
     fp.Reference().SetVisible(False)
-    pins = {p: K.to_local(a, *bd.pad_xy(ref, p)) for p in nets}
-    assert pins["1"][0] > pins[str(n)][0] and abs(pins["1"][0] + pins[str(n)][0]) < 0.01, f"{ref} pin order {pins}"
-    p1 = bd.pad_xy(ref, "1")
-    p2 = bd.pad_xy(ref, "2")
-    ex = ((p2[0] - p1[0]) / 2, (p2[1] - p1[1]) / 2)
-    ey = (-ex[1], ex[0])
-    w = lambda x, y: (p1[0] + x * ex[0] + y * ey[0], p1[1] + x * ex[1] + y * ey[1])  # noqa: E731
-    x1 = 2 * (n - 1) + 1.95
-    body = [w(-1.95, -1.7), w(x1, -1.7), w(x1, 2.8), w(-1.95, 2.8)]
-    bd.poly(BS, body, 0.15)
-    for lay, mir in ((FS, False), (BS, True)):
-        bd.text(lay, label, loc(a, 0, r + 4.4), 1.0, angle=-a, mirror=mir)
-        bd.text(lay, "1", loc(a, pins["1"][0], r - 2.7), 0.9, angle=-a, mirror=mir)
+    target = loc(a, 0, r)
+    pins = None
+    for turn in range(0, 360, 90):   # after the flip: the turn that puts the row tangential, housing toward the rim
+        fp.SetOrientation(pcbnew.EDA_ANGLE(K.fp_orient(a, turn), pcbnew.DEGREES_T))
+        xy = [bd.pad_xy(ref, p) for p in nets]
+        cx = sum(q[0] for q in xy) / n
+        cy = sum(q[1] for q in xy) / n
+        q = fp.GetPosition()
+        fp.SetPosition(pcbnew.VECTOR2I(q.x + K.mm(target[0] - cx), q.y + K.mm(target[1] - cy)))
+        cand = {p: K.to_local(a, *bd.pad_xy(ref, p)) for p in nets}
+        cy = fp.GetCourtyard(pcbnew.B_CrtYd).Outline(0)
+        vs = [K.to_local(a, pcbnew.ToMM(cy.CPoint(i).x), pcbnew.ToMM(cy.CPoint(i).y))[1] for i in range(cy.PointCount())]
+        if all(abs(v - r) < 0.01 for _, v in cand.values()) and max(vs) - r > r - min(vs):
+            pins = cand
+            break
+    assert pins, f"{ref}: no orientation puts the row tangential"
+    assert abs(pins["1"][0] + pins[str(n)][0]) < 0.01 and pins["1"][0] < pins[str(n)][0], f"{ref} pin order {pins}"
+    assert all(abs(v - r) < 0.01 for _, v in pins.values()), f"{ref} pin row not at r {r}: {pins}"
+    # the library footprint's own housing outline is on the bottom silkscreen now; labels inward of the pins
+    bd.text(BS, label, loc(a, 0, r - 3.2), 0.9, angle=-a, mirror=True)
+    bd.text(FS, f"{ref}: FIT ON BOTTOM", loc(a, 0, r - 3.2), 0.8, angle=-a)
+    bd.text(FS, "1", loc(a, pins["1"][0] - 1.6, r), 0.8, angle=-a)
     return pins
 
 
@@ -407,6 +469,8 @@ def build_deck(spacing):
             rpsma_fp(bd, f"H{n}", pos)
     for k, am in enumerate(LY.m3_angles):
         m3_fp(bd, f"M{k + 1}", pol(LY.m3_r, am))
+    for k, th in enumerate(VERTICES):         # core-corner M4 service bolts, in front of each XIAO's USB-C
+        m4_fp(bd, f"M{k + 4}", pol(LY.m4_r, th))
     for k in range(STITCH_COUNT):
         bd.via(pol(R - RIM_MASK_WIDTH / 2, k * 360 / STITCH_COUNT), "GND", VIA_D, VIA_DRILL)
 
@@ -472,12 +536,7 @@ def build_deck(spacing):
         for u, v in [(VIA_U, vg), (VIA_U, v7), (VIA_U, v10)] + SPOKE:
             assert core_ok(u, v, VIA_D / 2), f"via / spoke at {u} {v} outside the core"
         lane = L([(PIN_U, v5), (LANE_5V_U, v5)] + LANE_5V)
-        if th == t0:
-            lane.append(w1["1"])
-        elif th == t2:
-            lane.append(w2["1"])
-        else:
-            lane.append(circ(RING_5V, RING_5V_IN))
+        lane.append(circ(RING_5V, RING_5V_IN))   # every radio's +5V to the ring; J1 / J2 +5V pins join it from outside
         bd.track(lane, "+5V", TRACK_5V)
 
     # J1 / J2: +5V pin straight in to the ring (top); J1 CMD straight in to its ring (bottom); GND pins out (bottom)
@@ -485,7 +544,7 @@ def build_deck(spacing):
         bd.track([wp, pol(r, ang_of(wp))], "+5V", TRACK_5V)
     bd.track([w1["4"], pol(RING_CMD, ang_of(w1["4"]))], "CMD", TRACK, B)
     for wp in (w1["2"], w2["2"]):
-        bd.track([wp, pol(GND_STUB_R, ang_of(wp))], "GND", 0.5, B)
+        bd.track([wp, pol(math.hypot(wp[0] - K.CX, wp[1] - K.CY) + GND_STUB_OUT, ang_of(wp))], "GND", 0.5, B)
     # head D10 -> J1 DATA, on the bottom under the head
     bd.track([loc(t0, VIA_U, pin_v("D10"))] + [loc(t0, u, v) for u, v in HEAD_DATA] + [w1["3"]], "DATA", TRACK, B)
 
@@ -542,11 +601,11 @@ def build_deck(spacing):
         bd.text(FS, "P", loc(s, -8.5, a + PATCH_OFFSET), 1.5, angle=-s)
         bd.text(FS, "P2", loc(s, p2_u, a + PATCH_OFFSET + 8.3), 1.5, angle=-s)
     for th, lab in ((t0, "U2 HEAD"), (t1, "U3 -> HEAD D0"), (t2, "U4 -> HEAD D1")):
-        bd.text(FS, lab, loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 12.5), 1.0, angle=-th)
+        bd.text(FS, lab, loc(th, 0, LY.m4_r + NUT_PAD / 2 + 2.0), 1.0, angle=-th)   # out past the M4 washer
         # USB-C plug path (13 x 25 mm past the USB-C end), for the print check
         uw = loc(th, 0, XIAO_CENTRE_V + XIAO_L / 2 + 3.6)   # right in front of the USB-C plug, across its path
         bd.text(FS, USB_WARNING, uw, 0.9, angle=-th)
-        warn_icon(bd, FS, USB_WARNING, uw, 0.9, -th, "above", 3.2)
+        warn_icon(bd, FS, USB_WARNING, uw, 0.9, -th, "before", 3.2)   # beside, so the M4 washer pad stays clear
         x = [(-6.5, 45.0), (6.5, 45.0), (6.5, 70.0), (-6.5, 70.0)]
         bd.poly(pcbnew.Dwgs_User, [loc(th, u, v) for u, v in x], 0.15)
     bd.text(FS, "TOP - ELECTRONICS SIDE", band(0, 19.5, a + 19.5), 1.3, angle=0)
@@ -555,8 +614,8 @@ def build_deck(spacing):
     bd.text(FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, angle=-120)
     warn_icon(bd, FS, WARN_DECK, band(120, 17.5, a + 14.0), 1.0, -120, "after")
     bd.text(FS, ASSEMBLY_STEPS, band(240, 18.5, a + 15.0), 0.8, angle=-240)
-    for lay, mir in ((FS, False), (BS, True)):   # beside J2 (5V in from PoE), both sides like its outline
-        jw = loc(J2_POS[1], -7.0, J2_POS[0] - 1.5)   # counter-clockwise of J2, below U4's antenna end
+    for lay, mir in ((FS, False), (BS, True)):   # J2 (5V in from PoE), both sides: inward of its label
+        jw = loc(J2_POS[1], 0.0, J2_POS[0] - 6.0)
         bd.text(lay, USB_WARNING, jw, 0.8, angle=-J2_POS[1], mirror=mir)
         warn_icon(bd, lay, USB_WARNING, jw, 0.8, -J2_POS[1], "before", 2.8)
     bd.text(FS, "AS END PLATE:\nTHIS SIDE OUT, NO PARTS", band(0, 19.5, a + 23.5), 0.9, angle=0)
@@ -661,6 +720,8 @@ def build_endplate():
             bd.poly(pcbnew.Edge_Cuts, [loc(s, t + du, rv + dv) for du, dv in (
                 (-SLOT_L / 2, -SLOT_W / 2), (SLOT_L / 2, -SLOT_W / 2), (SLOT_L / 2, SLOT_W / 2), (-SLOT_L / 2, SLOT_W / 2))], 0.1)
     ro, ri = knockout(bd, "H1")
+    for k, th in enumerate(VERTICES):         # core-corner M4 service bolts, as on the deck
+        m4_fp(bd, f"M{k + 1}", pol(LAYOUT0.m4_r, th))
     # copper: GND both sides round the knockout
     circ = lambda r, n=180: [pol(r, 360 * i / n) for i in range(n)]  # noqa: E731
     for lay in (F, B):
@@ -900,6 +961,8 @@ if __name__ == "__main__":
             for ref, d_pipe, d_slot, d_pad in tie_check(bd):
                 print(f"  {ref} tie square: pipe {d_pipe:.1f} mm, slot {d_slot:.1f} mm, nearest pad / M3 keep-out "
                       f"{d_pad:.1f} mm")
+            clear, what = centre_check(bd)
+            print(f"  centre clear {clear:.1f} mm across (limit: {what}; DECK_CENTRE_CLEAR {DECK_CENTRE_CLEAR:g})")
         txt = finish(bd, name)
         print(name, summary(txt))
         cu, nb = export_copper(os.path.join(OUT, name + ".kicad_pcb"), name)

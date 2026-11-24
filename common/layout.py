@@ -58,6 +58,9 @@ class Layout:
                           p["SEAM_STRIP"] / 2 - p["CORE_MARGIN"], "mm",
                           "parts and wiring inside the core stay inside this distance from the centre,\n"
                           "measured across each face (1 mm clear of the seam)")
+        self.m4_r = f("TRIANGLE CORE", "r_M4", "2 x (r_in - FACE_THICK - NUT_AF / 2 - NUT_GAP)",
+                      2 * (self.r_in - p["FACE_THICK"] - p["NUT_AF"] / 2 - p["NUT_GAP"]), "mm",
+                      "core-corner M4 nut / bolt centre: nut flats against both faces' inner sides")
         # ---- antenna holes
         self.r_D = f("ANTENNA HOLES", "r_D", "r_in + d  (d = duck spacing)", self.r_in + spacing, "mm",
                      "D hole: duck / monopole, on each face normal (0 / 120 / 240 deg)")

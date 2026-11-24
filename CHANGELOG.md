@@ -156,6 +156,15 @@ Earlier, frame v2 (scanner firmware 0.3.0):
   duck spacing (with the acrylic plate's M4 corner holes and the on-deck parts' positions), a plain
   butt-jointed face and a formulas page printed from `layout.py`; the plate, stack, wiring, LED and unified
   board pages still show the older layout and D8 wiring (marked in `HAND_BUILD.md`).
+- Changed (2026-11-23): deck rev 3 service and centre clearance. M4 service bolts at the three core corners
+  (r 59.1 mm, plated, 9 mm pads) on the deck and the end plate, so either plate bolts onto nuts or standoffs in
+  the core corners; on the deck each bolt sits in front of a XIAO's USB-C on purpose (USB with the bolt out).
+  J1 and J2 moved onto the head's and U4's corner axes, just inside the antenna ends, rows parallel to that edge,
+  housings on the bottom; every XIAO's +5 V lane now runs to the ring. Pigtail angle 236 -> 248 deg (tie squares
+  still square to the IPEX4 line, now asserted). The centre is clear 39.4 mm across on both sides for a 1/2 in PVC
+  pipe or threaded fitting (`DECK_CENTRE_CLEAR`, checked). Corner labels moved out past the bolt pads; the USB
+  warning's sign beside its text. `HOLE_M4`, `NUT_AF`, `NUT_GAP`, `NUT_PAD` moved to `common/parameters.csv`.
+  The committed rev 3 RF copper runs predate this layout.
 - Restored (2026-11-23): the face's centre 6.5 mm RP-SMA hole, on the face PCB (plated, 12 mm nut pad, four
   stitching vias, "OUTSIDE - DIPOLE SIDE") and the hand-build face template, for an antenna on the face (a dipole or
   the printed fin). `DIPOLE_HOLE` moved to `common/parameters.csv`. The face copper is the same as before the

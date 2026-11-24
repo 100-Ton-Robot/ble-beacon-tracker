@@ -3,12 +3,8 @@ DISC_DIAMETER,146.0,mm,design,deck,"copper shield deck disc; fits the enclosure,
 DUCK_SPACING,31.0,mm,design,deck,D hole: antenna axis -> copper face (rubber duck / monopole)
 COAX_PASS_RADIUS,20.0,mm,design,deck,"C hole: dipole coax pass-through, inside the core"
 HOLE_CORE,10.0,mm,design,deck,centre hole into the core for antenna coax (2026-10-31); open up with a hole saw if more coax has to pass
-NUT_AF,7.0,mm,spec,deck,"M4 nut across flats (3.2 mm thick). One per core corner under the deck, two flats flush against the faces, soldered to deck and faces (2026-11-01)"
-NUT_GAP,0.0,mm,design,deck,extra room per face (e.g. for a seam fillet in the corner)
-NUT_PAD,9.0,mm,design,deck,bottom mask opening round each M4 hole for the nut solder (nut across corners ~8.1 mm)
 STITCH_RADIUS,71.0,mm,design,deck,ring of stitching vias tying top and bottom copper
 HOLE_COAX,10.0,mm,design,deck,coax + RP-SMA end pass-through
-HOLE_M4,4.8,mm,design,deck,"M4 bolt, slightly loose so it finds the soldered nut"
 HOLE_VIA,0.6,mm,design,deck,
 BOARD_W,50.0,mm,measured,panel,printed-dipole panel board as mounted (turned 90 deg): short side across
 BOARD_H,60.0,mm,measured,panel,same board: long side down
