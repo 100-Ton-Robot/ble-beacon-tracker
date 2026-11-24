@@ -1,12 +1,24 @@
 # Hand build (scratch): deck, faces and plate templates
 
-Build the mast by hand from copper-clad board, acrylic and stripboard, with printable 1:1 templates. The PCB build is the other way to build the same mast: [`pcb/README.md`](pcb/README.md). Both builds share the same physical layout of antennas and plates (deck size per duck spacing, antenna holes, faces, pipe hole, M3 registration holes), computed once in [`layout.py`](layout.py) from [`parameters.csv`](parameters.csv).
+Build the mast by hand from copper-clad board, acrylic and stripboard, with printable 1:1 templates. The PCB build is the other way to build the same mast: [`../pcb/README.md`](../pcb/README.md). Both builds share the same physical layout of antennas and plates (deck size per duck spacing, antenna holes, faces, pipe hole, M3 registration holes), computed once in [`common/layout.py`](../../common/layout.py) from [`common/parameters.csv`](../../common/parameters.csv). This build's own numbers (templates, plates, wiring, the copper deck, the LED ring and unified board options) are in [`parameters.csv`](parameters.csv) here.
 
 > **Status (2026-11-23): the templates are part way through an update to the shared layout.**
-> - **Updated:** pages 1-2 (deck drill template for each duck spacing, the same holes and outline as the PCB decks, plus the M4 corner holes for the acrylic plate option and the parts' positions for the on-deck option), page 5 (plain face, no holes, butt joints) and page 10 (formulas, printed from `layout.py`).
+> - **Updated:** pages 1-2 (deck drill template for each duck spacing, the same holes and outline as the PCB decks, plus the M4 corner holes for the acrylic plate option and the parts' positions for the on-deck option), page 5 (plain face, no holes, butt joints) and page 10 (formulas, printed from `common/layout.py`).
 > - **Not updated yet:** pages 3-4 (acrylic plates), 6 (stack views), 7 (wiring), 8 (LED ring) and 9 (unified board) still show the older layout and the older per-sector wiring (each XIAO's TX on D8 to its own ESP32 pin). **D8 has no UART on the nRF54L15: don't wire it.** Both builds move to the PCB's star wiring (relay protocol 4: head XIAO D10 to the ESP32, the other two D10 to the head's D0 / D1, D7 command bus), which needs protocol 4 firmware (not written yet).
 > - **Decided:** electronics either on the deck inside the core (as on the PCB) or on the acrylic plate above the deck; the plate keeps its three M4 bolts in the deck's core corners, with spacers, so its radios sit near the deck. Faces are plain butt-jointed squares. The LED ring stays as an option.
 > - `shield_deck_gerbers.zip` (`make_shield_deck.py`, a bare 146 mm deck for 31 mm ducks) is the older layout and is superseded by the deck templates and the PCB decks; it stays in the repo.
+
+## Firmware and pins (both builds)
+
+Both builds run the same scanner firmware ([`scanner_fw/`](../../scanner_fw/README.md)), but today the pins don't agree:
+
+| | Uplink TX (to the gateway or the head radio) | Command RX | Branch RX |
+| --- | --- | --- | --- |
+| Hand build, as wired so far | D6 on older masts, D8 since issue #1 | D7 | - |
+| Scanner firmware 0.8.0 (`scanner_fw/app.overlay`) | D8 | D7 | - |
+| PCB deck rev 3 (relay protocol 4) | D10 (head to J1 DATA, the other two to the head) | D7 | head D0 / D1 |
+
+D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 can't carry the stream. The plan is one firmware for both builds on the protocol 4 pins (D10, D7, D0 / D1); that firmware isn't written yet. This is recorded here, not fixed: no pins or firmware changed with the split into builds.
 
 ## Quick start (files in the repo, no software)
 
@@ -37,7 +49,7 @@ Build the mast by hand from copper-clad board, acrylic and stripboard, with prin
 - **ESP32 antenna:** mount it in a plastic cap or insulating bushing, not on the bare steel end.
 
 1. Print your pages of `shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
-2. Order the deck PCB: upload `shield_deck_gerbers.zip` to a PCB fab. Steps and settings: [PCBWAY.md](PCBWAY.md).
+2. Order the deck PCB: upload `shield_deck_gerbers.zip` to a PCB fab. Steps and settings: [PCBWAY.md](../pcb/PCBWAY.md).
 3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
 4. Drill the plate and back panel (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). Page 1 is the deck's own hole pattern, for checking the board (and marking the pipe's hole-saw cut).
 5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
@@ -95,26 +107,27 @@ Buy a few spares, and 2 more 150 mm ties if the pipe build's bus board goes on t
 
 ## Next
 
-- **Order the deck PCB:** [PCBWAY.md](PCBWAY.md): order steps, fab settings, what's on the board and the hole table.
+- **Order the deck PCB:** [PCBWAY.md](../pcb/PCBWAY.md): order steps, fab settings, what's on the board and the hole table.
 - **Build or change the files:** [Using the scripts](#using-the-scripts): change a measurement, [lay out a plate in Inkscape](#lay-out-a-plate-in-inkscape), regenerate the Gerbers, PDF and SVGs, [when something goes wrong](#when-something-goes-wrong).
 
 ## Using the scripts
 
-Everything here is generated from one file of numbers, [`parameters.csv`](parameters.csv). Change numbers there, or move parts in Inkscape and let the scripts write the numbers back. Don't hand-edit the outputs (Gerbers, PDF, SVGs): the next run overwrites them.
+Everything here is generated from two files of numbers: this build's [`parameters.csv`](parameters.csv) and the shared [`common/parameters.csv`](../../common/parameters.csv) (the geometry the PCB build uses too). Each name is in one of them only. Change numbers there, or move parts in Inkscape and let the scripts write the numbers back. Don't hand-edit the outputs (Gerbers, PDF, SVGs): the next run overwrites them.
 
 ### Setup (once)
 
 1. Install Python 3.10 or later.
 2. `pip install reportlab`. This is only needed for the PDF templates; the deck Gerbers need nothing extra.
 3. Install [Inkscape](https://inkscape.org) 1.x, but only if you want to lay out a plate by dragging parts.
-4. Run every command from this `shield_deck/` folder.
+4. Run every command from this `builds/hand/` folder.
 
 ### Files
 
 | File | What it is | Made by |
 | --- | --- | --- |
-| `parameters.csv` | Every measurement, size, placement and clearance rule | You (or `read_plate_svg.py`) |
-| `params.py` | Loads the CSV for the other scripts | - |
+| `parameters.csv` | This build's measurements, sizes, placements and clearance rules | You (or `read_plate_svg.py`) |
+| `../../common/parameters.csv` | Shared with the PCB build: faces and core, duck spacing, pipe, XIAO and radio positions, enclosure, RF | You |
+| `../../common/params.py`, `../../common/layout.py` | Load the CSVs; derive the shared layout (deck size, holes, core limit) | - |
 | `shield_deck_gerbers.zip`, `shield_deck_preview.svg`, `hole_table.csv` | Deck PCB Gerbers (any fab), a picture of it, hole coordinates | `make_shield_deck.py` |
 | `shield_deck_templates.pdf` | 1:1 printable drill templates, stack views, wiring, LED ring option, unified board option, design formulas | `make_templates.py` |
 | `plate_layout.svg`, `pipe_plate_layout.svg` | No-pipe (alt) and pipe plates for laying out in Inkscape | `make_plate_svg.py` |
@@ -139,9 +152,9 @@ The pages, in order (pick one build type, pipe or no pipe, and print only its pa
 
 ### Change a measurement or size
 
-1. Open `parameters.csv` in a spreadsheet or text editor and change the `value` cell. Keep the name as it is.
+1. Find the name in `parameters.csv` here or in `../../common/parameters.csv` (it is in one of them only), open that file in a spreadsheet or text editor and change the `value` cell. Keep the name as it is. A shared value changes the PCB build too: re-run `../pcb/make_pcbs.py` as well.
 2. Rebuild whatever uses it:
-   - **Deck rows** (`group` = `deck`): run `python make_shield_deck.py` and re-order the board ([PCBWAY.md](PCBWAY.md)).
+   - **Deck rows** (`group` = `deck`): run `python make_shield_deck.py` and re-order the board ([PCBWAY.md](../pcb/PCBWAY.md)).
    - **Plate placement rows** (`alt` or `pipe`): run `python make_plate_svg.py` so the Inkscape files match the CSV, then `python read_plate_svg.py --check`.
    - **Anything else**: run `python make_templates.py`.
 
@@ -177,7 +190,7 @@ How the cells read:
    - **Keep the page:** don't change the page size (Document Properties). The reader refuses a resized page.
 4. Save as **Inkscape SVG**, same file name.
 5. `python read_plate_svg.py --dry-run`. This lists what would change in the CSV and writes nothing.
-6. `python read_plate_svg.py`. This writes the new positions into `parameters.csv` and checks the rules:
+6. `python read_plate_svg.py`. This writes the new positions into this build's `parameters.csv` and checks the rules:
    - Every rule shows `ok` or `FAIL`, with the worst gap and where it is.
    - On a failure, move that part and repeat from step 5.
    - It only reads one plate if you name it: `python read_plate_svg.py alt` or `python read_plate_svg.py pipe`.
@@ -186,7 +199,7 @@ How the cells read:
 
 ### The rules
 
-The `rules` rows of `parameters.csv` set the margins. Change one there and re-run `python read_plate_svg.py --check`.
+The `rules` rows of this build's `parameters.csv` set the margins. Change one there and re-run `python read_plate_svg.py --check`.
 
 | Rule | Default | Keeps |
 | --- | --- | --- |

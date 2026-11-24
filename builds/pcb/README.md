@@ -1,6 +1,6 @@
 # Deck, face and end plate PCBs (parts on the deck)
 
-The PCB build. The hand build of the same mast is in [`../HAND_BUILD.md`](../HAND_BUILD.md); both share [`../parameters.csv`](../parameters.csv) and [`../layout.py`](../layout.py).
+The PCB build. The hand build of the same mast is in [`../hand/README.md`](../hand/README.md); both share [`common/parameters.csv`](../../common/parameters.csv) and [`common/layout.py`](../../common/layout.py). This build's own numbers (tracks, clearances, part positions, face tabs, end plate) are in [`parameters.csv`](parameters.csv) here.
 
 Four boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](make_pcbs.py). The deck comes in two sizes, one per duck spacing (the D hole's distance in front of each face); order the one that matches your antennas:
 
@@ -11,11 +11,23 @@ Four boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](
 | Face, 120 x 120 mm (+ tabs): one side of the triangle reflector core | `out/face_pcb_gerbers.zip` | 3 | 5 (minimum), so order 5 per mast and keep 2 spare, or 10 for 3 masts |
 | End plate, 144 mm round, optional: a second shield plate across the far end of the triangle. With 15 mm ducks a second deck board turned over does the same job (see Deck as end plate) | `out/endplate_pcb_gerbers.zip` | 0 or 1 | 5 (minimum) |
 
-This build replaces the hand-drilled acrylic electronics plate, the bus board / unified stripboard and the hand-cut copper-clad faces. The older deck (`../shield_deck_gerbers.zip`, 146 mm, no parts) and the plate templates stay in `..` for the older build. Status: **generated and DRC-clean, not yet ordered or built** (revision 3, 2026-11-23; spec [`REV3_PLAN.md`](REV3_PLAN.md)). Preview: [`pcb_preview.png`](pcb_preview.png).
+This build replaces the hand-drilled acrylic electronics plate, the bus board / unified stripboard and the hand-cut copper-clad faces. The older deck (`../hand/shield_deck_gerbers.zip`, 146 mm, no parts) and the plate templates stay in [`../hand/`](../hand/README.md) for the older build. Status: **generated and DRC-clean, not yet ordered or built** (revision 3, 2026-11-23; spec [`REV3_PLAN.md`](REV3_PLAN.md)). Preview: [`pcb_preview.png`](pcb_preview.png).
 
 > **Unplug PoE before plugging in USB.** All modules share one 5 V rail, with no diodes. Plugging a USB cable into a XIAO or the ESP32 while the PoE splitter is feeding the deck ties the computer's USB VBUS to the splitter's 5 V. Power from PoE OR from USB, never both. Damage to the boards, the splitter or the computer from ignoring this is not covered by anything in this repo; you build and power it at your own risk. The same warning is on the deck, on each face and on the end plate, and "UNPLUG POE / BEFORE USB" sits right in front of each XIAO's USB-C plug (across the plug path) and beside J2 (both sides). Every warning has a drawn caution sign (triangle with !, ISO 7010 W001 style; the silkscreen font has no emoji).
 
-> **Firmware:** this deck wires the radios for relay protocol 4 (star wiring: D10 uplink TX, D0 / D1 branch RX, D7 command RX). That firmware is not written yet; scanner firmware 0.8.0 and older (one TX per radio straight to the gateway) does not work on this deck.
+> **Firmware:** this deck wires the radios for relay protocol 4 (star wiring: D10 uplink TX, D0 / D1 branch RX, D7 command RX). That firmware is not written yet; scanner firmware 0.8.0 and older (one TX per radio straight to the gateway) does not work on this deck. See [Firmware and pins](#firmware-and-pins-both-builds).
+
+## Firmware and pins (both builds)
+
+Both builds run the same scanner firmware ([`scanner_fw/`](../../scanner_fw/README.md)), but today the pins don't agree:
+
+| | Uplink TX (to the gateway or the head radio) | Command RX | Branch RX |
+| --- | --- | --- | --- |
+| Hand build, as wired so far | D6 on older masts, D8 since issue #1 | D7 | - |
+| Scanner firmware 0.8.0 (`scanner_fw/app.overlay`) | D8 | D7 | - |
+| PCB deck rev 3 (relay protocol 4) | D10 (head to J1 DATA, the other two to the head) | D7 | head D0 / D1 |
+
+D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 can't carry the stream. The plan is one firmware for both builds on the protocol 4 pins (D10, D7, D0 / D1); that firmware isn't written yet. This is recorded here, not fixed: no pins or firmware changed with the split into builds.
 
 ## Build order
 
@@ -91,7 +103,7 @@ C1 (bulk capacitor) is not on revision 3; see Deck.
 
 ## Order settings (PCBWay)
 
-Same as the old deck ([../PCBWAY.md](../PCBWAY.md)) except:
+Same as the old deck ([PCBWAY.md](PCBWAY.md)) except:
 
 | Setting | Deck | Face | End plate |
 | --- | --- | --- | --- |
@@ -108,9 +120,9 @@ Same as the old deck ([../PCBWAY.md](../PCBWAY.md)) except:
 python3 make_pcbs.py
 ```
 
-Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path (on Debian / Ubuntu `apt install kicad kicad-footprints`), plus `pip install shapely pypdf pillow` (tie-mount clearance check, seam distance table, merged print PDF, preview) and `rsvg-convert` (preview). Sizes and rules come from `../parameters.csv` (groups `pcb`, `face`, `endplate`, plus `deck` for the antenna hole geometry; `DECK_VARIANTS` lists the duck spacings built; `plate` for the XIAO size and `ADAPTER_HOLE` from `pipe`). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
+Needs KiCad 7 or later with its Python module (`pcbnew`) and `kicad-cli` on the path (on Debian / Ubuntu `apt install kicad kicad-footprints`), plus `pip install shapely pypdf pillow` (tie-mount clearance check, seam distance table, merged print PDF, preview) and `rsvg-convert` (preview). Sizes and rules come from `parameters.csv` here and `../../common/parameters.csv` (groups `pcb`, `face`, `endplate`, plus `deck` for the antenna hole geometry; `DECK_VARIANTS` lists the duck spacings built; `plate` for the XIAO size and `ADAPTER_HOLE` from `pipe`). Part positions and track routes are the tables in `make_pcbs.py`, in each corner's local frame: they are a layout, not measurements, so they live with the code.
 
-Output in `out/`: `*.kicad_pcb` (open in KiCad 7+; KiCad 8 / 10 will upgrade the file on save), `*_gerbers.zip`, `*_drc.rpt`, `*.kicad_dru` (the +5 V clearance rule; keep it next to its board), `deck_d*_part_clearance.csv`, `*_copper.json` (each board's copper as polygons plus its plated holes, for the RF model: `../../rf_model/sector_model.py --deck d15 --copper`), and `../pcb_preview.png`. The DRC reports should show **0 errors**; the remaining warnings are silkscreen clipped by the exposed copper, "library not in configuration" for the generated footprints, and on the end plate "isolated copper fill" (its GND pour has no pads, only vias).
+Output in `out/`: `*.kicad_pcb` (open in KiCad 7+; KiCad 8 / 10 will upgrade the file on save), `*_gerbers.zip`, `*_drc.rpt`, `*.kicad_dru` (the +5 V clearance rule; keep it next to its board), `deck_d*_part_clearance.csv`, `*_copper.json` (each board's copper as polygons plus its plated holes, for the RF model: `../../rf_model/sector_model.py --build pcb --deck d15 --copper`), and `../pcb_preview.png`. The DRC reports should show **0 errors**; the remaining warnings are silkscreen clipped by the exposed copper, "library not in configuration" for the generated footprints, and on the end plate "isolated copper fill" (its GND pour has no pads, only vias).
 
 Routing is by hand in the script (no autorouter). If you move a part, re-run and read the DRC report: clearances, unconnected nets and courtyard overlaps are all checked there.
 

@@ -2,7 +2,9 @@
 
 `sector_model.py` simulates one sector of the mast with [openEMS](https://openems.de) (free, open-source FDTD).
 It builds the copper deck, the triangular core and the antennas at the three D holes from
-`../shield_deck/parameters.csv`, so the model follows the deck when you change it there. It feeds sector 0's
+the parameter files (`../common/parameters.csv` plus one build's own: `--build hand`, the default, is the
+hand build's plain `DISC_DIAMETER` disc; `--build pcb` the rev 3 PCBs, see below), so the model follows the deck
+when you change it there. It feeds sector 0's
 antenna and ends the other two sectors' antennas in 50 ohm, the way their radios do.
 
 What you get, in `out/<antenna>/`:
@@ -42,8 +44,11 @@ On Linux with openEMS installed, `python3 sector_model.py ...` runs it directly.
 - `--length` sets the element length (default 0.95 x a quarter or half wavelength at `RF_FREQ`).
 - `--single` leaves out the other sectors' antennas.
 - `--sectors N` builds an N-sided core with N sectors 360/N apart (default `RF_SECTORS`, 3).
-- `--set NAME=VALUE` overrides any `shield_deck/parameters.csv` value for this run only (repeatable), e.g.
-  `--set FACE_WIDTH=80 --set DISC_DIAMETER=125`. Every dimension the model uses comes from that file; the
+- `--build pcb|hand` picks the mast: `hand` (the default without `--deck`) is a plain copper disc of
+  `DISC_DIAMETER` with the antennas `DUCK_SPACING` out; `pcb` (the default with `--deck`) is the rev 3 deck,
+  `--deck d15` unless another is given. Each reads `../common/parameters.csv` plus `../builds/<build>/parameters.csv`.
+- `--set NAME=VALUE` overrides any value in those files for this run only (repeatable), e.g.
+  `--set FACE_WIDTH=80 --set DISC_DIAMETER=125`. Every dimension the model uses comes from them; the
   logged command carries the overrides, so it reproduces the run.
 - `--end-plate` adds the end plate (`ENDPLATE_DIAMETER`) across the far end of the core.
 - `--fine` uses a finer mesh (0.5 mm at the antenna, lambda/32 elsewhere) for convergence checks.
@@ -220,9 +225,9 @@ How small can the mast get, and do a fourth sector or an end plate help? `size_s
 simulation (default noise) and the back-level measure from `spec_sweep.py`. Each sweep writes `summary.txt` and
 `summary.csv` in its `out/size*/` folder.
 
-Every dimension comes from `shield_deck/parameters.csv`:
+Every dimension comes from `../common/parameters.csv` and `../builds/hand/parameters.csv` (each run is `--build hand`, a plain disc):
 
-- Deck: the rev 3 rule (`shield_deck/pcb/deck_size.py`) scaled to the core: the larger of the D hole's exposed
+- Deck: the rev 3 rule (`../common/layout.py`) scaled to the core: the larger of the D hole's exposed
   pad + `DECK_EDGE_MARGIN`, and the core's corners + the margin `DECK_MIN_DIAMETER` leaves past today's corners
   (2.7 mm).
 - End plate: the core's corners + the margin `ENDPLATE_DIAMETER` leaves past today's corners (2.7 mm).
@@ -310,11 +315,11 @@ only on the command line. Re-running all of them on 2026-11-12 reproduced the ea
 
 ## Rev 3 PCBs: outline vs real copper (2026-11-23, full mesh)
 
-The rev 3 boards (`shield_deck/pcb`) at two levels of detail, H50327 with its feed 65 mm down, end plate fitted:
+The rev 3 boards (`../builds/pcb`, `--build pcb`) at two levels of detail, H50327 with its feed 65 mm down, end plate fitted:
 `--deck d15|d31 --end-plate` (outline: deck disc of the variant's diameter with the 22.2 mm pipe hole, solid core,
 144 mm end plate disc) and the same with `--copper` (both deck layers 1.6 mm apart joined by every plated hole and
 via, every hole, slot and track gap, the end plate's copper including the knockout ring, and a hollow core of three
-1.6 mm face-board slabs with their tabs through the slots; from `shield_deck/pcb/out/*_copper.json`, written by
+1.6 mm face-board slabs with their tabs through the slots; from `../builds/pcb/out/*_copper.json`, written by
 `make_pcbs.py`). Antennas at each deck's D holes (15 / 31 mm).
 
 | Run | S11 at 2440 | Peak | -3 dB width el 0 / -30 | F/B el 0 / -30 | Isolation | Median bearing error | 90% | Right sector |

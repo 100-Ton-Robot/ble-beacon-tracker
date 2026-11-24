@@ -11,10 +11,14 @@ in Home Assistant. See `README.md` and each folder's README.
 - `gateway/`: ESPHome package `packages/bletracker-gateway.yaml`, per-mast `example-mast.yaml`
   and external component `components/sector_scanner/`. Frame and command
   formats are defined in `scanner_fw/README.md`; keep both sides in step.
-- `shield_deck/`: every number lives in `parameters.csv` (loaded by `params.py`); change values there,
-  not in the scripts. Regenerate Gerbers and templates from `make_shield_deck.py` and
-  `make_templates.py` (needs `reportlab`) rather than hand-editing outputs. Plate layouts round-trip
-  through Inkscape: `make_plate_svg.py` -> edit -> `read_plate_svg.py` (writes the CSV, checks rules).
+- Mast builds: `builds/pcb/` (KiCad boards from `make_pcbs.py`) and `builds/hand/` (templates and
+  copper deck from `make_templates.py`, `make_shield_deck.py`; needs `reportlab`). Every number lives
+  in exactly one CSV: `common/parameters.csv` (shared geometry, read by `common/layout.py`) or the
+  build's own `parameters.csv`; `common/params.py` loads common + one build (`load(build=...)`) and
+  refuses a name in two files. Change values there, not in the scripts; regenerate rather than
+  hand-edit outputs. Plate layouts round-trip through Inkscape: `make_plate_svg.py` -> edit ->
+  `read_plate_svg.py` (writes `builds/hand/parameters.csv`, checks rules). `shield_deck/README.md`
+  only points to the new folders.
 - Open work is in GitHub issues (conventions in `NEXT_STEPS.md`): check them before starting,
   comment or close them with the work.
 - **This repo is public.** No private data, locations or home context anywhere: files, commit

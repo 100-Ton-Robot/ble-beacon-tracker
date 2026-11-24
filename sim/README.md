@@ -17,7 +17,7 @@ exits 1 if a check fails.
 
 | File | What |
 |---|---|
-| `parameters.csv` | Model values: splitter, wiring, loads, U1 and WS2812B input figures. Same columns as `shield_deck/parameters.csv`; `source` says which are datasheet values and which are estimates. |
+| `parameters.csv` | Model values: splitter, wiring, loads, U1 and WS2812B input figures. Same columns as `common/parameters.csv`; `source` says which are datasheet values and which are estimates. |
 | `netlists/power.cir` | Splitter (with a current limit), cord, pigtails, C1, ESP32 and XIAO loads, fuse, C2, strip feed and the strip as a PWM current load. |
 | `netlists/data.cir` | ESP32 GPIO1, U1 gate 1 (behavioural: threshold, delay, output resistance), R, the data wire and the strip's DIN. |
 | `netlists/boot.cir` | GPIO1 high-impedance while the ESP32 boots: U1's input leakage against R2. |
@@ -25,7 +25,8 @@ exits 1 if a check fails.
 | `ring.py` | Ring lighting toward beacon bearings, strip current against the firmware cap, over a 60 s scenario. |
 
 The board's own values (C1, C2, R, R2, the fuse rating, pixel count and current) come from
-`shield_deck/parameters.csv`, so the simulation follows any change there. Netlists hold no numbers.
+the hand build's parameter files (`common/parameters.csv`, `builds/hand/parameters.csv`: the LED ring and unified
+board are hand-build options), so the simulation follows any change there. Netlists hold no numbers.
 
 ## Cases
 

@@ -6,6 +6,19 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Repo layout
+
+- Split (2026-11-23): `shield_deck/` is now two builds of the same mast plus their shared geometry.
+  `common/` holds `parameters.csv` (rows read by `layout.py`, by both builds, or by the RF model for both),
+  `params.py` and `layout.py`; `builds/pcb/` the PCB build (`make_pcbs.py`, `out/`, `PCBWAY.md`, `REV3_PLAN.md`)
+  and `builds/hand/` the hand build (templates, plate SVGs, copper deck Gerbers; `HAND_BUILD.md` became its
+  `README.md`). Each build has its own `parameters.csv`; `params.load(build="pcb"|"hand")` reads common plus that
+  file and refuses a name in two files. `read_plate_svg.py` writes `builds/hand/parameters.csv`.
+  `rf_model/sector_model.py --build pcb|hand` picks the mast (`--deck` implies `pcb`; plain disc is `hand`).
+  Files moved with `git mv`; every generator gives the same output as before (only the templates' formulas page
+  names the new paths). `shield_deck/README.md` points to the new folders. Pins are unchanged: the hand build's
+  wiring, firmware 0.8.0 and the PCB deck still disagree (see either build's README, Firmware and pins).
+
 ### Simulation
 
 - Added (2026-11-23): `rf_model/sector_model.py --deck d15|d31 [--end-plate] [--copper]` models the rev 3

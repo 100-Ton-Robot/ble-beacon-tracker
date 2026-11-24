@@ -1,12 +1,12 @@
 # Ordering the shield deck PCB (PCBWay)
 
-> This page is the older 146 mm deck without parts. For the deck with the parts on it (144 / 146.3 mm), and the face PCBs, see [pcb/README.md](pcb/README.md).
+> This page is the older 146 mm deck without parts. For the deck with the parts on it (144 / 146.3 mm), and the face PCBs, see [README.md](README.md).
 
-The deck is a round 146 mm two-layer PCB. These steps and settings are for PCBWay, the fab used so far; the Gerbers are standard RS-274X, so any PCB fab can make it with the same settings. Back to the [hand build doc](HAND_BUILD.md). Superseded 2026-11-23 by the deck templates (same layout as the PCB decks) and the PCB decks in `pcb/`; kept for the older 146 mm build.
+The deck is a round 146 mm two-layer PCB. These steps and settings are for PCBWay, the fab used so far; the Gerbers are standard RS-274X, so any PCB fab can make it with the same settings. Back to the [hand build doc](../hand/README.md). Superseded 2026-11-23 by the deck templates (same layout as the PCB decks) and the PCB decks in this folder; kept for the older 146 mm build.
 
 ## Order
 
-1. Use `shield_deck_gerbers.zip` from this folder as it is. Rebuild it with `python make_shield_deck.py` only after changing a `deck` row in `parameters.csv` ([Using the scripts](HAND_BUILD.md#using-the-scripts)).
+1. Use `../hand/shield_deck_gerbers.zip` (the hand build's folder) as it is. Rebuild it with `python make_shield_deck.py` there only after changing a `deck` row in the parameter files ([Using the scripts](../hand/README.md#using-the-scripts)).
 2. Upload the zip to PCBWay's quick-order PCB page with the [order settings](#order-settings) below.
 3. Check it in PCBWay's online Gerber viewer before paying.
 
@@ -50,4 +50,4 @@ RP-SMA connector thread OD is 6.3 mm, so 6.5 mm gives ~0.2 mm clearance. If the 
 
 The M4 holes sit where a 7 mm (across flats) M4 nut, under the deck inside the core, has two flats flush against the faces' inner sides (`FACE_THICK = 1.6` mm boards) in each corner; solder the nut to the deck pad and both faces. 4.8 mm gives the bolt a little room to find the nut. If the faces are a different thickness, or a seam fillet fills the corner, change `FACE_THICK` / `NUT_GAP` and regenerate.
 
-Exact coordinates: `hole_table.csv`.
+Exact coordinates: `../hand/hole_table.csv`.
