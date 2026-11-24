@@ -19,6 +19,10 @@ in Home Assistant. See `README.md` and each folder's README.
   hand-edit outputs. Plate layouts round-trip through Inkscape: `make_plate_svg.py` -> edit ->
   `read_plate_svg.py` (writes `builds/hand/parameters.csv`, checks rules). `shield_deck/README.md`
   only points to the new folders.
+- Docs take their numbers from the parameter CSVs, unless there is a reason not to (a measured result, a part's
+  datasheet value used once): generate them where practical (e.g. `docs/make_antenna_doc.py` writes
+  `docs/ANTENNA_SELECTION.md` from `parameters.csv`, `common/layout.py` and the RF runs), and name the parameter
+  beside any number written by hand. A part spec several docs use goes in `parameters.csv`.
 - `boards/`: module boards either build can use (`carrier/`, `radio3/`, `led/`, each with its own
   `parameters.csv`, loaded with `params.load(boards=[...])`) and `lib/kicad_lib.py`, the KiCad
   helpers every board generator shares, `builds/pcb/make_pcbs.py` included.

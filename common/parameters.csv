@@ -44,3 +44,8 @@ M3_KEEPOUT,10.0,mm,design,pcb,"washer keep-out round each M3 (no tracks or vias,
 J1_POS,22.2 60.0,mm deg,design,pcb,"J1 (JST PH 4-pin vertical TH, 5V / GND / DATA / CMD like the carrier Up port) pin-row centre: radius, angle. 2026-11-23: on the head XIAO's axis just inside its antenna end, row parallel to that edge, housing on the bottom (inside the core) so only the pins are on top, outside DECK_CENTRE_CLEAR. Was r 17 at 76 deg"
 J2_POS,22.2 300.0,mm deg,design,pcb,"J2 (5V in, JST PH 2-pin vertical TH, housing on the bottom): pin-row centre radius, angle. 2026-11-23: on U4's axis just inside its antenna end, row parallel to that edge. Was r 17.5 at 322 deg"
 ENDPLATE_DIAMETER,144.0,mm,design,endplate,"end plate PCB across the far end of the triangle, FACE_H below the deck. Outer face corners at r 69.3: 144 leaves 2.7 mm of plate past them; under ~146 so it does not reach past the ducks. Not simulated (110 / 140 / 170 were) (2026-11-22)"
+ANT_DUCK_LENGTH,108.0,mm,spec,antenna,"HiRO H50327 rubber duck (the reference duck): length, RP-SMA, 2.4 / 5 GHz half-wave sleeve dipole. docs/ANTENNA_SELECTION.md"
+ANT_DUCK_GAIN,2.0,dBi,spec,antenna,"HiRO H50327 rated gain"
+ANT_STUBBY_LENGTH,28.4,mm,spec,antenna,"2.4 GHz stubby (OL-3464-2X, owner's candidate 2026-11-24): end to end, RP-SMA male, 2 dBi, a shortened quarter-wave monopole; modelled as a straight monopole this long"
+ANT_STUBBY_RADOME,20.3,mm,spec,antenna,"stubby radome length below the connector (the element is inside it)"
+ANT_STUBBY_GAIN,2.0,dBi,spec,antenna,"stubby rated gain"

@@ -1,5 +1,7 @@
 # RF model of a sector and bearing simulation
 
+Antenna and spacing choice, summarised from these runs: [`../docs/ANTENNA_SELECTION.md`](../docs/ANTENNA_SELECTION.md) (rerun `docs/make_antenna_doc.py` after new runs).
+
 `sector_model.py` simulates one sector of the mast with [openEMS](https://openems.de) (free, open-source FDTD).
 It builds the copper deck, the triangular core and the antennas at the three D holes from
 the parameter files (`../common/parameters.csv` plus one build's own: `--build hand`, the default, is the

@@ -1,0 +1,5 @@
+label,antenna,spacing_mm,run,bearing,notes
+Duck (H50327) at 15 mm,duck,15,rev3_d15_copper_gusset,bearing_rev3_stubby_d15_d31,"half-wave sleeve dipole modelled as a centre-fed dipole, feed DUCK_FEED_DEPTH below the deck; rev 3 copper, end plate"
+Duck (H50327) at 31 mm,duck,31,rev3_d31_copper_gusset,bearing_rev3_gusset,"as above, 31 mm deck"
+Stubby monopole at 15 mm,stubby,15,rev3_d15_copper_stubby,bearing_rev3_stubby_d15_d31,"modelled as a straight monopole ANT_STUBBY_LENGTH long; the match is the wire's, not the part's"
+Stubby monopole at 31 mm,stubby,31,rev3_d31_copper_stubby,bearing_rev3_stubby_d15_d31,"as above, 31 mm deck"
