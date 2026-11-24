@@ -336,6 +336,13 @@ The copper runs above have the face's centre RP-SMA hole (the face PCB as built)
 (hole dropped for a few hours on 2026-11-23) are kept in `out/rev3_*_copper*_solidface` and
 `out/bearing_rev3_solidface`: bearing within 0-1 deg of these, so the hole doesn't change the result.
 
+The same copper runs on the service layout (M4 corner bolts, J1 / J2 on the bottom, ties at 248 deg, face gusset
+slots open, gussets not modelled; ble-beacon-tracker 74aa1a4) are in `out/rev3_*_copper*_gusset` and
+`out/bearing_rev3_gusset` (2026-11-24, openEMS v0.37.0 built natively from the Dockerfile's source; S11 within 0.2 dB
+and peak gain within 0.1 dBi of the earlier runs). Bearing: 15 mm deck 15 / 38 deg median / 90% (14 / 38 before),
+31 mm deck 15 / 40 (14 / 39), right sector within 0.2 points: the layout changes and slots cost nothing measurable.
+Isolation below about -48 dB moves by several dB between runs and isn't a layout signal.
+
 - **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
   median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,
   the hollow core, the layer-to-layer vias) doesn't change the result: the outline model is enough for size and
