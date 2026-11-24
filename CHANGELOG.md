@@ -6,8 +6,30 @@ when the image was built, where known.
 
 ## Unreleased
 
+### Repo layout
+
+- Split (2026-11-23): `shield_deck/` is now two builds of the same mast plus their shared geometry.
+  `common/` holds `parameters.csv` (rows read by `layout.py`, by both builds, or by the RF model for both),
+  `params.py` and `layout.py`; `builds/pcb/` the PCB build (`make_pcbs.py`, `out/`, `REV3_PLAN.md`)
+  and `builds/hand/` the hand build (templates, plate SVGs, copper deck Gerbers; `HAND_BUILD.md` became its
+  `README.md`). Each build has its own `parameters.csv`; `params.load(build="pcb"|"hand")` reads common plus that
+  file and refuses a name in two files. `read_plate_svg.py` writes `builds/hand/parameters.csv`.
+  `rf_model/sector_model.py --build pcb|hand` picks the mast (`--deck` implies `pcb`; plain disc is `hand`).
+  Files moved with `git mv`; every generator gives the same output as before (only the templates' formulas page
+  names the new paths). `shield_deck/README.md` points to the new folders. Pins are unchanged: the hand build's
+  wiring, firmware 0.8.0 and the PCB deck still disagree (see either build's README, Firmware and pins).
+  `PCBWAY.md` (order notes for the superseded bare 146 mm deck) is retired; the PCB README's order settings
+  now stand alone. New `boards/` for module boards either build can use: `carrier/` (one radio, Up + two branch ports),
+  `radio3/` (three radios, one Up cable) and `led/` (LED add-on), README stubs with empty `parameters.csv`
+  so far, loaded with `params.load(boards=[...])`; `kicad_lib.py` moved to `boards/lib/`.
+
 ### Simulation
 
+- Added (2026-11-23): `rf_model/sector_model.py --deck d15|d31 [--end-plate] [--copper]` models the rev 3
+  PCBs, as outlines (deck disc + pipe hole, solid core, end plate disc) or as their real copper
+  (`shield_deck/pcb/out/*_copper.json`, now written by `make_pcbs.py`; hollow core of face boards).
+  Four runs and their bearing comparison in `rf_model/README.md`: outline and copper agree within 0.3 dB and
+  1-2 deg; the 15 mm deck gives the narrower beam and 14-15 deg median bearing error vs 14-16 at 31 mm.
 - New `sim/` (2026-11-20): ngspice models of the unified power + LED board and a model of the LED
   direction ring, run by `sim/run_sim.sh`. All checks pass; a short on the strip is flagged: the
   splitter current-limits before the 2 A fuse can open, and the 5 V rail collapses.
@@ -119,9 +141,72 @@ Earlier, frame v2 (scanner firmware 0.3.0):
 - Added (2026-11-12): `sector_model.py --spacing` and a D-hole spacing sweep (15-34 mm,
   `rf_model/out/h50327_c65_s*`, `out/bearing_spacing`): 31 mm is within 1 deg of the best;
   keep it.
+- Added (2026-11-23): mast size study. `sector_model.py` gains `--sectors N` (any N-sided core; every run
+  writes `meta.json`, which `bearing_sim.py` reads), `--set NAME=VALUE` (override any `parameters.csv` value
+  for one run) and `--fine`; the dipole feed depth defaults to the new `RF_FEED_DEPTH`. New `size_sweep.py`
+  sweeps sectors, face size, spacing, element and end plate with every dimension from `parameters.csv` (new
+  rows `RF_SECTORS`, `RF_FEED_DEPTH`, `DUCK_FEED_DEPTH`, `CHIP_STANDIN_LENGTH`; group `rf`). Results in
+  `rf_model/out/size*/` and `rf_model/README.md`.
 
 ### Shield deck
 
+- Changed (2026-11-23): two build docs for the same mast: the PCB build (`shield_deck/pcb/README.md`) and the
+  hand build (`shield_deck/HAND_BUILD.md`, was `shield_deck/README.md`, which is now an index). Shared geometry
+  in `shield_deck/layout.py`. Hand-build templates part way through an update to it: deck drill templates per
+  duck spacing (with the acrylic plate's M4 corner holes and the on-deck parts' positions), a plain
+  butt-jointed face and a formulas page printed from `layout.py`; the plate, stack, wiring, LED and unified
+  board pages still show the older layout and D8 wiring (marked in `HAND_BUILD.md`).
+- Removed (2026-11-23): the face PCB's centre RP-SMA hole (face-centre dipole option); the face is now solid
+  GND both sides. USB warning with a caution sign right in front of each XIAO USB-C plug and beside J2; caution
+  signs on every power warning.
+- Changed (2026-11-23): deck rev 3 gets the end plate's centre knockout (broken out for the pipe on a deck), so
+  a d15 deck turned over can serve as the end plate (RF model: same result as the end plate PCB, which stays as
+  the option). Repo URL on every silkscreen. Antenna strain relief ties moved out to 15 mm from the IPEX4 (3.3 mm
+  clear of the XIAO), labelled "ANT STRAIN RELIEF TIE", with a dotted pigtail path from the IPEX4 marker.
+- Changed (2026-11-23): `shield_deck/pcb/` revision 3, as specified in `REV3_PLAN.md` (KiCad 7, DRC 0 errors
+  on all four boards, not yet ordered or built). The three XIAOs sit inside the core on the corner axes
+  (antenna end 24 mm, USB-C out to the corners), so every net runs inside the shield, on both layers there.
+  Star wiring for relay protocol 4: the 2 o'clock XIAO is the head (D10 -> J1 DATA), the other two D10 ->
+  head D0 / D1, J1 CMD -> every D7. J1 is a 4-pin JST PH (5V / GND / DATA / CMD, as the carrier Up port),
+  J2 a 2-pin PH footprint for 5V in; both through-hole with the housing outline on both sides. +5V is
+  tracks only, with a 0.5 mm clearance DRC rule (`out/*.kicad_dru`) and the bottom pour held 2 mm back
+  from +5V pads. One tie square per pigtail, square to the cable, 13 mm from the IPEX4. Round 22.2 mm pipe
+  hole and three plated M3 registration holes (r 25.75 mm) replace the 62 mm opening and the bayonet
+  lugs. Removed: the LED block and every LED net, the service switch (deck loop, end plate hole, silk),
+  R3; warning silk now "UNPLUG POE BEFORE USB". The deck is built once per duck spacing in
+  `DECK_VARIANTS`: `out/deck_d15_*` (144 mm) and `out/deck_d31_*` (146.3 mm) replace `out/deck_pcb_*`.
+  C1 is left off (no room for the 8 mm footprint inside the core; open). New and retired values in
+  `parameters.csv` (retired rows moved to group `retired`); the 1:1 print PDF has seven pages;
+  `make_pcbs.py` also writes `pcb_preview.png`. Needs protocol 4 scanner firmware (not written yet).
+- Added (2026-11-23): `shield_deck/pcb/REV3_PLAN.md` and `rev3_layout.png`, the settled spec for deck
+  PCB revision 3 (not implemented yet): radios inside the core with every net inside the shield, star
+  wiring with a 4-pin J1, strain-relief ties square to each pigtail, 22.2 mm round pipe hole with the
+  M3s for registration, no LED block, no service switch, deck 144 / ~147 mm built for both duck
+  spacings (15 and 31 mm).
+- Changed (2026-11-22): `shield_deck/pcb/` revision 2 (KiCad 7, DRC 0 errors on all three boards, not
+  yet ordered or built). New optional 144 mm end plate PCB across the far end of the triangle: bare GND
+  both sides, the nine face slots and seam copper, a centre RP-SMA hole in a mouse-bite knockout that breaks
+  out to pass the 1/2 in PVC adapter thread (clamped by a faucet lock nut), and a hole for a panel-mount
+  service switch. Faces: tabs, relief notches and exposed seam copper on both ends, power warning on the
+  outside. Deck: D1-D4 / JP1-JP4 removed (every 5V pin straight to the rail); service switch loop SW1 in
+  series with 5V IN, shipped bridged, cut when a switch is wired in; warning now "SET SERVICE BEFORE USB";
+  assembly steps in silkscreen; 62 mm opening with three bayonet lugs and the collar M3s at r 41 mm; J1 out
+  to 48 mm; C1 one footprint for an 8 mm SMD or radial can, leads inside the core; J4 1 x 3 2.54 mm header
+  beside the J3 pads (both 5V / DIN / GND); U1 on channel 3; slots 9.4 mm long (was 10.4); F1 Littelfuse
+  0466002.NR. New `endplate` group in `parameters.csv`; `out/deck_part_clearance.csv` lists each part's
+  distance to the seam strip; the 1:1 print PDF has five pages.
+- Added (2026-11-21): `shield_deck/pcb/`, a parts-on-the-deck build generated with KiCad 7
+  (`make_pcbs.py`, DRC 0 errors, not yet ordered or built). A 170 mm deck PCB (max 171.5 mm,
+  the case interior) with the three XIAOs (castellated, hand-solder pads, USB-C at the rim), the
+  power + LED circuit in SMD (74HCT125, 2 A one-time fuse, polymer tantalum), J1 (JST
+  B7B-PH-K-S, through-hole, inside the core) to the ESP32 on the pipe, 5V IN and LED strip pads,
+  per-module 5 V solder jumpers with optional SMA Schottky footprints, a 57 mm centre opening with
+  three M3 collar holes, and nine slots that key the faces. Kept the D, P, P2 holes; dropped the C,
+  core and M4 holes. Plus a 120 x 120 mm face PCB: one centre RP-SMA hole, three tabs, exposed
+  seam edges. Replaces the acrylic plate, the bus / unified stripboard and the hand-cut faces for
+  this build; the older files stay. Groups `pcb` and `face` in `parameters.csv`; 1:1 print check
+  `pcb/out/pcb_print_1to1.pdf`. Power from PoE or USB, never both (warning on the board and in
+  `pcb/README.md`).
 - Added (2026-11-20): option page for a unified power + LED board (templates page 8; the design
   formulas are now page 9): one stripboard on the pipe in place of the bus board and the LED power
   board, which both stay. XIAOs fed from the splitter rail (no VBUS wire), one-time 2 A fuse on the

@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in the scanner firmware, gateway or deck scripts doesn't work
+description: Something in the scanner firmware, gateway or build scripts doesn't work
 labels: [bug]
 body:
   - type: dropdown
@@ -9,7 +9,9 @@ body:
       options:
         - Scanner firmware (scanner_fw)
         - Gateway (ESPHome)
-        - Shield deck / templates
+        - Mast build: PCB (builds/pcb)
+        - Mast build: hand / templates (builds/hand)
+        - Module boards (boards)
         - Docs
         - Not sure
     validations:

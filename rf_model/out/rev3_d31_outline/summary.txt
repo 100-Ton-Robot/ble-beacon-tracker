@@ -1,0 +1,23 @@
+command: python3 sector_model.py --antenna dipole --centre 65 --deck d31 --end-plate --out out/rev3_d31_outline
+date: 2026-11-23 14:05 UTC
+PCBs (rev 3): deck d31, 146.3 mm, outline: disc + pipe hole, solid core, end plate
+antenna: dipole, element 58.4 mm, 31 mm in front of the face, feed 65 mm below the deck, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [59, 61, 54] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11   -5.9 dB  Zin  104.6  +65.6j ohm
+  2440 MHz  S11   -5.1 dB  Zin  110.6  +78.8j ohm
+  2480 MHz  S11   -4.4 dB  Zin  116.9  +92.9j ohm
+
+peak 8.0 dBi at az 0, el 0 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         8.0       0      105 deg       25.0 dB
+   -15         7.0       0      105 deg       22.8 dB
+   -30         4.1       0      125 deg       20.5 dB
+   -45        -0.0     330      145 deg       42.7 dB
+   -60        -5.3      30      145 deg       12.6 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -48.6 dB
+  S2: -48.6 dB

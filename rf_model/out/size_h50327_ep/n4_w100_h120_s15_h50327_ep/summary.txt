@@ -1,0 +1,25 @@
+command: python3 sector_model.py --antenna dipole --sectors 4 --spacing 15 --centre 65 --set FACE_WIDTH=100 --set FACE_H=120 --set DISC_DIAMETER=146.9 --end-plate --set ENDPLATE_DIAMETER=146.9 --out out/size_h50327_ep/n4_w100_h120_s15_h50327_ep
+date: 2026-11-23 19:00 UTC
+deck: 147 mm disc, solid core, end plate 146.9 mm
+4 sectors, faces 100 x 120 mm, overrides: FACE_WIDTH=100, FACE_H=120, DISC_DIAMETER=146.9, ENDPLATE_DIAMETER=146.9
+antenna: dipole, element 58.4 mm, 15 mm in front of the face, feed 65 mm below the deck, other sectors' antennas in, 50 ohm
+f0 2440 MHz, mesh [59, 59, 54] cells
+
+match (sector 0 port, 50 ohm):
+  2402 MHz  S11   -3.4 dB  Zin   43.4  +84.8j ohm
+  2440 MHz  S11   -2.8 dB  Zin   47.3 +101.3j ohm
+  2480 MHz  S11   -2.4 dB  Zin   51.6 +118.9j ohm
+
+peak 8.6 dBi at az 0, el 0 deg
+
+elevation   max dBi   at az   -3 dB width   front-to-back (az 0 vs 180)
+     0         8.6       0       85 deg       29.4 dB
+   -15         7.7       0       95 deg       24.6 dB
+   -30         5.0       0      105 deg       22.1 dB
+   -45         0.6       0      115 deg       19.5 dB
+   -60        -5.5       0      125 deg       13.2 dB
+
+isolation, sector 0 -> other sectors' ports (|S21|):
+  S1: -50.6 dB
+  S2: -54.8 dB
+  S3: -50.6 dB

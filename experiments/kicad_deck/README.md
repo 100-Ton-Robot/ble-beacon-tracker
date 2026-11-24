@@ -1,7 +1,7 @@
 # Experiment: shield deck through KiCad
 
-Is KiCad a workable replacement for the hand-written Gerber writer in `shield_deck/make_shield_deck.py`?
-Nothing in `shield_deck/` is changed. This folder imports that script's geometry and builds the same board as a KiCad project.
+Is KiCad a workable replacement for the hand-written Gerber writer in `builds/hand/make_shield_deck.py`?
+Nothing in `builds/hand/` is changed. This folder imports that script's geometry and builds the same board as a KiCad project.
 
 ## Run
 

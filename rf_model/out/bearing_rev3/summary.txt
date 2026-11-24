@@ -1,0 +1,21 @@
+command: python3 bearing_sim.py out/rev3_d15_outline out/rev3_d15_copper out/rev3_d15_copper_deckplate out/rev3_d31_outline out/rev3_d31_copper --out out/bearing_rev3
+date: 2026-11-23 14:55 UTC
+fading 5.0 dB/advert, 3 adverts/s, room 3.0 dB, shadow 4.0 dB, window 1 s, mast 1.4 m above the beacon, beacons 1-15 m out, n 2.2
+
+pattern      |bearing error| deg: median  90%   rms   (<=5 m / >5 m median)   right sector   range error: median  90%
+rev3_d15_outline                        15    39    25      ( 17 /  13)              84.4%               52%  100%
+rev3_d15_copper                        14    38    24      ( 16 /  12)              83.5%               53%  100%
+rev3_d15_copper_deckplate                        14    38    25      ( 16 /  12)              83.6%               54%  100%
+rev3_d31_outline                        16    42    28      ( 18 /  14)              80.9%               54%  100%
+rev3_d31_copper                        14    39    26      ( 16 /  12)              81.1%               53%  100%
+
+median |bearing error| deg, room reflections x tracker window (fading, adverts, shadow as above):
+  room dB  window s  rev3_d15_outline  rev3_d15_copper  rev3_d15_copper_deckplate  rev3_d31_outline  rev3_d31_copper
+        0         1          12          11          11          12          11
+        0         5           6           5           5           6           5
+        2         1          13          13          13          14          13
+        2         5           9           8           8          10           8
+        3         1          15          15          15          17          15
+        3         5          12          11          11          13          12
+        5         1          19          19          19          21          19
+        5         5          18          18          17          19          17

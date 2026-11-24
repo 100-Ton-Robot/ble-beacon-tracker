@@ -47,7 +47,7 @@ def write_pattern(root, bw, floor):
 
 def run(folder, trials, **kw):
     a = argparse.Namespace(fading=5.0, room=3.0, shadow=4.0, adverts=3, window=1, height=1.4, n=2.2,
-                           tx1m=-59.0, trials=trials, seed=1)
+                           tx1m=-59.0, trials=trials, seed=1, sectors=None)
     for k, v in kw.items():
         setattr(a, k, v)
     r = bs.simulate(folder, a, np.random.default_rng(1))

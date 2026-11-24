@@ -2,7 +2,9 @@
 
 `sector_model.py` simulates one sector of the mast with [openEMS](https://openems.de) (free, open-source FDTD).
 It builds the copper deck, the triangular core and the antennas at the three D holes from
-`../shield_deck/parameters.csv`, so the model follows the deck when you change it there. It feeds sector 0's
+the parameter files (`../common/parameters.csv` plus one build's own: `--build hand`, the default, is the
+hand build's plain `DISC_DIAMETER` disc; `--build pcb` the rev 3 PCBs, see below), so the model follows the deck
+when you change it there. It feeds sector 0's
 antenna and ends the other two sectors' antennas in 50 ohm, the way their radios do.
 
 What you get, in `out/<antenna>/`:
@@ -37,10 +39,21 @@ On Linux with openEMS installed, `python3 sector_model.py ...` runs it directly.
 
 - `--antenna monopole`: a quarter-wave whip straight down from the D jack, the deck as its ground plane.
 - `--antenna dipole`: a rubber duck as a vertical half-wave dipole; `--centre` sets its feed point's depth below
-  the deck (default 45 mm).
+  the deck (default `RF_FEED_DEPTH`, 45 mm; the H50327 runs use `DUCK_FEED_DEPTH`, 65 mm).
 - `--spacing` moves the antennas in or out from the faces (default `DUCK_SPACING`, 31 mm: the D hole).
 - `--length` sets the element length (default 0.95 x a quarter or half wavelength at `RF_FREQ`).
-- `--single` leaves out the other two sectors' antennas.
+- `--single` leaves out the other sectors' antennas.
+- `--sectors N` builds an N-sided core with N sectors 360/N apart (default `RF_SECTORS`, 3).
+- `--build pcb|hand` picks the mast: `hand` (the default without `--deck`) is a plain copper disc of
+  `DISC_DIAMETER` with the antennas `DUCK_SPACING` out; `pcb` (the default with `--deck`) is the rev 3 deck,
+  `--deck d15` unless another is given. Each reads `../common/parameters.csv` plus `../builds/<build>/parameters.csv`.
+- `--set NAME=VALUE` overrides any value in those files for this run only (repeatable), e.g.
+  `--set FACE_WIDTH=80 --set DISC_DIAMETER=125`. Every dimension the model uses comes from them; the
+  logged command carries the overrides, so it reproduces the run.
+- `--end-plate` adds the end plate (`ENDPLATE_DIAMETER`) across the far end of the core.
+- `--fine` uses a finer mesh (0.5 mm at the antenna, lambda/32 elsewhere) for convergence checks.
+- Each run also writes `meta.json` (sectors, face size, deck and end plate, spacing, feed, overrides);
+  `bearing_sim.py` takes the sector count from it.
 - `--coarse` uses a coarser mesh for a quick check. On a 12-core PC the coarse run takes about 10 s and the full
   one about 20 s of solver time; the two agreed within about 0.5 dB on the monopole.
 
@@ -205,6 +218,73 @@ moved in and out with `--spacing`; 34 mm is as far out as a 6.5 mm hole fits on 
   checking the real match there (NanoVNA or the RSSI walk). The reflector's shape (wider faces, wings) is still the
   bigger lever.
 
+## Mast size, sector count and end plate (2026-11-23)
+
+How small can the mast get, and do a fourth sector or an end plate help? `size_sweep.py` runs one
+`sector_model.py` per geometry with `--set` overrides (face size, deck, end plate), then scores it with the bearing
+simulation (default noise) and the back-level measure from `spec_sweep.py`. Each sweep writes `summary.txt` and
+`summary.csv` in its `out/size*/` folder.
+
+Every dimension comes from `../common/parameters.csv` and `../builds/hand/parameters.csv` (each run is `--build hand`, a plain disc):
+
+- Deck: the rev 3 rule (`../common/layout.py`) scaled to the core: the larger of the D hole's exposed
+  pad + `DECK_EDGE_MARGIN`, and the core's corners + the margin `DECK_MIN_DIAMETER` leaves past today's corners
+  (2.7 mm).
+- End plate: the core's corners + the margin `ENDPLATE_DIAMETER` leaves past today's corners (2.7 mm).
+- Elements: `h50327`, the reference duck fed `DUCK_FEED_DEPTH` (65 mm) below the deck; `short`, a
+  `CHIP_STANDIN_LENGTH` (20 mm) dipole at mid face height, a pattern stand-in for a chip antenna (its match and
+  carrier ground are not modelled); `dipole`, a half-wave dipole at mid face height.
+
+Checks: the ported model reproduces the PCB branch's patterns within 0.01 dB. The end-plate reference
+(`out/ep_ref_0`, `out/ep_ref_140`: duck, 170 mm deck, no plate / 140 mm plate; `out/bearing_ep_ref`) gives
+median bearing error 20 -> 16 deg and 90% 64 -> 46 deg. The fine mesh agrees with the default within 1 deg
+(`out/size_ep_fine/`, `out/size_h50327_ep_fine/`). The coarse mesh is not good enough for size work.
+
+**Ducks (H50327), faces 120 mm tall, with end plate** (`out/size_h50327_ep/`):
+
+| Sectors | Face width | Spacing | Deck | End plate | Median | 90% | Right sector |
+|---|---|---|---|---|---|---|---|
+| 3 | 120 mm | 31 mm | 146 mm | 144 mm | 16 deg | 42 deg | 81% |
+| 3 | 120 | 15 | 144 | 144 | 15 | 39 | 84% |
+| 3 | 100 | 15 | 121 | 121 | 15 | 39 | 83% |
+| 3 | 80 | 15 | 98 | 98 | 15 | 42 | 82% |
+| 3 | 60 | 15 | 80 | 75 | 16 | 46 | 80% |
+| 4 | 60 | 15 | 105 | 90 | 15 | 45 | 68% |
+| 4 | 80 | 15 | 125 | 119 | 13 | 36 | 71% |
+| 4 | 100 | 15 | 147 | 147 | 12 | 33 | 73% |
+| 4 | 120 | 15 | 175 | 175 | 11 | 31 | 75% |
+
+**Short element (chip stand-in), square faces, with end plate** (`out/size_ep/`):
+
+| Sectors | Face | Spacing | Deck | Median | 90% |
+|---|---|---|---|---|---|
+| 3 | 120 mm | 15 mm | 144 mm | 14 deg | 37 deg |
+| 3 | 100 | 15 | 121 | 16 | 45 |
+| 3 | 80 | 15 | 98 | 19 | 59 |
+| 3 | 60 | 15 | 80 | 23 | 75 |
+| 4 | 60 | 8 | 91 | 16 | 54 |
+| 4 | 80 | 8 | 119 | 13 | 42 |
+| 4 | 100 | 15 | 147 | 11 | 33 |
+
+Without the end plate (`out/size/`, `out/size_h50327/`): the duck masts are 4-7 deg worse at the median and their
+90% tail passes 100 deg once the faces narrow (e.g. 60 x 120 mm at 15 mm: 20 deg, 90% 115 deg); ducks on faces
+shorter than they hang (80 x 80 mm) fail (48-101 deg). The chip stand-in on square faces changes little either way:
+3 sectors at 60 mm / 15 mm is 20 deg without the plate and 23 deg with it, 80 mm is 20 vs 19 deg.
+
+What it shows:
+
+- For the ducks, the end plate is the biggest gain after spacing; for the chip stand-in on short square faces it
+  barely matters.
+- 15 mm spacing beats 31 mm at every size. 8 mm adds little and drops the feed resistance to about 13-20 ohm (a
+  hard match).
+- With the end plate, the duck mast can narrow to 60-80 mm wide x 120 mm tall faces (80-98 mm across) at
+  15-16 deg, as good as the 144 mm version.
+- Face height matters as much as width: ducks on 60 x 120 mm faces (16 deg) beat the chip stand-in on 60 x 60 mm
+  faces (23 deg) at the same diameter.
+- A fourth sector gains 2-4 deg at the same face width, for one more radio and 25-30% more diameter.
+- 45 mm faces are about 30 deg either way.
+- No geometry reaches 20 dB back rejection at el -55 (best about 12 dB).
+
 ## Every simulation run
 
 All runs are kept. `run_all.sh` holds every run behind this README, in order, and re-runs the lot in about 4 min:
@@ -232,6 +312,44 @@ only on the command line. Re-running all of them on 2026-11-12 reproduced the ea
 | `out/spec_sweep` | Idealised beams: beamwidth x back floor x noise | Back rejection matters most; specs above |
 
 ## Limits
+
+## Rev 3 PCBs: outline vs real copper (2026-11-23, full mesh)
+
+The rev 3 boards (`../builds/pcb`, `--build pcb`) at two levels of detail, H50327 with its feed 65 mm down, end plate fitted:
+`--deck d15|d31 --end-plate` (outline: deck disc of the variant's diameter with the 22.2 mm pipe hole, solid core,
+144 mm end plate disc) and the same with `--copper` (both deck layers 1.6 mm apart joined by every plated hole and
+via, every hole, slot and track gap, the end plate's copper including the knockout ring, and a hollow core of three
+1.6 mm face-board slabs with their tabs through the slots; from `../builds/pcb/out/*_copper.json`, written by
+`make_pcbs.py`). Antennas at each deck's D holes (15 / 31 mm).
+
+| Run | S11 at 2440 | Peak | -3 dB width el 0 / -30 | F/B el 0 / -30 | Isolation | Median bearing error | 90% | Right sector |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| d15 outline | -2.8 dB | 8.8 dBi | 85 / 105 deg | 29.4 / 19.9 dB | -49.3 dB | 15 deg | 39 deg | 84.4% |
+| d15 copper | -2.7 dB | 8.7 dBi | 85 / 95 deg | 29.2 / 20.2 dB | -49.4 dB | 14 deg | 38 deg | 83.7% |
+| d15 copper, deck board as end plate | -2.6 dB | 8.7 dBi | 85 / 95 deg | 29.5 / 19.9 dB | -49.7 dB | 14 deg | 38 deg | 83.7% |
+| d31 outline | -5.1 dB | 8.0 dBi | 105 / 125 deg | 25.0 / 20.5 dB | -48.6 dB | 16 deg | 42 deg | 80.9% |
+| d31 copper | -5.0 dB | 8.1 dBi | 100 / 130 deg | 30.2 / 21.0 dB | -52.1 / -49.4 dB | 14 deg | 39 deg | 81.0% |
+
+(`out/rev3_*`, bearing at default noise in `out/bearing_rev3`.)
+
+- **Outline vs copper:** the two agree to within 0.3 dB on match, peak and the main-lobe numbers, and to 1-2 deg on
+  median bearing error, which is at the simulation's noise level (about 1 deg). The real copper (holes, slots,
+  the hollow core, the layer-to-layer vias) doesn't change the result: the outline model is enough for size and
+  spacing questions. Single-angle front-to-back figures differ more where a null lands near az 180 (d31 at el -45:
+  42.7 vs 16.9 dB); read those as "a null is near", not as a real difference.
+- **d15 vs d31:** 15 mm gives the narrower beam (85 vs 100-105 deg at el 0), the higher peak (8.7-8.8 vs 8.0-8.1
+  dBi) and a slightly better bearing (14-15 vs 14-16 deg median, 37-39 vs 39-42 deg at 90%, 84 vs 81% right
+  sector). The duck's match is worse close to the face (-2.8 vs -5.1 dB S11), as in the spacing sweep; for a
+  receiver that costs little.
+- **Deck board as end plate** (`--end-plate deck`: a second d15 deck turned over, knockout in): the same as the
+  end plate PCB within 0.1 dB and 0 deg, so one board design can serve both plates at 15 mm. (The d15 and d31
+  copper runs were re-run after the deck gained its knockout, broken out in the model; within 0.3 dB / 1 deg of the
+  first runs.)
+- **Not comparable** with the older runs above (146 mm disc, no end plate, no pipe hole): both the deck size and
+  the end plate changed at once.
+- **Model limits (`--copper`):** tracks and gaps narrower than the 1 mm mesh are only roughly resolved, the faces
+  at 120 / 240 deg are staircased, the face board is solid metal through its thickness, and the XIAOs, coax and
+  pipe are not in the model.
 
 Not modelled: the enclosure, the electronics plate and its parts, the coax runs, the bolts and spacers, the
 printed-dipole panels and the DIY dipoles. The core is a solid copper prism (only its outside affects the pattern),

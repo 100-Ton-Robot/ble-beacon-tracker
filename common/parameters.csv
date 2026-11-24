@@ -1,0 +1,41 @@
+name,value,unit,source,group,note
+FACE_WIDTH,120.0,mm,design,deck,triangular reflector core face width
+PATCH_OFFSET,7.0,mm,measured,deck,"P / P2 holes: patch connector axis -> copper face. Measured panel: axis in line with the housing back, so the panel stands this far off the face (plug nut clearance)"
+PATCH_END_INSET,35.0,mm,design,deck,"P2 hole: same offset, this far in from the face's counter-clockwise end (top view), i.e. 25 mm off the face centre. Moved in from 14 on 2026-11-10 (user) so one coax length reaches from back-panel positions A and C (notch assumed centred on the board's long edge)"
+FACE_THICK,1.6,mm,spec,deck,core face board (copper clad) thickness: the M4 nuts sit against its inner side
+EDGE_CLEAR,0.5,mm,design,deck,copper pull-back from the board edge
+RIM_MASK_WIDTH,4.0,mm,design,deck,exposed copper ring at the rim (copper-tape edge seal)
+SEAM_STRIP,6.0,mm,design,deck,exposed strip on the bottom for soldering the core seams
+PAD_EXPOSE,12.0,mm,design,deck,exposed copper round each RP-SMA hole (nut contact)
+STITCH_COUNT,36,count,design,deck,
+HOLE_RPSMA,6.5,mm,spec,deck,RP-SMA bulkhead (thread OD 6.3 mm)
+FACE_H,120.0,mm,design,panel,back panel height: square 120 x 120 faces so the core fits the enclosure
+XIAO_L,21.0,mm,spec,plate,Seeed XIAO nRF54L15 board length
+XIAO_W,17.8,mm,spec,plate,XIAO board width
+XIAO_IPEX,8.25 3.9,mm,measured,plate,"IPEX4 (MHF4) centre from the XIAO centre: along toward its end, across toward the D0-D6 pin edge"
+ADAPTER_HOLE,22.2,mm,spec,pipe,7/8 in drill for the 1/2 in male pipe adapter thread (21.3 mm OD)
+ENC_OD,177.0,mm,spec,enclosure,"PP pail (housing, https://a.co/d/08ZUdBcy) outside diameter, vendor approx. 7 in"
+ENC_OH,188.0,mm,spec,enclosure,"PP pail outside height, vendor approx. 7.4 in"
+ENC_ID,170.0,mm,spec,enclosure,"PP pail inside diameter, vendor approx. 6.7 in"
+ENC_IH,180.0,mm,spec,enclosure,"PP pail inside height, vendor approx. 7.1 in"
+ENC_MOUTH_ID,160.0,mm,spec,enclosure,"PP pail opening inside diameter, vendor approx. 6.3 in: the deck and module plate pass through it"
+RF_FREQ,2440.0,MHz,spec,formulas,BLE band centre (2402-2480 MHz): sets the wavelength on the formulas page (page 8)
+RF_SECTORS,3,count,design,rf,rf_model: sectors (core faces) the RF model builds; 3 today. sector_model.py --sectors / size_sweep.py --sectors override it
+RF_FEED_DEPTH,45.0,mm,design,rf,rf_model: default dipole feed point depth below the deck (sector_model.py --centre)
+DUCK_FEED_DEPTH,65.0,mm,estimated,rf,"rf_model: HiRO H50327 duck (108 mm long, base on the deck jack) modelled as a half-wave dipole fed this far below the deck; 55 and 75 give 19-22 deg bearing error, a small effect (README)"
+CHIP_STANDIN_LENGTH,20.0,mm,design,rf,rf_model size_sweep.py: short centre-fed dipole standing in for a chip antenna (pattern only; the chip's match and carrier ground are not modelled)
+COLLAR_HOLE,3.4,mm,design,pcb,"three M3 holes (plated, GND ring) that register the deck to the collar; positions M3_POS"
+XIAO_PAD,3.4 1.6,mm,design,pcb,castellation pad for hand soldering: length (out from the board edge 1.7 mm) x width
+CORE_MARGIN,1.0,mm,rule,pcb,"bottom copper (tracks, vias, through-hole parts) stays inside the core, this far clear of the seam strip. Rev 3: both layers carry signals inside the core"
+MOUNT_SQ,12.5,mm,spec,pcb,"1/2 in HS-100 adhesive tie mount footprint (silkscreen square, mask only underneath): rev 3 has one per XIAO, on its pigtail, square to the cable"
+DECK_VARIANTS,15 31,mm,design,pcb,"duck spacings (DUCK_SPACING values) the generator builds, one deck per value: out/deck_d15, out/deck_d31 (owner 2026-11-23). DUCK_SPACING itself stays the old 146 mm deck's value"
+DECK_MIN_DIAMETER,144.0,mm,design,pcb,"smallest deck: face corners (r 69.3) + 2.7 mm, as the end plate. Deck diameter = max(this, 2 x (inradius + spacing + PAD_EXPOSE / 2 + DECK_EDGE_MARGIN)) (rev 3, 2026-11-23)"
+DECK_EDGE_MARGIN,1.5,mm,design,pcb,board edge past the D hole's exposed pad
+XIAO_CENTRE_V,34.5,mm,design,pcb,"rev 3: XIAO centre this far out along its core corner axis, USB-C end out (v 45), antenna end in (v 24); outer pad corners ~0 mm inside CORE_MARGIN"
+TIE_FROM_IPEX,15.0,mm,design,pcb,"tie square centre this far from the IPEX4 along the pigtail (corner frame u -16.34 v 17.86). 15 (owner 2026-11-23, was 13 in the rev 3 spec): the square sits 3.3 mm clear of the XIAO so it stays visible and reachable once the XIAO is on; 3.1 mm from the M3 washer keep-out, 1.4 mm from the nearest slot"
+PIGTAIL_ANGLE,236.0,deg,design,pcb,"pigtail direction leaving the IPEX4, in the corner frame (clockwise from straight out): 56 deg off straight in, toward the radio's own sector. The tie square is turned square to it"
+M3_POS,25.75 342.0,mm deg,design,pcb,"rev 3 M3 registration holes: radius and first angle; the others at +120 and +240 (342 / 102 / 222), in the free ring between the radios"
+M3_KEEPOUT,10.0,mm,design,pcb,"washer keep-out round each M3 (no tracks or vias, both layers)"
+J1_POS,17.0 76.0,mm deg,design,pcb,"J1 (JST PH 4-pin vertical TH, 5V / GND / DATA / CMD like the carrier Up port) pin-row centre: radius, angle; row tangential, next to the head XIAO"
+J2_POS,17.5 322.0,mm deg,design,pcb,"J2 (5V in from the splitter, JST PH 2-pin vertical TH footprint): pin-row centre radius, angle"
+ENDPLATE_DIAMETER,144.0,mm,design,endplate,"end plate PCB across the far end of the triangle, FACE_H below the deck. Outer face corners at r 69.3: 144 leaves 2.7 mm of plate past them; under ~146 so it does not reach past the ducks. Not simulated (110 / 140 / 170 were) (2026-11-22)"
