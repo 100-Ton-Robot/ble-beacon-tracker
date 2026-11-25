@@ -1,0 +1,11 @@
+decision,question,option,label,changes,columns
+1,Which duck spacing?,"The H50327 duck {DECK_VARIANTS:0} in front of each face (recommended, `docs/ANTENNA_SELECTION.md`)",D15,Drill the D15 holes on the deck template (page 1); cut the deck {=DECK_DIAMETER_D15} round.,
+,,{DECK_VARIANTS:1},D31,Drill the D31 holes; cut the deck {=DECK_DIAMETER_D31} round.,
+2,Which board is the top?,"The acrylic electronics plate, above the deck on M4 spacers",,"The plate's radios sit {SPACER} above the deck, on three M4 bolts in the deck's core corners. The on-deck layout is the PCB build's.",
+3,Will you use 1/2 in PVC pipe?,"Yes: 1/2 in Sch 40 PVC ({PIPE_OD} OD), the pipe plate (page 2) and the stack views (page 5)",Pipe,PoE splitter and ESP32 hang on the pipe inside the core and go in through the deck's {PIPE_SAW} centre hole.,yes
+,,No: the split plate (page 3),No pipe,ESP32 and bus board hang under the plate; the PoE splitter sits in its own 4 in round box.,yes
+,,1/2 in EMT (steel conduit) instead of the PVC pipe,EMT,"{EMT_OD} OD, {EMT_ID} bore; same {ADAPTER_HOLE} hole for a set-screw or compression connector and locknut. Notes below.",
+4,"How will you mount it, and to what?","Your answer: ceiling junction box, wall bracket, post, or a housing",,"With [[Pipe]]: the pipe length, the adapter, nut and cap (page 5) and the enclosure top. With [[No pipe]]: the bracket and the splitter box. Nothing for this is designed in the repo yet: write down what you choose.",
+5,Where are the ESP32 and the power source?,ESP32-S3-ETH and a PoE splitter (5 V USB-C out),,"[[Pipe]]: both on the pipe. [[No pipe]]: the ESP32 under the plate, the splitter in its box.",
+6,Add the options?,LED direction ring (page 7),LED ring,"A WS2812B strip ring above the deck, a second pad board, its own parts list on page 7. Wiring only: the gateway does not drive it yet.",
+,,"Unified power + LED board (page 8, pipe build)",Unified board,"One stripboard in place of the bus board and the LED power board. Drawn only, not built; its wire list still shows the older wiring.",

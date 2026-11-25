@@ -2,15 +2,7 @@
 
 The PCB build. The hand build of the same mast is in [`../hand/README.md`](../hand/README.md); both share [`common/parameters.csv`](../../common/parameters.csv) and [`common/layout.py`](../../common/layout.py). This build's own numbers (tracks, clearances, part positions, face tabs, end plate) are in [`parameters.csv`](parameters.csv) here.
 
-Five boards for PCBWay (or any fab), generated with KiCad from [`make_pcbs.py`](make_pcbs.py). The deck comes in two sizes, one per duck spacing (the D hole's distance in front of each face); order the one that matches your antennas:
-
-| Board | File to upload | Qty per mast | Order |
-| --- | --- | --- | --- |
-| Deck, 15 mm ducks, 144 mm round: the shield plate the antennas go through, with the three scanners on top | `out/deck_d15_gerbers.zip` | 1 (this or the next) | 5 (minimum) |
-| Deck, 31 mm ducks, 146.3 mm round: the same deck with the D holes 31 mm off the faces | `out/deck_d31_gerbers.zip` | 1 (this or the previous) | 5 (minimum) |
-| Face, 120 x 120 mm (+ tabs): one side of the triangle reflector core | `out/face_pcb_gerbers.zip` | 3 | 5 (minimum), so order 5 per mast and keep 2 spare, or 10 for 3 masts |
-| Corner gusset, 21.3 x 13.3 mm: holds an M4 nut in a core corner so a plate bolts on (see Gusset) | `out/gusset_pcb_gerbers.zip` | 6 (3 per bolted plate) | 10 |
-| End plate, 144 mm round, optional: a second shield plate across the far end of the triangle. With 15 mm ducks a second deck board turned over does the same job (see Deck as end plate) | `out/endplate_pcb_gerbers.zip` | 0 or 1 | 5 (minimum) |
+Five boards, generated with KiCad from [`make_pcbs.py`](make_pcbs.py): two deck sizes (one per duck spacing), the face, the corner gusset and the optional end plate. **To build one, follow [`BUILD.md`](BUILD.md)**: decisions, boards to order with fab settings, BOM, the 1:1 print check and the assembly steps (generated from the CSVs here by `docs/make_build_docs.py`). This README describes the boards and how to regenerate them.
 
 This build replaces the hand-drilled acrylic electronics plate, the bus board / unified stripboard and the hand-cut copper-clad faces. The older deck (`../hand/shield_deck_gerbers.zip`, 146 mm, no parts) and the plate templates stay in [`../hand/`](../hand/README.md) for the older build. Status: **generated and DRC-clean, not yet ordered or built** (revision 3, 2026-11-23; spec [`REV3_PLAN.md`](REV3_PLAN.md)). Preview: [`pcb_preview.png`](pcb_preview.png).
 
@@ -30,19 +22,6 @@ Both builds run the same scanner firmware ([`scanner_fw/`](../../scanner_fw/READ
 | PCB deck rev 3 (relay protocol 4) | D10 (head to J1 DATA, the other two to the head) | D7 | head D0 / D1 |
 
 D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 can't carry the stream. Both builds are now drawn on the protocol 4 pins (D10, D7, D0 / D1), the one firmware for both; it isn't in `scanner_fw/` yet (0.8.0 is still per-radio D8).
-
-## Build order
-
-The deck's silkscreen carries the same list.
-
-1. Deck: break out the centre knockout and file the bridge nubs flush, so the pipe adapter passes. (A deck board used as the end plate keeps its knockout unless the pipe goes through.)
-2. Faces first, on the bare boards: drop all three faces' tabs into the deck slots and the end plate slots together (dry fit), tack the faces to each other, check, then solder the face-to-face seams. Push a gusset into each corner's slot pair at both ends, M4 nut on the side away from the plate (a bolt through the plate hole lines it up), and solder tabs and nut. Then bolt the plates on (M4 x 14 cap bolts with washers), or for a permanent build solder or tape the plate seams too. With both plates fitted no squareness jig is needed (see Face).
-3. Clean (IPA).
-4. J1 and J2 on the bottom (housings inside the core, see Deck), then the XIAOs.
-5. RP-SMAs, coax, antenna strain relief ties.
-6. Splitter lead to J2.
-
-To rework a seam later, remove the XIAOs first: their outer pad corners are 1.0 mm from the seam strip (`out/deck_d15_part_clearance.csv`).
 
 ## Deck
 
@@ -98,36 +77,9 @@ A second shield plate across the far end of the triangle, `FACE_H` (120 mm) belo
 - **Adapter:** the pipe glues into the adapter's socket from above, the adapter's shoulder sits on the plate inside the core, the thread goes down through the knockout and a 1/2 in IPS faucet mounting lock nut on the outside clamps the plate (mechanical only, no seal). A 54 mm keep-clear ring is marked on both sides (lock nut estimated at 50 mm across). Check on the dry fit that the assembly still comes out of the housing on the one post nut.
 - **Silkscreen:** inside: "END PLATE - INSIDE", the build-order note; outside: the power warning, the knockout note. Revision 3 removed the service switch hole and its "RUN" / "SERVICE" marks.
 
-## BOM (one mast)
+## Ordering
 
-| Ref | Part | Package | Qty |
-| --- | --- | --- | --- |
-| U2-U4 | Seeed XIAO nRF54L15 | castellated | 3 |
-| J1 | JST B4B-PH-K-S (JLCPCB / LCSC: B4B-PH-K-S(LF)(SN), C131334); mating PHR-4 housing + SPH-002T-P0.5S crimps (4-wire harness to the ESP32, as the carrier Up port) | 2.0 mm TH | 1 |
-| J2 | JST B2B-PH-K-S (JLCPCB / LCSC: B2B-PH-K-S(LF)(SN), C131337); mating PHR-2 + crimps on the splitter lead (or solder the lead into the holes) | 2.0 mm TH | 0 or 1 |
-| - | 1/2 in HS-100 adhesive tie mounts | - | 3 |
-| - | Gusset PCB | - | 3 per bolted plate |
-| - | M4 x 14 cap bolt (DIN 912) + M4 washer (9 mm OD) | - | 3 per bolted plate |
-| - | M4 hex nut, solderable (brass or tin-plated) | - | 3 per bolted plate |
-| - | Deck PCB (15 or 31 mm ducks) | - | 1 |
-| - | Face PCB | - | 3 |
-| - | End plate PCB, optional | - | 0 or 1 |
-| - | 1/2 in IPS faucet mounting lock nut (with the end plate and the pipe through it) | - | 0 or 1 |
-
-C1 (bulk capacitor) is not on revision 3; see Deck.
-
-## Order settings (JLCPCB, PCBWay)
-
-Per board (JLCPCB, PCBWay, or any fab: the Gerbers are standard RS-274X; the boards are generated to the rules in [Fab rules](#fab-rules)):
-
-| Setting | Deck | Face | End plate |
-| --- | --- | --- | --- |
-| Size | 144 x 144 mm (15 mm ducks) or 146.3 x 146.3 mm (31 mm ducks), round (outline, the knockout ring and the nine face slots in Edge_Cuts) | 120 x 123.2 mm (with the tabs) | 144 x 144 mm, round |
-| Silkscreen | White, **both sides** | White, both sides | White, both sides |
-| Min hole | 0.4 mm (vias) | 0.4 mm | 0.4 mm (vias); 0.5 mm mouse bites |
-| Note to fab | "Round board, nine 2.0 mm milled slots (non-plated) and a routed centre knockout ring with mouse-bite bridges (keep the bridges). Large copper pour on the bottom is intentional (RF shield)." | "Tabs on two edges. Solid copper both sides is intentional (RF reflector)." | "Round board, nine 2.0 mm milled slots and a routed knockout ring with mouse-bite bridges (keep the bridges). Solid copper both sides is intentional (RF shield)." |
-
-All boards: single pieces, 2 layers, FR-4 (TG130 or better), 1.6 mm, 1 oz outer copper, HASL lead-free or ENIG (exposed copper must take solder), any solder mask colour, all holes plated unless noted, sizes are finished hole sizes, quantity 5 (`FAB_MIN_QTY`, the minimum at both). Check each in the fab's Gerber viewer before paying.
+Boards, quantities, fab settings and notes to the fab are in [`BUILD.md`](BUILD.md#boards-to-order), the BOM in [`BUILD.md`](BUILD.md#bill-of-materials-one-mast). The fab limits the boards are generated to are below.
 
 ## Fab rules
 
@@ -157,4 +109,4 @@ Routing is by hand in the script (no autorouter). If you move a part, re-run and
 
 ## Check a 1:1 print before ordering
 
-`out/pcb_print_1to1.pdf` has nine pages: eight A4 landscape 1:1 pages (15 mm deck top and bottom (mirrored, as seen from below), 31 mm deck top and bottom, one face, end plate inside, end plate outside (mirrored), one gusset), then the design formulas page with the radio placement (letter, not to size; `common/formulas_page.py`, the same page the hand build prints without the radios). Pads and exposed copper print black, with silkscreen, outline and holes. Print at 100% ("Actual size", not "Fit to page") and measure both 100 mm scale bars on each page before trusting it. Then lay the real parts on it: the XIAOs (castellations on the pads, IPEX4 on its circle; the outer pad corners have no spare against the core margin), a USB-C plug in each drawn plug path, J1 and J2, the tie mounts on their squares with a pigtail run to its sector's holes, the RP-SMA connectors in their holes, the pipe adapter in the 22.2 mm hole, an M3 washer on each 10 mm circle, the adapter / lock nut in the end plate's knockout ring and, if a pigtail goes through the ring, its IPEX4 plug edge-on in a ring gap.
+`out/pcb_print_1to1.pdf` has the boards at 1:1 and the design formulas page with the radio placement (`common/formulas_page.py`). The checklist is in [`BUILD.md`](BUILD.md#before-ordering-check-a-11-print).

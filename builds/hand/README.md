@@ -23,38 +23,9 @@ D8 has no UART on the nRF54L15, so the D8 wiring of issue #1 and firmware 0.8.0 
 
 Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes through JST pin 3 to the ESP32's GPIO17 (header pin 34, gateway pin 0); S1's D10 goes to the head's D0 and S2's D10 to its D1, each one wire soldered pad to pad (no connector), so their JST pin 3 stays empty. 5V, GND and CMD (every D7, from the ESP32's GPIO21) run through the bus board as before. GPIO16 and GPIO18 are left free for two more heads.
 
-## Quick start (files in the repo, no software)
+## Build it
 
-**Use the 15 mm duck spacing (D15) and pick one plate (pipe or no pipe).** Print and use only the pages you need. 15 mm is the recommended spacing (2026-11-24): in the RF model it is as good or better than 31 mm for every antenna tried, about the same for the H50327 ducks (15 / 38 deg median / 90% bearing error against 15 / 40) and much better for a stubby monopole (29 / 89 against 36 / 105), and it lets the deck be 144 mm. D31 stays on the template for 31 mm builds; its one advantage is a better duck match (S11 about -5 dB against -3 dB in the model). See [`../../rf_model/README.md`](../../rf_model/README.md). (The electronics on the deck, inside the core, is the PCB build: [`../pcb/README.md`](../pcb/README.md).)
-
-| Page | What | Status |
-| --- | --- | --- |
-| 1 | Deck drill template, 15 and 31 mm ducks (144 / 146.3 mm) | updated |
-| 2 | Pipe plate (acrylic) | updated (reference holes) |
-| 3 | No-pipe split plate (acrylic) | updated (reference holes) |
-| 4 | Face (make 3) | updated |
-| 5 | Pipe stack views (not to scale) | older layout |
-| 6 | Wiring diagram (star wiring) | updated |
-| 7 | Option: LED direction ring, its power board and strip wiring | older layout |
-| 8 | Option: unified power + LED board | older wiring |
-| 9 | Design formulas (reference, no need to print), without the PCB deck's radio placement | updated |
-
-- **Pipe:** pages 1, 2, 4, 5, 6. PoE splitter and ESP32 hang on a 1/2" PVC pipe inside the core; they go in through the deck's 2-1/4" centre hole.
-- **No pipe:** pages 1, 3, 4, 6. ESP32 and bus board hang under the plate; the PoE splitter sits in its own box.
-
-**Pipe option, 1/2" EMT instead of PVC** (page 5 notes):
-- **Size:** 17.9 mm OD and a 15.8 mm bore (`EMT_OD` / `EMT_ID`). The PVC pipe is 21.3 / 15.8 mm.
-- **Mounting:** a set-screw or compression connector and locknut go in the same 7/8" (22.2 mm) hole.
-- **RJ45:** a crimped head only just fits inside 1/2" EMT, so make sure there is no boot or crimp sleeve on the plug when it goes through. Check the connector's throat too.
-- **Bushings:** fit one on every cut or drilled hole a cable passes near or through (the side slot, the tube ends), even when it's deburred properly.
-- **Bonding:** bond the tube to the deck all round where it passes through: a copper collar, a ground clamp and braid, or conductive copper tape. Solder won't take on galvanized steel. Outdoors, seal the joint against zinc-copper corrosion.
-- **ESP32 antenna:** mount it in a plastic cap or insulating bushing, not on the bare steel end.
-
-1. Print your pages of `hand_build_shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page"). Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
-2. Make the deck: drill copper-clad board from the deck template (page 1): only the antenna jack you use in each sector (D15 for ducks, the recommended spacing; D31 for a 31 mm build; P or P2 for a patch), or order a PCB deck ([../pcb/README.md](../pcb/README.md)). The older bare 146 mm deck (`shield_deck_gerbers.zip`) is superseded; its order notes (`PCBWAY.md`) were retired on 2026-11-23 and are in git history.
-3. Lay out your plate (page 2 or 3). Its layout is only a suggestion: lay your own parts on the printout and check every hole against them before drilling.
-4. Drill the plate and the faces (page 4); sizes, counts and zip ties: [Drill sizes and zip ties](#drill-sizes-and-zip-ties). The plates' dotted antenna holes sit over the deck's (page 1) when the M4 holes line up.
-5. Put it together with the wiring diagram (page 6), and for the pipe the stack views (page 5).
+**Follow [`BUILD.md`](BUILD.md)**: decisions (duck spacing, pipe or no pipe, EMT, options), pages to print, BOM, drill sizes, zip ties and the steps, generated from the CSVs here by `docs/make_build_docs.py`. Below: the two options in detail, then the scripts.
 
 **Option: LED direction ring** (page 7). A WS2812B strip wrapped into a ring above the deck, facing out, to light toward a detected beacon:
 
@@ -75,67 +46,6 @@ Star wiring on the plate: S0 is the head (as U2 on the PCB deck). Its D10 goes t
 - **Status:** drawn only, not built. The layout is a table in `make_templates.py` (`UNI_*`), sizes in `parameters.csv` (group `uni`).
 
 Page 9 shows how the parts are sized: the monopole (D hole) spacing from the wavelength, the triangle core and back panels, and every hole radius on the baseplate (shield deck), worked out from the current `parameters.csv` values. It leaves out the PCB deck's radio placement (XIAOs, IPEX4, tie squares, J1 / J2): the same page with the radios is the last page of `../pcb/out/pcb_print_1to1.pdf`. Both come from `common/formulas_page.py`.
-
-### Drill sizes and zip ties
-
-Holes you drill yourself (the deck PCB comes drilled from the fab). Counts are for one mast. Inch sizes are the nearest drill that works.
-
-| Drill | Inch | For | Pipe | No pipe |
-| --- | --- | --- | :---: | :---: |
-| 4.8 mm | 3/16" | Plate: M4 bolts to the deck | 3 | 3 |
-| 4.8 mm | 3/16" | Plate: zip tie holes (pairs; any 3.0-4.8 mm fits a 2.5 mm tie) | 6 (3 XIAOs) | 10 (3 XIAOs + 2 across the ESP32) |
-| 3.4 mm | 9/64" | Plate: bus board M3 | 1 (skip if the bus goes on the pipe) | 1 |
-| 22.2 mm | 7/8" | Plate centre + enclosure top: 1/2" male pipe adapter thread | 2 (1 plate, 1 enclosure top) | - |
-| 57 mm hole saw | 2-1/4" | Deck centre, pipe build: splitter and ESP32 pass into the core (cuts away the M3 holes) | 1 | - |
-| 22.2 mm | 7/8" | Deck centre, no pipe | - | 1 (optional) |
-| 6.5 mm | 17/64" | Deck: RP-SMA antenna jack, one per sector (D15, D31, P or P2) | 3 | 3 |
-| 4.8 mm | 3/16" | Deck: M4 bolts in the core corners (plate spacers) | 3 | 3 |
-| 3.4 mm | 9/64" | Deck: M3 registration to the collar (optional, as the PCB deck) | 0 or 3 | 0 or 3 |
-| 25 mm | 1" | PoE splitter's 4" round box | - | 1 |
-| 6.5 mm | 17/64" | Face: RP-SMA bulkhead at the face centre (only for a face antenna: dipole or printed fin; page 4) | 0 or 1 per face | 0 or 1 per face |
-| 6.5 mm | 17/64" | Plate: antenna holes (dotted on pages 2-3, reference only, not by design) | 0 (up to 9) | 0 (up to 9) |
-
-Don't use 1/4" (6.35 mm) for the RP-SMA holes: the thread is 6.3 mm.
-
-Zip ties: 2.5 mm wide (they fit the 4.8 mm holes and the HS-100 mounts' 3.2 mm slots). Lengths allow for the strap round the part plus a tail to pull on.
-
-| Length | For | Pipe | No pipe |
-| --- | --- | :---: | :---: |
-| 100 mm (4") | Each XIAO to the plate, across its back through its hole pair | 3 | 3 |
-| 100 mm (4") | Coax clamped in each 1/2" HS-100 tie mount | 3 | 3 |
-| 150 mm (6") | ESP32 to the plate, through its two hole pairs (room for standoffs) | - | 2 |
-| 150 mm (6") | ESP32 to the pipe (round the pipe and board) | 2 | - |
-| 200 mm (8") | PoE splitter to the pipe (round the pipe and splitter body) | 2 | - |
-| | **Total** | **6 x 100, 2 x 150, 2 x 200** | **6 x 100, 2 x 150** |
-
-Buy a few spares, and 2 more 150 mm ties if the pipe build's bus board goes on the pipe. Also 3 x 1/2" HS-100 adhesive tie mounts (both builds).
-
-## BOM (one mast)
-
-Plate build, star wiring. Drill sizes and zip ties are in the tables above.
-
-| Part | For | Pipe | No pipe |
-| --- | --- | :---: | :---: |
-| Seeed XIAO nRF54L15 | Radios S0 (head), S1, S2 | 3 | 3 |
-| Waveshare ESP32-S3-ETH | Gateway | 1 | 1 |
-| PoE splitter, 5 V USB-C out | Power | 1 | 1 |
-| Copper-clad FR-4, 1.6 mm, single or double sided | Deck (144 mm disc for 15 mm ducks, recommended; 146.3 mm for 31 mm) and 3 faces (120 x 120 mm) | 1 deck + 3 faces | 1 deck + 3 faces |
-| Acrylic disc, 152 mm | Electronics plate (page 2 or 3) | 1 | 1 |
-| RP-SMA female bulkhead | Deck jacks, one per sector | 3 | 3 |
-| IPEX4 (MHF4) to RP-SMA bulkhead pigtail | Radio to its deck jack | 3 | 3 |
-| Antenna: 2.4 GHz duck (RP-SMA) or patch | One per sector | 3 | 3 |
-| Pad board, 4x4 (MBSS) | Bus: 5V, GND, CMD rows | 1 | 1 |
-| Inline 4-pin JST pair, ~90 mm tails each side | One per radio (pin 3 used on the head only) | 3 | 3 |
-| Hook-up wire, 24-26 AWG: red, black, yellow, green | Tails, bus feed; 2 yellow branch wires S1 / S2 D10 to head D0 / D1, soldered direct | 1 set | 1 set |
-| M4 bolt + 25-30 mm spacer + washer, M4 nut in the core corner | Plate to deck | 3 | 3 |
-| M3 x 8 bolt + nut | Bus board to the plate | 1 (0 if the bus goes on the pipe) | 1 |
-| 1/2 in HS-100 adhesive tie mount | Coax strain relief | 3 | 3 |
-| Zip ties, 2.5 mm | See the zip tie table | 6 x 100, 2 x 150, 2 x 200 | 6 x 100, 2 x 150 |
-| 1/2 in PVC pipe, male adapter, nut, cap (page 5) | Pipe mount | 1 set | - |
-| 4 in round electrical box | PoE splitter | - | 1 |
-| Copper tape, Kapton tape | Face seams, insulation | 1 roll each | 1 roll each |
-
-Optional: the LED ring (page 7) and the unified board (page 8) list their own parts.
 
 ## Next
 
@@ -170,7 +80,7 @@ Everything here is generated from two files of numbers: this build's [`parameter
 2. Print `hand_build_shield_deck_templates.pdf` at 100% ("Actual size", not "Fit to page").
 3. Measure both 100 mm scale bars (across the top and down the left side) on each drill template with a ruler before you drill: the printer can scale one direction and not the other.
 
-The pages, in order (pick one build type, pipe or no pipe, and print only its pages: [which pages](#quick-start-files-in-the-repo-no-software)):
+The pages, in order (pick one build type, pipe or no pipe, and print only its pages: [which pages](BUILD.md#pages-to-print)):
 
 1. Deck drill template (both)
 2. Pipe plate (pipe only)

@@ -93,8 +93,6 @@ ADP_HEX_W,30.0,mm,estimated,stack,adapter hex / shoulder width
 ADP_HEX_H,8.0,mm,estimated,stack,adapter hex / shoulder height
 ADP_SOCK_OD,27.0,mm,estimated,stack,adapter socket the pipe glues into
 ADP_SOCK_H,22.0,mm,estimated,stack,
-PIPE_OD,21.3,mm,spec,stack,1/2 in Sch 40 PVC
-PIPE_ID,15.8,mm,spec,stack,1/2 in Sch 40 PVC
 EMT_OD,17.9,mm,spec,stack,"option instead of the PVC pipe: 1/2 in EMT (steel conduit), 0.706 in OD"
 EMT_ID,15.8,mm,spec,stack,"1/2 in EMT bore (0.622 in): a crimped RJ45 head only just fits, so no boot or crimp sleeve on it. Bushing on every cut or hole a cable passes, even deburred"
 CAP_OD,27.0,mm,estimated,stack,1/2 in PVC cap
@@ -132,3 +130,4 @@ UNI_PITCH,2.54,mm,spec,uni,stripboard hole pitch (0.1 in)
 UNI_SIZE,10 23,count,design,uni,Unified board: strips (A-J) x holes per strip (rows 0-22); rows 0 and 22 are left empty for the two pipe ties (2026-11-20)
 UNI_PULLDOWN_OHM,10000,ohm,design,uni,"R2, pull-down on U1 1A (GPIO1 side) to GND so the strip stays dark while the ESP32 boots and GPIO1 floats (user, 2026-11-20)"
 BRANCH_STUB_X,57.0,mm,drawing,wiring,"star wiring (2026-11-24): the head's D0 / D1 branch wires end here, right of its USB end, labelled with the branch radio"
+BOX_HOLE,25.0,mm,design,stack,"cable hole in the PoE splitter's 4 in round box (no-pipe build)"

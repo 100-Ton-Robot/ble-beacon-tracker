@@ -1,0 +1,19 @@
+table,part,note,applies_to,Pipe,No pipe
+main,Seeed XIAO nRF54L15,"Radios S0 (head), S1, S2",,3,3
+main,Waveshare ESP32-S3-ETH,Gateway,,1,1
+main,"PoE splitter, 5 V USB-C out",Power,,1,1
+main,"Copper-clad FR-4, {DECK_T}, single or double sided","Deck ({=DECK_DIAMETER_D15} disc for [[D15]], {=DECK_DIAMETER_D31} for [[D31]]) and 3 faces ({FACE_WIDTH} x {FACE_H})",,1 deck + 3 faces,1 deck + 3 faces
+main,"Acrylic disc, {PLATE_DIAMETER}",Electronics plate (page 2 or 3),,1,1
+main,RP-SMA female bulkhead,"Deck jacks, one per sector",,3,3
+main,IPEX4 (MHF4) to RP-SMA bulkhead pigtail,Radio to its deck jack,,3,3
+main,Antenna: H50327 duck (RP-SMA) or a patch,One per sector,,3,3
+main,"Pad board, 4x4 (MBSS)","Bus: 5V, GND, CMD rows",,1,1
+main,"Inline 4-pin JST pair, about 90 mm tails each side",One per radio (pin 3 used on the head only),,3,3
+main,"Hook-up wire, 24-26 AWG: red, black, yellow, green","Tails, bus feed; 2 yellow branch wires S1 / S2 D10 to head D0 / D1, soldered direct",,1 set,1 set
+main,"M4 bolt + {SPACER} spacer + washer, M4 nut in the core corner",Plate to deck,,3,3
+main,M3 x 8 bolt + nut,Bus board to the plate,,1 (0 if the bus goes on the pipe),1
+main,1/2 in HS-100 adhesive tie mount,Coax strain relief,,3,3
+main,"Zip ties, 2.5 mm",Mounting parts,,see Zip ties,see Zip ties
+main,"1/2 in PVC pipe, male adapter, nut, cap (page 5)",Pipe mount,,1 set,
+main,4 in round electrical box,PoE splitter,,,1
+main,"Copper tape, Kapton tape","Face seams, insulation",,1 roll each,1 roll each

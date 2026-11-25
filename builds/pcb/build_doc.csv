@@ -1,0 +1,63 @@
+kind,applies_to,text
+h1,,PCB mast: build guide
+p,,"Decide, order, check and assemble one PCB mast. The boards, their design and how to regenerate them are in [`README.md`](README.md); the antenna choice is in [`docs/ANTENNA_SELECTION.md`](../../docs/ANTENNA_SELECTION.md). Status: **generated and DRC-clean, not yet ordered or built.**"
+p,,Labels such as [[Pipe]] or [[PoE splitter]] name the options chosen under Decisions; a row or step with a label belongs to that option only. [[All builds]] rows apply whatever you choose.
+note,,"**Unplug PoE before plugging in USB.** All modules share one 5 V rail with no diodes, so a USB cable on a XIAO or the ESP32 while PoE feeds the deck ties the computer's VBUS to the PoE supply. Power from PoE OR from USB, never both. Damage from ignoring this is not covered by anything in this repo; you build and power it at your own risk. More in [README: Deck](README.md#deck)."
+note,,"**Firmware:** this deck is wired for relay protocol 4 (D10 uplink TX, D0 / D1 branch RX, D7 command RX). That firmware is not written yet; scanner firmware 0.8.0 does not run on this deck. See [README: Firmware and pins](README.md#firmware-and-pins-both-builds)."
+h2,,Decisions before building
+p,,"Make these choices before ordering: each one changes which boards, parts and steps you need."
+table,,options
+h2,,Boards to order
+p,,"Gerbers are in [`out/`](out/). Order the deck that matches your duck spacing. Every fab takes at least {FAB_MIN_QTY} of a design, so the order columns round up to that."
+table,,boards
+p,D15,With {DECK_VARIANTS:0} ducks a second deck board turned over (bottom to the core) can replace the end plate; the RF model gives the same result. At {DECK_VARIANTS:1} the deck is too big for that: use the end plate PCB.
+p,,"**Fab settings, all boards:** 2 layers, FR-4 (TG130 or better), {FACE_THICK}, 1 oz outer copper, HASL lead-free or ENIG (the exposed copper must take solder), white silkscreen on **both sides**, any solder mask colour, finished hole sizes, single pieces, quantity {FAB_MIN_QTY}. Smallest holes: {VIA:1} vias, {FAB_NPTH_MIN} mouse bites."
+p,,"**Fabs:** JLCPCB or PCBWay (or any fab: the Gerbers are standard RS-274X). The boards are generated and DRC-checked against the fab rules in [`fab/board_rules.csv`](../../fab/board_rules.csv), the stricter of the two; see [README: Fab rules](README.md#fab-rules). Check each board in the fab's Gerber viewer before paying."
+p,,**Notes to the fab:**
+li,,"Deck: ""Round board, {=SLOT_COUNT} milled slots {SLOT_W} wide (non-plated) and a routed centre knockout ring with mouse-bite bridges (keep the bridges). Large copper pour on the bottom is intentional (RF shield)."""
+li,,"Face: ""Tabs on two edges. Solid copper both sides is intentional (RF reflector)."""
+li,End plate,"End plate: ""Round board, {=SLOT_COUNT} milled slots {SLOT_W} wide and a routed knockout ring with mouse-bite bridges (keep the bridges). Solid copper both sides is intentional (RF shield)."""
+end,,
+h2,,Bill of materials (one mast)
+p,,Add up the rows for your choices. The deck carries no passives on revision 3; C1 is still open (Before ordering).
+table,,bom
+p,,**Off the boards:**
+table,,bom_more
+h2,,Before ordering: check a 1:1 print
+p,,"[`out/pcb_print_1to1.pdf`](out/pcb_print_1to1.pdf) has the boards at 1:1 (both decks top and bottom, a face, the end plate inside and outside, a gusset) and the design formulas page with the radio placement. Print at 100% (""Actual size"", not ""Fit to page""), then lay the real parts on it."
+check,,Measure both 100 mm scale bars on every page.
+check,,"XIAOs on their pads, castellations on the pads, IPEX4 on its circle: the outer pad corners have no spare against the {CORE_MARGIN} core margin."
+check,,A USB-C plug in each drawn plug path.
+check,,J1 outline (fitted on the bottom).
+check,PoE splitter; USB power,J2 outline (fitted on the bottom).
+check,,"Tie mounts on their {MOUNT_SQ} squares, each pigtail run to its sector's hole."
+check,,RP-SMAs in the D holes; M3 washers on the {M3_KEEPOUT} circles; M4 washers on their pads.
+check,Pipe,Pipe adapter in the {ADAPTER_HOLE} hole; nothing tall inside {DECK_CENTRE_CLEAR} across the centre.
+check,,Face tabs against the deck slots; a gusset against its face slots.
+check,End plate; Pipe,End plate: adapter and lock nut in the knockout ring.
+check,End plate; Pipe,A pigtail through a knockout ring gap: the IPEX4 plug edge-on in a {KO_CHANNEL} x {=KO_GAP_L} gap (`KO_CHANNEL`; widen it if tight).
+check,,"C1 bulk capacitor: choose an 8 mm radial can at r 19.5 mm, 194 deg (about 33 mm from J2), a 6.3 mm can at r 19 mm, 300 deg (about 7 mm from J2), or none. If fitted: 330 uF, 10 V or more, low ESR."
+end,,
+h2,,Assembly
+p,,"Solder the faces before any parts go on: the XIAO pads sit close to the seam strip, so seam heat on a populated board can lift them. The deck's silkscreen carries the same list. To rework a seam later, remove the XIAOs first (`out/deck_d15_part_clearance.csv`)."
+step,Pipe,**Deck knockout:** break out the centre knockout and file the bridge nubs flush so the pipe adapter passes. A deck used as the end plate keeps its knockout unless the pipe goes through it.
+step,No pipe,**Deck knockout:** leave it in.
+step,,"**Faces:** drop all three faces' tabs into the deck slots, and the end plate slots if fitted, together as a dry fit; tack the faces to each other, check, then solder the face-to-face seams. With both plates fitted no squareness jig is needed."
+step,,"**Gussets:** push a gusset into each corner's slot pair at each bolted plate, M4 nut on the side away from the plate (a bolt through the plate hole lines it up), then solder the tabs inside and out, and the nut."
+step,,"**Plates:** bolt the deck, and the end plate if fitted, on with M4 x 14 cap bolts and washers, snug (0.5-1 N.m). For a permanent build, solder or tape the plate seams too."
+step,,**Clean** with IPA.
+step,,"**J1** on the bottom of the deck, housing inside the core, deep side toward the rim; cut the pins flush on top. Seen from the top, pin 1 (square pad) is at the counter-clockwise end."
+step,PoE splitter; USB power,**J2** the same way.
+step,,"**XIAOs** U2-U4, castellations on the lengthened pads, USB-C end out toward the corner."
+step,,"**Antennas:** RP-SMA pigtails into the D holes, IPEX4 onto each XIAO, tie mounts on their squares, each pigtail tied inline (it leaves the IPEX4 at {PIGTAIL_ANGLE} in the corner frame, toward its own sector)."
+step,PoE splitter,**Power:** the splitter lead into J2.
+step,USB power,**Power:** the USB-C pigtail lead into J2.
+step,PoE on gateway,**Power:** nothing on J2; the gateway feeds 5 V through the J1 harness.
+step,,**Gateway:** the J1 harness to the ESP32 (wiring in [README: Deck](README.md#deck)).
+end,,
+h2,,Mounting
+li,Pipe,"The pipe comes down through the deck's {ADAPTER_HOLE} hole. With the end plate, the 1/2 in male adapter's shoulder sits on the plate inside the core, its thread goes down through the broken-out knockout, and the lock nut clamps it from below (mechanical only)."
+li,No pipe,Three {COLLAR_HOLE} M3 holes at r {M3_POS:0} register the deck to a collar or bracket; keep tracks out of their {M3_KEEPOUT} washer circles.
+li,,Each plate comes off with its three M4 bolts: the way to the XIAOs' USB-C ports.
+li,,The whole assembly should come out of its housing by removing one nut on the post. Check this on the dry fit.
+end,,

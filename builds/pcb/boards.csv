@@ -1,0 +1,6 @@
+board,file,applies_to,size,per_mast,per_mast_end_plate
+"Deck, {DECK_VARIANTS:0} ducks: the shield plate the antennas go through, with the three scanners on top",deck_d15,D15,{=DECK_DIAMETER_D15} round,1,
+"Deck, {DECK_VARIANTS:1} ducks: the same deck with the D holes {DECK_VARIANTS:1} off the faces",deck_d31,D31,{=DECK_DIAMETER_D31} round,1,
+Face: one side of the triangle reflector core,face_pcb,,{=FACE_SIZE} with the tabs,3,
+Corner gusset: holds an M4 nut in a core corner so a plate bolts on,gusset_pcb,,{=GUSSET_SIZE},3,6
+End plate: a second shield plate across the far end of the triangle,endplate_pcb,End plate,{ENDPLATE_DIAMETER} round,1,

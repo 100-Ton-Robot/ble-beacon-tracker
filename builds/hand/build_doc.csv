@@ -1,0 +1,39 @@
+kind,applies_to,text
+h1,,Hand-built mast: build guide
+p,,"Decide, gather, drill and assemble one hand-built mast from copper-clad board, acrylic and stripboard with the 1:1 templates. The scripts, the template pages in detail and the options are in [`README.md`](README.md); the antenna choice is in [`docs/ANTENNA_SELECTION.md`](../../docs/ANTENNA_SELECTION.md). The PCB build of the same mast: [`../pcb/BUILD.md`](../pcb/BUILD.md)."
+p,,Labels such as [[Pipe]] or [[No pipe]] name the options chosen under Decisions; quantities are given per option where they differ. [[All builds]] rows apply whatever you choose.
+note,,"**Firmware:** the templates are drawn for relay protocol 4 star wiring (D10 uplink TX, D0 / D1 branch RX, D7 command RX). That firmware is not written yet. See [README: Firmware and pins](README.md#firmware-and-pins-both-builds)."
+h2,,Decisions before building
+table,,options
+h3,EMT,1/2 in EMT instead of PVC
+li,,**Size:** {EMT_OD} OD and a {EMT_ID} bore; the PVC pipe is {PIPE_OD} / {PIPE_ID}.
+li,,**Mounting:** a set-screw or compression connector and locknut go in the same {ADAPTER_HOLE} hole.
+li,,**RJ45:** a crimped head only just fits inside 1/2 in EMT: no boot or crimp sleeve on the plug when it goes through. Check the connector's throat too.
+li,,"**Bushings:** on every cut or drilled hole a cable passes near or through (the side slot, the tube ends), even when deburred."
+li,,"**Bonding:** bond the tube to the deck all round where it passes through: a copper collar, a ground clamp and braid, or conductive copper tape. Solder won't take on galvanized steel. Outdoors, seal the joint against zinc-copper corrosion."
+li,,"**ESP32 antenna:** in a plastic cap or insulating bushing, not on the bare steel end."
+end,,
+h2,,Pages to print
+p,,From `hand_build_shield_deck_templates.pdf`; print only the pages you need.
+li,Pipe,"Pages 1 (deck), 2 (pipe plate), 4 (face, make 3), 5 (pipe stack views, older layout), 6 (star wiring)."
+li,No pipe,"Pages 1, 3 (split plate), 4, 6."
+li,LED ring,Page 7 (older layout).
+li,Unified board,Page 8 (older wiring).
+li,,"Page 9: design formulas, reference only."
+end,,
+h2,,Bill of materials (one mast)
+table,,bom
+p,,The LED ring (page 7) and the unified board (page 8) list their own parts; see [README](README.md).
+h2,,Drill sizes
+p,,Holes you drill yourself. Counts are for one mast; the inch size is the nearest fractional drill at or just above the metric size. Don't use 1/4 in for the RP-SMA holes: the thread is 6.3 mm.
+table,,drills
+h2,,Zip ties
+p,,"2.5 mm wide (they fit the {TIE_HOLE} holes and the HS-100 mounts' slots). Lengths allow for the strap round the part plus a tail to pull on. Buy a few spares, and 2 more 150 mm ties if the pipe build's bus board goes on the pipe."
+table,,zip_ties
+h2,,Steps
+step,,"Print your pages at 100% (""Actual size"", not ""Fit to page""). Measure both 100 mm scale bars (across the top and down the left side) on each drill template before you drill: a printer can scale one direction and not the other."
+step,,"**Deck:** drill copper-clad board from page 1, only the antenna jack you use in each sector ([[D15]] or [[D31]] for ducks, P or P2 for a patch), and cut it round. Or order a PCB deck ([`../pcb/BUILD.md`](../pcb/BUILD.md))."
+step,,**Plate:** lay out page 2 ([[Pipe]]) or 3 ([[No pipe]]). The layout is a suggestion: lay your own parts on the printout and check every hole against them before drilling.
+step,,**Drill** the plate and the faces (page 4); sizes and counts above. The plate's dotted antenna holes sit over the deck's when the M4 holes line up.
+step,,"**Assemble** with the wiring diagram (page 6), and for [[Pipe]] the stack views (page 5)."
+end,,

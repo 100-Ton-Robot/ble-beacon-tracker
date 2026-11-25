@@ -1,0 +1,26 @@
+table,ref,part,applies_to,qty,note
+main,U2-U4,"Seeed XIAO nRF54L15 (castellated, hand soldered)",,3,
+main,J1,"JST B4B-PH-K-S, 2.0 mm through-hole (JLCPCB / LCSC: B4B-PH-K-S(LF)(SN), C131334)",,1,"mating PHR-4 housing + SPH-002T-P0.5S crimps: the 4-wire harness to the ESP32, as the carrier Up port"
+main,J2,"JST B2B-PH-K-S, 2.0 mm through-hole (JLCPCB / LCSC: B2B-PH-K-S(LF)(SN), C131337)",PoE splitter; USB power,1,"mating PHR-2 + crimps on the power lead, or solder the lead into the holes"
+main,,"1/2 in HS-100 adhesive tie mount (antenna strain relief, on its {MOUNT_SQ} square)",,3,
+main,,Corner gusset PCB,,3,one per core corner at the deck
+main,,Corner gusset PCB,End plate,3,one per core corner at the end plate
+main,,"M4 x 14 cap bolt (DIN 912) + M4 washer, 9 mm OD",,3,deck
+main,,"M4 x 14 cap bolt (DIN 912) + M4 washer, 9 mm OD",End plate,3,end plate
+main,,"M4 hex nut, solderable (brass or tin-plated)",,3,deck
+main,,"M4 hex nut, solderable (brass or tin-plated)",End plate,3,end plate
+main,,Deck PCB,D15,1,`deck_d15`
+main,,Deck PCB,D31,1,`deck_d31`
+main,,Face PCB,,3,
+main,,"End plate PCB, or a second d15 deck turned over",End plate,1,
+main,,1/2 in IPS faucet mounting lock nut,Pipe; End plate,1,clamps the pipe adapter under the end plate
+more,,"HiRO H50327 rubber duck, RP-SMA",,3,"half-wave sleeve dipole, one per sector in the D hole"
+more,,IPEX4 (MHF4) to RP-SMA bulkhead pigtail,,3,0.81 mm coax; bend radius 3.2 mm or more; length not chosen yet
+more,,"4-wire harness, J1 to the ESP32 (red 5V, black GND, yellow DATA, green CMD)",,1,length set by where the ESP32 sits
+more,,Waveshare ESP32-S3-ETH with its PoE module,PoE on gateway,1,powers itself from Ethernet and feeds the deck through J1 pin 1
+more,,"Waveshare ESP32-S3-ETH, no PoE module",PoE splitter; USB power,1,powered from the deck through J1 pin 1
+more,,"PoE splitter, 5 V out",PoE splitter,1,lead into J2; part not chosen yet
+more,,5 V USB supply + USB-C pigtail lead to J2,USB power,1,second cable to the mast
+more,,1/2 in Sch 40 PVC pipe ({PIPE_OD} OD) + 1/2 in male adapter,Pipe,1,length set by the mount
+more,,"Collar or bracket on the deck's three M3 holes, M3 screws",No pipe,1,not designed in the repo
+more,,Kapton tape,Pipe; End plate,1 roll,a pigtail through a knockout ring gap: wrap the coax where it sits in the gap

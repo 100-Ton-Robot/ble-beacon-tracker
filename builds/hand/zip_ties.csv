@@ -1,0 +1,6 @@
+length_mm,for,Pipe,No pipe
+100,"Each XIAO to the plate, across its back through its hole pair",3,3
+100,Coax clamped in each 1/2 in HS-100 tie mount,3,3
+150,"ESP32 to the plate, through its two hole pairs (room for standoffs)",,2
+150,ESP32 to the pipe (round the pipe and board),2,
+200,PoE splitter to the pipe (round the pipe and splitter body),2,

@@ -1,0 +1,13 @@
+hole,tool,for,Pipe,No pipe
+HOLE_M4,,Plate: M4 bolts to the deck,3,3
+TIE_HOLE,,Plate: zip tie holes (pairs; any 3.0-4.8 mm hole fits a 2.5 mm tie),6 (3 XIAOs),10 (3 XIAOs + 2 across the ESP32)
+PLATE_M3,,Plate: bus board M3,1 (skip if the bus goes on the pipe),1
+ADAPTER_HOLE,,Plate centre and enclosure top: 1/2 in male pipe adapter thread,"2 (1 plate, 1 enclosure top)",
+PIPE_SAW,hole saw,"Deck centre, pipe build: splitter and ESP32 pass into the core (cuts away the M3 holes)",1,
+ADAPTER_HOLE,,"Deck centre, no pipe",,1 (optional)
+HOLE_RPSMA,,"Deck: RP-SMA antenna jack, one per sector (D15, D31, P or P2)",3,3
+HOLE_M4,,Deck: M4 bolts in the core corners (plate spacers),3,3
+COLLAR_HOLE,,"Deck: M3 registration to the collar (optional, as the PCB deck)",0 or 3,0 or 3
+BOX_HOLE,,PoE splitter's 4 in round box,,1
+DIPOLE_HOLE,,Face: RP-SMA bulkhead at the face centre (only for a face antenna: dipole or printed fin; page 4),0 or 1 per face,0 or 1 per face
+HOLE_RPSMA,,"Plate: antenna holes (dotted on pages 2-3, reference only)",0 (up to 9),0 (up to 9)

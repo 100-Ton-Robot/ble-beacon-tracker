@@ -19,6 +19,8 @@ XIAO_L,21.0,mm,spec,plate,Seeed XIAO nRF54L15 board length
 XIAO_W,17.8,mm,spec,plate,XIAO board width
 XIAO_IPEX,8.25 3.9,mm,measured,plate,"IPEX4 (MHF4) centre from the XIAO centre: along toward its end, across toward the D0-D6 pin edge"
 ADAPTER_HOLE,22.2,mm,spec,pipe,7/8 in drill for the 1/2 in male pipe adapter thread (21.3 mm OD)
+PIPE_OD,21.3,mm,spec,pipe,1/2 in Sch 40 PVC
+PIPE_ID,15.8,mm,spec,pipe,1/2 in Sch 40 PVC
 ENC_OD,177.0,mm,spec,enclosure,"PP pail (housing, https://a.co/d/08ZUdBcy) outside diameter, vendor approx. 7 in"
 ENC_OH,188.0,mm,spec,enclosure,"PP pail outside height, vendor approx. 7.4 in"
 ENC_ID,170.0,mm,spec,enclosure,"PP pail inside diameter, vendor approx. 6.7 in"
